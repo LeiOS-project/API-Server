@@ -8,12 +8,16 @@
         "dev": "bun run --watch src/index.ts"
     },
     "devDependencies": {
-        "@types/bun": "latest"
+        "@types/bun": "latest",
+        "drizzle-kit": "^0.31.7"
     },
     "peerDependencies": {
         "typescript": "^5"
     },
     "dependencies": {
-        "elysia": "latest"
+        "drizzle-orm": "^0.44.7",
+        "drizzle-zod": "^0.8.3",
+        "elysia": "latest",
+        "zod": "^4.1.12"
     }
 }
