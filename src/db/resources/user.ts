@@ -26,7 +26,6 @@ export class UserResource extends Resource {
 
     insert(data: z.infer<typeof this.schemas.create>) {
         return this.db.insert(usersTable).values(data);
-
     }
 
     select(data: z.infer<typeof this.schemas.select>) {

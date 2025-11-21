@@ -1,6 +1,3 @@
-import { Elysia } from 'elysia'
-import { db } from './db/model'
-import { z } from 'zod'
 import { UserResource } from './db/resources/user';
 import { DB } from './db/index';
 
