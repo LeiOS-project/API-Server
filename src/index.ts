@@ -17,9 +17,7 @@ export class Main {
         );
 
         await AptlyAPI.init({
-            aptlyBinaryPath: config.LRA_APTLY_BINARY_PATH ?? "./data/aptly/aptly",
-            aptlyConfigPath: config.LRA_APTLY_CONFIG_PATH ?? "./data/aptly/aptly.conf",
-            aptlyDataPath: config.LRA_APTLY_DATA_PATH ?? "./data/aptly/data",
+            aptlyRoot: config.LRA_APTLY_ROOT ?? "./data/aptly",
             aptlyPort: parseInt(config.LRA_APTLY_PORT ?? "12150"),
         });
 

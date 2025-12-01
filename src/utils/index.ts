@@ -30,6 +30,10 @@ export class Utils {
         return Object.assign({}, ...objects) as Utils.MergeArray<T>;
     }
 
+    static sleep(ms: number) {
+        return new Promise<void>(resolve => setTimeout(() => resolve(), ms));
+    }
+
 }
 
 export namespace Utils {

@@ -112,10 +112,7 @@ export class ConfigHandler {
 
         .add("LRA_DB_PATH", false)
 
-        .add("LRA_APTLY_BINARY_PATH", false)
-        .add("LRA_APTLY_CONFIG_PATH", false)
-        .add("LRA_APTLY_DATA_PATH", false)
-
+        .add("LRA_APTLY_ROOT", false)
         .add("LRA_APTLY_PORT", false)
 
 
