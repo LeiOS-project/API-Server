@@ -25,7 +25,8 @@ export class DB {
         await this.db.insert(DB.Schema.users).values({
             username,
             email: "admin@leios.local",
-            password_hash: await Bun.password.hash(randomPassword)
+            password_hash: await Bun.password.hash(randomPassword),
+            role: "admin"
         });
 
         Bun.file('./data/initial_admin_credentials.txt').write(`Username: ${username}\nPassword: ${randomPassword}\n`);
