@@ -7,4 +7,6 @@ export default defineConfig({
     dbCredentials: {
         url: process.env.LRA_DB_PATH ?? './data/db.sqlite',
     },
+    verbose: true,
+    strict: true
 });

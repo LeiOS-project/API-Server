@@ -34,6 +34,12 @@ export class Logger {
         }
     }
 
+    static info(...args: any[]) {
+        if (this.logLevel <= this.logLevelMap.info) {
+            console.info(...args);
+        }
+    }
+
     static warn(...args: any[]) {
         if (this.logLevel <= this.logLevelMap.warn) {
             console.warn(...args);
