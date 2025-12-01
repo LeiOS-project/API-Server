@@ -47,10 +47,12 @@ export namespace DB.Schema {
     export const users = TableSchema.users;
     export const sessions = TableSchema.sessions;
     export const passwordResets = TableSchema.passwordResets;
+    export const apiKeys = TableSchema.apiKeys;
 }
 
 export namespace DB.Models {
     export type User = typeof DB.Schema.users.$inferSelect;
     export type Session = typeof DB.Schema.sessions.$inferSelect;
     export type PasswordReset = typeof DB.Schema.passwordResets.$inferSelect;
+    export type ApiKey = typeof DB.Schema.apiKeys.$inferSelect;
 }

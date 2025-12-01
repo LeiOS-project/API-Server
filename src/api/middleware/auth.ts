@@ -1,11 +1,10 @@
 import { createMiddleware } from 'hono/factory'
 import { APIResponse } from "../utils/api-res";
-import { SessionHandler } from '../utils/sessionHandler';
+import { AuthHandler } from '../utils/authHandler';
 
 export const authMiddleware = createMiddleware(async (c, next) => {
 
     if (
-        c.req.path.startsWith("/nic/update") ||
         c.req.path.startsWith("/auth/login") || c.req.path.startsWith("/auth/signup") ||
 
         c.req.path.startsWith("/docs") ||
@@ -22,13 +21,14 @@ export const authMiddleware = createMiddleware(async (c, next) => {
     }
 
     const token = authHeader.substring("Bearer ".length);
-    const session = await SessionHandler.getSession(token);
 
-    if (!session || !(await SessionHandler.isValidSession(session))) {
-        return APIResponse.unauthorized(c, "Invalid or expired session");
+    const authContext = await AuthHandler.getAuthContext(token);
+
+    if (!authContext || !(await AuthHandler.isValidAuthContext(authContext))) {
+        return APIResponse.unauthorized(c, "Invalid or expired token");
     }
 
-    c.set("session", session);
+    c.set("authContext", authContext);
 
     await next();
 

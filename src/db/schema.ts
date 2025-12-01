@@ -35,8 +35,12 @@ export const sessions = sqliteTable('sessions', {
     expires_at: int().notNull()
 });
 
+/**
+ * @deprecated Use DB.Schema.apiKeys instead
+ */
 export const apiKeys = sqliteTable('api_keys', {
-    key: text().primaryKey(),
+    id: int().primaryKey({ autoIncrement: true }),
+    token: text().notNull().unique(),
     user_id: int().notNull().references(() => users.id),
     expires_at: int(),
 });

@@ -4,7 +4,7 @@ import { validator as zValidator } from "hono-openapi";
 import { DB } from "../../../db";
 import { eq } from "drizzle-orm";
 import { APIResponse } from "../../utils/api-res";
-import { SessionHandler } from "../../utils/sessionHandler";
+import { AuthHandler, SessionHandler } from "../../utils/authHandler";
 import { APIResponseSpec, APIRouteSpec } from "../../utils/specHelpers";
 
 export const router = new Hono().basePath('/auth');
@@ -54,15 +54,19 @@ router.get('/session',
         responses: APIResponseSpec.describeBasic(
             APIResponseSpec.success("Session info retrieved successfully", Model.Session.Response),
             APIResponseSpec.unauthorized("Unauthorized: Invalid or missing session token"),
+            APIResponseSpec.badRequest("Your Auth Context is not a session")
         )
 
     }),
 
     async (c) => {
         // @ts-ignore
-        const session = c.get("session") as DB.Models.Session;
+        const authContext = c.get("authContext") as AuthHandler.AuthContext;
+        if (authContext.type !== 'session') {
+            return APIResponse.badRequest(c, "Your Auth Context is not a session");
+        }
 
-        return APIResponse.success(c, "Session info retrieved successfully", session);
+        return APIResponse.success(c, "Session info retrieved successfully", authContext);
     }
 );
 
@@ -76,15 +80,20 @@ router.post('/logout',
         responses: APIResponseSpec.describeBasic(
             APIResponseSpec.successNoData("Logout successful"),
             APIResponseSpec.unauthorized("Unauthorized: Invalid or missing session token"),
+            APIResponseSpec.badRequest("Your Auth Context is not a session")
         )
 
     }),
 
     async (c) => {
         // @ts-ignore
-        const session = c.get("session") as DB.Models.Session;
+        const authContext = c.get("authContext") as AuthHandler.AuthContext;
 
-        await SessionHandler.invalidateSession(session.token);
+        if (authContext.type !== 'session') {
+            return APIResponse.badRequest(c, "Your Auth Context is not a session");
+        }
+
+        await SessionHandler.inValidateSession(authContext.token);
 
         return APIResponse.successNoData(c, "Logout successful");
     }
