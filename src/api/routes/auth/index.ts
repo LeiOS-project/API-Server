@@ -6,5 +6,5 @@ export const auth = new Elysia({ prefix: '/auth' })
     // Handle login logic here
     return { message: 'User logged in successfully' };
 }, {
-    body: AuthSR
+    body: 
 
