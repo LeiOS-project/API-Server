@@ -6,7 +6,7 @@ export const authMiddleware = createMiddleware(async (c, next) => {
 
     if (
         c.req.path.startsWith("/auth/login") || c.req.path.startsWith("/auth/signup") ||
-
+        c.req.path.startsWith("/public") ||
         c.req.path.startsWith("/docs") ||
         c.req.path.startsWith("/favicon.ico") ||
         c.req.path === "/"
