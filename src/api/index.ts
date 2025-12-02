@@ -12,8 +12,11 @@ export class API {
 	protected static app: Hono;
 
 	protected static routers = [
+		(import('./routes/public')),
 		(import('./routes/auth')),
 		(import('./routes/account')),
+		(import('./routes/developer')),
+		(import('./routes/admin')),
 	];
 
 	static async init(

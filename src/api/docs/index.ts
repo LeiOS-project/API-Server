@@ -46,7 +46,14 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
                 description: "Production server",
             },
         ],
-    },
+
+        tags: [
+            {
+                name: "Public API",
+                description: "Endpoints that do not require authentication",
+            }
+        ]
+    }
 }
 
 export function setupDocs(app: Hono) {

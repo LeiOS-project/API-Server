@@ -15,6 +15,13 @@
       "when": 1764596590125,
       "tag": "0001_bizarre_wallow",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1764682691475,
+      "tag": "0002_soft_korg",
+      "breakpoints": true
     }
   ]
 }
