@@ -28,6 +28,7 @@ export class DB {
             username,
             email: "admin@leios.local",
             password_hash: await Bun.password.hash(randomPassword),
+            display_name: "Default Administrator",
             role: "admin"
         });
 
@@ -51,6 +52,8 @@ export namespace DB.Schema {
     export const sessions = TableSchema.sessions;
     export const passwordResets = TableSchema.passwordResets;
     export const apiKeys = TableSchema.apiKeys;
+
+    export const packages = TableSchema.packages;
 }
 
 export namespace DB.Models {
@@ -58,4 +61,6 @@ export namespace DB.Models {
     export type Session = typeof DB.Schema.sessions.$inferSelect;
     export type PasswordReset = typeof DB.Schema.passwordResets.$inferSelect;
     export type ApiKey = typeof DB.Schema.apiKeys.$inferSelect;
+
+    export type Package = typeof DB.Schema.packages.$inferSelect;
 }

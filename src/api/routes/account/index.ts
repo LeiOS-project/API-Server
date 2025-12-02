@@ -175,17 +175,22 @@ router.delete('/',
         // @ts-ignore
         const authContext = c.get("authContext") as AuthHandler.SessionAuthContext;
 
+        // check if it have still packages owned
+        const ownedPackages = await DB.instance().select().from(DB.Schema.packages).where(
+            eq(DB.Schema.packages.owner_user_id, authContext.user_id)
+        );
+
+        if (ownedPackages.length > 0) {
+            return APIResponse.badRequest(c, "You must delete all your packages before deleting your account.");
+        }
+
         // invalidate all sessions for the user
         await SessionHandler.inValidateAllSessionsForUser(authContext.user_id);
-
-        // delete all user data here (e.g., domains, records, etc.) if applicable
 
         // delete password resets
         DB.instance().delete(DB.Schema.passwordResets).where(
             eq(DB.Schema.passwordResets.user_id, authContext.user_id)
         ).run();
-
-
 
         // finally, delete the user account
         DB.instance().delete(DB.Schema.users).where(
