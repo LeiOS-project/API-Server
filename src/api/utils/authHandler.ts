@@ -2,6 +2,18 @@ import { eq } from "drizzle-orm";
 import { DB } from "../../db";
 import { randomBytes as crypto_randomBytes } from 'crypto';
 
+class AuthUtils {
+
+    static async getUserRole(userID: number) {
+        const user = DB.instance().select().from(DB.Schema.users).where(eq(DB.Schema.users.id, userID)).get();
+        if (!user) {
+            return null;
+        }
+        return user.role;
+    }
+
+}
+
 export class SessionHandler {
 
     static readonly SESSION_TOKEN_PREFIX = "lra_sess_";
@@ -10,6 +22,7 @@ export class SessionHandler {
         const result = await DB.instance().insert(DB.Schema.sessions).values({
             token: this.SESSION_TOKEN_PREFIX + crypto_randomBytes(32).toString('hex'),
             user_id: userID,
+            user_role: await AuthUtils.getUserRole(userID) || 'user',
             expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).getTime() // 7 days from now
         }).returning()
         
@@ -53,6 +66,14 @@ export class SessionHandler {
         await DB.instance().delete(DB.Schema.sessions).where(eq(DB.Schema.sessions.token, sessionToken));
     }
 
+    static async changeUserRoleInSessions(userID: number, newRole: 'admin' | 'user') {
+        await DB.instance().update(DB.Schema.sessions).set({
+            user_role: newRole
+        }).where(
+            eq(DB.Schema.sessions.user_id, userID)
+        )
+    }
+
 }
 
 export class APIKeyHandler {
@@ -61,10 +82,11 @@ export class APIKeyHandler {
 
     static async createApiKey(userID: number, expiresInDays?: number) {
         const expiresAt = expiresInDays ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).getTime() : null;
-
+        
         const result = await DB.instance().insert(DB.Schema.apiKeys).values({
             token: this.API_KEY_PREFIX + crypto_randomBytes(32).toString('hex'),
             user_id: userID,
+            user_role: await AuthUtils.getUserRole(userID) || 'user',
             expires_at: expiresAt
         }).returning()
 
@@ -103,6 +125,14 @@ export class APIKeyHandler {
 
     static async deleteApiKey(apiKey: string) {
         await DB.instance().delete(DB.Schema.apiKeys).where(eq(DB.Schema.apiKeys.token, apiKey));
+    }
+
+    static async changeUserRoleInApiKeys(userID: number, newRole: 'admin' | 'user') {
+        await DB.instance().update(DB.Schema.apiKeys).set({
+            user_role: newRole
+        }).where(
+            eq(DB.Schema.apiKeys.user_id, userID)
+        );
     }
 }
 
@@ -169,9 +199,19 @@ export class AuthHandler {
     }
 
     static async invalidateAllAuthContextsForUser(userID: number): Promise<void> {
-        await SessionHandler.inValidateAllSessionsForUser(userID);
-        await APIKeyHandler.deleteAllApiKeysForUser(userID);
+        return await Promise.all([
+            SessionHandler.inValidateAllSessionsForUser(userID),
+            APIKeyHandler.deleteAllApiKeysForUser(userID)
+        ]).then(() => { return; });
     }
+
+    static async changeUserRoleInAuthContexts(userID: number, newRole: 'admin' | 'user'): Promise<void> {
+        return await Promise.all([
+            SessionHandler.changeUserRoleInSessions(userID, newRole),
+            APIKeyHandler.changeUserRoleInApiKeys(userID, newRole)
+        ]).then(() => { return; });
+    }
+
 }
 
 export namespace AuthHandler {
