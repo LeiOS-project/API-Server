@@ -162,7 +162,7 @@ export class AptlyAPI {
                 throw new Error("Failed to fetch existing repositories: " + existReposResponse.error);
             }
             const existingRepos = existReposResponse.data;
-            // @ts-ignore
+
             if (!existingRepos.some(repo => repo.Name === "leios-stable")) {
                 await this.getClient().postApiRepos({
                     body: {
@@ -171,8 +171,10 @@ export class AptlyAPI {
                         DefaultDistribution: "stable"
                     }
                 });
+
+                Logger.info("Repository 'leios-stable' created.");
             }
-            // @ts-ignore
+
             if (!existingRepos.some(repo => repo.Name === "leios-testing")) {
                 await this.getClient().postApiRepos({
                     body: {
@@ -181,6 +183,8 @@ export class AptlyAPI {
                         DefaultDistribution: "testing"
                     }
                 });
+
+                Logger.info("Repository 'leios-testing' created.");
             }
 
         } catch (error) {
