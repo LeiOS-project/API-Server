@@ -85,4 +85,11 @@ export class API {
 		Logger.log(`API is running at ${this.server?.hostname}:${this.server?.port}`);
 	}
 
+	static async stop() {
+		if (this.server) {
+			this.server.stop();
+			Logger.log("API server stopped.");
+		}
+	}
+
 }

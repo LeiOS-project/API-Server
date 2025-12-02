@@ -61,13 +61,6 @@ export class AptlyAPI {
         this.forwardAptlyOutput(this.aptlyProcess.stderr, (line: string) => Logger.error(`[APTLY] ${line}`));
 
 
-        // ensure subprocess dies with parent
-        const killChild = (type: NodeJS.Signals) => this.aptlyProcess.kill(type);
-        process.on("SIGINT", killChild);
-        process.on("SIGTERM", killChild);
-        process.on("exit", killChild);
-
-
         await Utils.sleep(1000);
 
         if (this.aptlyProcess.exitCode !== null) {
@@ -115,8 +108,8 @@ export class AptlyAPI {
             }
 
             const file = Bun.file(`/tmp/aptly-download.zip`);
-            await file.write(response);
-
+            const archiveBuffer = await response.arrayBuffer();
+            await Bun.write(file, archiveBuffer);
             await Bun.$`unzip -o /tmp/aptly-download.zip -d /tmp/aptly-archive`.text();
 
             await fs.copyFile(`/tmp/aptly-archive/${binName}/aptly`, this.aptlyBinaryPath);
@@ -240,6 +233,13 @@ export class AptlyAPI {
         };
 
         pump();
+    }
+
+    static async stop(type: NodeJS.Signals) {
+        if (this.aptlyProcess) {
+            this.aptlyProcess.kill(type);
+            Logger.info("Aptly process stopped.");
+        }
     }
 
 }

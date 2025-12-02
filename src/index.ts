@@ -30,6 +30,16 @@ export class Main {
             config.LRA_API_HOST ?? "::"
         );
 
+        process.on("SIGINT", (type) => this.onKill(type));
+        process.on("SIGTERM", (type) => this.onKill(type));
+
+    }
+
+    private static onKill(type: NodeJS.Signals) {
+        Logger.log(`Received ${type}, shutting down...`);
+        API.stop();
+        AptlyAPI.stop(type);
+        process.exit();
     }
 
 }
