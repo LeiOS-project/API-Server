@@ -161,8 +161,8 @@ export class AptlyAPI {
                 throw new Error("Failed to fetch existing repositories: " + existReposResponse.error);
             }
             const existingRepos = existReposResponse.data;
-
-            if (!existingRepos.some(repo => repo.name === "leios-stable")) {
+            // @ts-ignore
+            if (!existingRepos.some(repo => repo.Name === "leios-stable")) {
                 await this.getClient().postApiRepos({
                     body: {
                         Name: "leios-stable",
@@ -171,8 +171,8 @@ export class AptlyAPI {
                     }
                 });
             }
-
-            if (!existingRepos.some(repo => repo.name === "leios-testing")) {
+            // @ts-ignore
+            if (!existingRepos.some(repo => repo.Name === "leios-testing")) {
                 await this.getClient().postApiRepos({
                     body: {
                         Name: "leios-testing",
@@ -205,6 +205,7 @@ export class AptlyAPI {
 
         const emitLine = (rawLine: string) => {
             const line = rawLine.replace(/\r$/, "");
+            if (line.startsWith("[GIN]")) return; // skip gin logs
             logFn(line);
         };
 
