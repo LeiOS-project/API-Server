@@ -15,7 +15,7 @@ router.use("*", async (c, next) => {
     const authContext = c.get("authContext") as AuthHandler.AuthContext;
 
     if (authContext.type !== 'session') {
-        return APIResponse.badRequest(c, "Your Auth Context is not a session");
+        return APIResponse.unauthorized(c, "Your Auth Context is not a session");
     }
 
     await next();
@@ -30,7 +30,7 @@ router.get('/',
 
         responses: APIResponseSpec.describeBasic(
             APIResponseSpec.success("Account information retrieved successfully", AccountModel.GetInfo.Response),
-            APIResponseSpec.badRequest("Your Auth Context is not a session")
+            APIResponseSpec.unauthorized("Your Auth Context is not a session")
         )
     }),
 
@@ -59,9 +59,9 @@ router.put('/',
         description: "Update information about the authenticated user's account.",
         tags: ['Account'],
 
-        responses: APIResponseSpec.describeBasic(
+        responses: APIResponseSpec.describeWithWrongInputs(
             APIResponseSpec.successNoData("Account information updated successfully"), 
-            APIResponseSpec.badRequest("Your Auth Context is not a session / Syntax or validation error in request")
+            APIResponseSpec.unauthorized("Your Auth Context is not a session")
         )
     }),
 
@@ -90,8 +90,8 @@ router.put('/password',
 
         responses: APIResponseSpec.describeBasic(
             APIResponseSpec.successNoData("Password changed successfully"),
-            APIResponseSpec.unauthorized("Current password is incorrect"),
-            APIResponseSpec.badRequest("Your Auth Context is not a session / Syntax or validation error in request")
+            APIResponseSpec.unauthorized("Your Auth Context is not a session"),
+            APIResponseSpec.badRequest("Current password is incorrect / Syntax or validation error in request")
         )
     }),
 
@@ -102,7 +102,7 @@ router.put('/password',
         const authContext = c.get("authContext") as AuthHandler.SessionAuthContext;
 
         if (authContext.type !== 'session') {
-            return APIResponse.badRequest(c, "Your Auth Context is not a session");
+            return APIResponse.unauthorized(c, "Your Auth Context is not a session");
         }
 
         const body = c.req.valid("json")
@@ -142,7 +142,7 @@ router.post('/logout',
 
         responses: APIResponseSpec.describeBasic(
             APIResponseSpec.successNoData("Logged out successfully"),
-            APIResponseSpec.badRequest("Your Auth Context is not a session")
+            APIResponseSpec.unauthorized("Your Auth Context is not a session")
         )
     }),
 
@@ -167,7 +167,7 @@ router.delete('/',
 
         responses: APIResponseSpec.describeBasic(
             APIResponseSpec.successNoData("Account deleted successfully"),
-            APIResponseSpec.badRequest("Your Auth Context is not a session")
+            APIResponseSpec.unauthorized("Your Auth Context is not a session")
         )
     }),
 

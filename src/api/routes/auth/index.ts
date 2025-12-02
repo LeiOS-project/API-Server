@@ -53,8 +53,7 @@ router.get('/session',
 
         responses: APIResponseSpec.describeBasic(
             APIResponseSpec.success("Session info retrieved successfully", AuthModel.Session.Response),
-            APIResponseSpec.unauthorized("Unauthorized: Invalid or missing session token"),
-            APIResponseSpec.badRequest("Your Auth Context is not a session")
+            APIResponseSpec.unauthorized("Unauthorized: Invalid or missing session token / Your Auth Context is not a session"),
         )
 
     }),
@@ -63,7 +62,7 @@ router.get('/session',
         // @ts-ignore
         const authContext = c.get("authContext") as AuthHandler.AuthContext;
         if (authContext.type !== 'session') {
-            return APIResponse.badRequest(c, "Your Auth Context is not a session");
+            return APIResponse.unauthorized(c, "Your Auth Context is not a session");
         }
 
         return APIResponse.success(c, "Session info retrieved successfully", authContext);
@@ -79,8 +78,7 @@ router.post('/logout',
 
         responses: APIResponseSpec.describeBasic(
             APIResponseSpec.successNoData("Logout successful"),
-            APIResponseSpec.unauthorized("Unauthorized: Invalid or missing session token"),
-            APIResponseSpec.badRequest("Your Auth Context is not a session")
+            APIResponseSpec.unauthorized("Unauthorized: Invalid or missing session token / Your Auth Context is not a session"),
         )
 
     }),
@@ -90,7 +88,7 @@ router.post('/logout',
         const authContext = c.get("authContext") as AuthHandler.AuthContext;
 
         if (authContext.type !== 'session') {
-            return APIResponse.badRequest(c, "Your Auth Context is not a session");
+            return APIResponse.unauthorized(c, "Your Auth Context is not a session");
         }
 
         await SessionHandler.inValidateSession(authContext.token);
