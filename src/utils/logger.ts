@@ -24,37 +24,37 @@ export class Logger {
 
     static debug(...args: any[]) {
         if (this.logLevel <= this.logLevelMap.debug) {
-            console.debug(...args);
+            console.debug("[DEBUG]", ...args);
         }
     }
 
     static log(...args: any[]) {
         if (this.logLevel <= this.logLevelMap.info) {
-            console.log(...args);
+            console.log("[INFO]", ...args);
         }
     }
 
     static info(...args: any[]) {
         if (this.logLevel <= this.logLevelMap.info) {
-            console.info(...args);
+            console.info("[INFO]", ...args);
         }
     }
 
     static warn(...args: any[]) {
         if (this.logLevel <= this.logLevelMap.warn) {
-            console.warn(...args);
+            console.warn("[WARN]", ...args);
         }
     }
 
     static error(...args: any[]) {
         if (this.logLevel <= this.logLevelMap.error) {
-            console.error(...args);
+            console.error("[ERROR]", ...args);
         }
     }
 
     static critical(...args: any[]) {
         if (this.logLevel <= this.logLevelMap.critical) {
-            console.error(...args);
+            console.error("[CRITICAL]", ...args);
         }
     }
 

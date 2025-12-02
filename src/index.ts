@@ -23,6 +23,8 @@ export class Main {
 
         await API.init();
 
+        await AptlyAPI.start();
+
         await API.start(
             parseInt(config.LRA_API_PORT ?? "12151"),
             config.LRA_API_HOST ?? "::"
