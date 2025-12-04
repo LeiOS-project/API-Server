@@ -66,7 +66,7 @@ export class SessionHandler {
         await DB.instance().delete(DB.Schema.sessions).where(eq(DB.Schema.sessions.token, sessionToken));
     }
 
-    static async changeUserRoleInSessions(userID: number, newRole: 'admin' | 'user') {
+    static async changeUserRoleInSessions(userID: number, newRole: 'admin' | 'developer' | 'user') {
         await DB.instance().update(DB.Schema.sessions).set({
             user_role: newRole
         }).where(
@@ -127,7 +127,7 @@ export class APIKeyHandler {
         await DB.instance().delete(DB.Schema.apiKeys).where(eq(DB.Schema.apiKeys.token, apiKey));
     }
 
-    static async changeUserRoleInApiKeys(userID: number, newRole: 'admin' | 'user') {
+    static async changeUserRoleInApiKeys(userID: number, newRole: 'admin' | 'developer' | 'user') {
         await DB.instance().update(DB.Schema.apiKeys).set({
             user_role: newRole
         }).where(
@@ -205,7 +205,7 @@ export class AuthHandler {
         ]).then(() => { return; });
     }
 
-    static async changeUserRoleInAuthContexts(userID: number, newRole: 'admin' | 'user'): Promise<void> {
+    static async changeUserRoleInAuthContexts(userID: number, newRole: 'admin' | 'developer' | 'user'): Promise<void> {
         return await Promise.all([
             SessionHandler.changeUserRoleInSessions(userID, newRole),
             APIKeyHandler.changeUserRoleInApiKeys(userID, newRole)

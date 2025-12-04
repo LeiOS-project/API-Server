@@ -15,3 +15,5 @@ router.use("*", async (c, next) => {
     await next();
 });
 
+router.route("/", (await import('./users')).router);
+
