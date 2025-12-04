@@ -1,5 +1,5 @@
 import { API } from "./api";
-import { AptlyAPIServer } from "./aptly";
+import { AptlyAPIServer } from "./aptly/server";
 import { DB } from "./db";
 import { ConfigHandler } from "./utils/config";
 import { Logger } from "./utils/logger";

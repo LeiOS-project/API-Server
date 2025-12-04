@@ -1,4 +1,4 @@
-import { AptlyAPIServer } from ".";
+import { AptlyAPIServer } from "./server";
 import fs from 'fs';
 import { dirname } from 'path';
 import { AptlyUtils } from "./utils";

@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
-import { AptlyAPIServer } from "../src/aptly";
+import { AptlyAPIServer } from "../src/aptly/server";
 import { AptlyAPI } from "../src/aptly/aptly";
 
 beforeAll(async() => {
