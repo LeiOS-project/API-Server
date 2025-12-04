@@ -39,6 +39,16 @@ describe("Aptly Package Tests", () => {
         expect(packageRefs[0]).toInclude("fastfetch");
     });
 
+    test("Check Package Existence", async () => {
+        const exists = await AptlyAPI.Packages.existsInRepo("leios-testing", "fastfetch", "2.55.0", undefined, "amd64");
+        expect(exists).toBe(true);
+    });
+
+    test("Get Package Details", async () => {
+        const result = await AptlyAPI.Packages.getInRepo("leios-testing", "fastfetch", "2.55.0", undefined, "amd64");
+        console.log(result);
+    });
+
     test("Remove Package from Repo", async () => {
         const removeResult = await AptlyAPI.Packages.deleteInRepo("leios-testing", "fastfetch");
         expect(removeResult).toBe(true);

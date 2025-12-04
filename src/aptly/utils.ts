@@ -1,6 +1,7 @@
 import { Logger } from "../utils/logger";
 import fs from 'fs/promises';
 import path from 'path';
+import z from "zod";
 
 export class AptlyUtils {
 
@@ -95,20 +96,29 @@ export class AptlyUtils {
         pump();
     }
 
-    static extractVersionFromLeiOSSuffix(fullVersion: string) {
-        const leiOSSuffixIndex = fullVersion.indexOf("leios");
-        if (leiOSSuffixIndex === -1) {
-            return fullVersion;
+    static extractVersionAndPatchSuffix(fullVersion: string) {
+        const leiosSuffixMatch = fullVersion.match(/(.*)leios(\d+)$/);
+        if (leiosSuffixMatch) {
+            return {
+                version: leiosSuffixMatch[1],
+                leiosPatch: parseInt(leiosSuffixMatch[2])
+            };
+        } else {
+            return {
+                version: fullVersion,
+                leiosPatch: undefined
+            };
         }
-        return fullVersion.substring(0, leiOSSuffixIndex);
     }
 
-    static buildVersionWithLeiOSSuffix(version: string, leiosPatchVersion?: number) {
-        if (leiosPatchVersion) {
-            if (version.endsWith(`leios${leiosPatchVersion}`)) {
+
+
+    static buildVersionWithLeiOSSuffix(version: string, leiosPatch?: number) {
+        if (leiosPatch) {
+            if (version.endsWith(`leios${leiosPatch}`)) {
                 return version;
             }
-            return version + `leios${leiosPatchVersion}`;
+            return version + `leios${leiosPatch}`;
         }
         return version;
     }

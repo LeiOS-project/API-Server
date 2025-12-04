@@ -7,6 +7,8 @@ import { APIResponse } from "../../../utils/api-res";
 import { APIResponseSpec, APIRouteSpec } from "../../../utils/specHelpers";
 import { AuthHandler } from "../../../utils/authHandler";
 import z from "zod";
+import { AptlyAPI } from "../../../../aptly/api";
+import { router as releasesRouter } from "./releases/index";
 
 export const router = new Hono().basePath('/packages');
 
@@ -104,7 +106,7 @@ router.get('/:packageName',
 
     APIRouteSpec.authenticated({
         summary: "Get package details",
-        description: "Retrieve details of a specific package owned by the authenticated developer.",
+        description: "Retrieve details of a specific package.",
         tags: ['Developer API / Packages'],
 
         responses: APIResponseSpec.describeBasic(
@@ -150,27 +152,32 @@ router.put('/:packageName',
     }
 );
 
-router.delete('/:packageName',
+// Only admins can delete packages for now
+// router.delete('/:packageName',
 
-    APIRouteSpec.authenticated({
-        summary: "Delete a package",
-        description: "Delete a specific package owned by the authenticated developer.",
-        tags: ['Developer API / Packages'],
+//     APIRouteSpec.authenticated({
+//         summary: "Delete a package",
+//         description: "Delete a specific package owned by the authenticated developer.",
+//         tags: ['Developer API / Packages'],
 
-        responses: APIResponseSpec.describeBasic(
-            APIResponseSpec.successNoData("Package deleted successfully"),
-            APIResponseSpec.notFound("Package with specified name not found")
-        )
-    }),
+//         responses: APIResponseSpec.describeBasic(
+//             APIResponseSpec.successNoData("Package deleted successfully"),
+//             APIResponseSpec.notFound("Package with specified name not found")
+//         )
+//     }),
 
-    async (c) => {
-        // @ts-ignore
-        const packageData = c.get("package") as DB.Models.Package;
+//     async (c) => {
+//         // @ts-ignore
+//         const packageData = c.get("package") as DB.Models.Package;
 
-        await DB.instance().delete(DB.Schema.packages).where(
-            eq(DB.Schema.packages.name, packageData.name)
-        );
+//         await AptlyAPI.Packages.deleteAllInAllRepos(packageData.name);
 
-        return APIResponse.successNoData(c, "Package deleted successfully");
-    }
-);
+//         await DB.instance().delete(DB.Schema.packages).where(
+//             eq(DB.Schema.packages.name, packageData.name)
+//         );
+
+//         return APIResponse.successNoData(c, "Package deleted successfully");
+//     }
+// );
+
+router.route('/:packageName', releasesRouter);
