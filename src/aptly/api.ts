@@ -10,6 +10,16 @@ export namespace AptlyAPI.Utils {
 
 }
 
+export namespace AptlyAPI.DB {
+
+    export async function cleanup() {
+        const result = await AptlyAPIServer.getClient().postApiDbCleanup();
+        if (result.error) return false;
+        return true;
+    }
+
+}
+
 export namespace AptlyAPI.Packages {
 
     export async function getRefInRepo(repoName: AptlyAPI.Utils.DefaultRepos, packageName: string, packageVersion?: string, packageArch?: string) {
@@ -110,14 +120,20 @@ export namespace AptlyAPI.Packages {
                 name: repoName
             }
         });
+
+        if (doCleanup) {
+            await AptlyAPI.DB.cleanup();
+        }
+
         return (result.data && !result.error) ? true : false;
     }
 
     export async function deleteAllInAllRepos(packageName: string) {
         let result = true;
         for (const repo of AptlyAPI.Utils.DEFAULT_REPOS) {
-            result = await deleteInRepo(repo, packageName) && result;
+            result = await deleteInRepo(repo, packageName, undefined, undefined, false) && result;
         }
+        await AptlyAPI.DB.cleanup();
         return result;
     }
 
