@@ -71,7 +71,7 @@ export namespace AptlyAPI.Packages {
                 throw new Error("Invalid package data from Aptly server.");
             }
 
-            if (pkg.Name !== packageName || 
+            if (pkg.Package !== packageName || 
                 (fullPackageVersion && pkg.Version !== fullPackageVersion) ||
                 (packageArch && pkg.Architecture !== packageArch)) {
                 throw new Error("Package data mismatch from Aptly server.");
@@ -80,7 +80,7 @@ export namespace AptlyAPI.Packages {
             const versionInfo = AptlyUtils.extractVersionAndPatchSuffix(pkg.Version);
 
             returnedPackages.push({
-                name: pkg.Name as string,
+                name: pkg.Package as string,
                 key: pkg.Key as string,
                 version: versionInfo.version as string,
                 leiosPatch: versionInfo.leiosPatch as number | undefined,
@@ -162,7 +162,7 @@ export namespace AptlyAPI.Packages {
         }
 
         const uploadSubDir = Bun.randomUUIDv7();
-        const packageIdentifier = `${packageData.name}_${fullPackageVersion}_${packageData.architecture}`;
+        const packageIdentifier = AptlyUtils.getPackageIdentifier(packageData.name, fullPackageVersion, packageData.architecture);
         const fileName = `${packageIdentifier}.deb`;
         const fullFilePath = AptlyAPIServer.aptlyUploadDir + "/" + uploadSubDir + "/" + fileName;
 
@@ -207,6 +207,22 @@ export namespace AptlyAPI.Packages {
             throw new Error("Failed to add package to repository: " + addingResult.error);
         }
 
+        return true;
+    }
+
+    export async function copyIntoRepo(targetRepo: "leios-stable" | "leios-testing", packageName: string, packageVersion: string, leiosPatch: number | undefined, packageArch: AptlyAPI.Utils.Architectures) {
+        const result = await AptlyAPIServer.getClient().postApiReposByNameCopyBySrcByFile({
+            path: {
+                name: targetRepo,
+                src: "leios-archive",
+                file: AptlyUtils.getPackageIdentifier(packageName, packageVersion, leiosPatch, packageArch)
+            }
+        });
+        const parsedResult = (result.data as any as { "Report": { "Added": string[] } })["Report"]["Added"][0] || "error";
+
+        if (result.error || !parsedResult.includes("added")) {
+            throw new Error("Failed to copy package into repository: " + result.error);
+        }
         return true;
     }
 

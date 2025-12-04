@@ -15,3 +15,12 @@ export namespace PackageReleaseModel.GetAll {
 
 }
 
+export namespace PackageReleaseModel.CreateRelease {
+
+    export const Response = z.object({
+        version: z.string(),
+        arch: z.enum(["amd64", "arm64"]),
+    });
+    export type Response = z.infer<typeof Response>;
+
+}

@@ -4,7 +4,7 @@ import { validator as zValidator } from "hono-openapi";
 import { APIResponse } from "../../../../utils/api-res";
 import { APIResponseSpec, APIRouteSpec } from "../../../../utils/specHelpers";
 import z from "zod";
-import { DB } from "../../../../db";
+import { DB } from "../../../../../db";
 import { AptlyAPI } from "../../../../../aptly/api";
 
 export const router = new Hono().basePath('/releases');
@@ -31,38 +31,40 @@ router.get('/',
     }
 );
 
-router.post('/',
+router.post('/:version/:arch',
 
     APIRouteSpec.authenticated({
-        summary: "Create a new package",
-        description: "Create a new package under the authenticated developer's account.",
+        summary: "Create a new package release",
+        description: "Create a new release for the specified package.",
         tags: ['Developer API / Packages / Releases'],
 
         responses: APIResponseSpec.describeWithWrongInputs(
-            APIResponseSpec.created("Package created successfully", PackageModel.CreatePackage.Response),
-            APIResponseSpec.conflict("Conflict: Package with this name already exists")
+            APIResponseSpec.created("Package release created successfully", PackageReleaseModel.CreateRelease.Response),
+            APIResponseSpec.conflict("Conflict: Package release with this version already exists")
         )
     }),
 
-    zValidator("json", PackageModel.CreatePackage.Body),
+    zValidator("form", z.file()),
+
+    zValidator("param", z.object({
+        version: z.string().min(1),
+        arch: z.enum(["amd64", "arm64"])
+    })),
 
     async (c) => {
         // @ts-ignore
-        const session = c.get("session") as DB.Models.Session;
+        const authContext = c.get("authContext") as AuthHandler.AuthContext;
 
-        const packageData = c.req.valid("json");
+        const file = c.req.valid("form");
 
-        const existingPackage = DB.instance().select().from(DB.Schema.packages).where(eq(DB.Schema.packages.name, packageData.name)).get();
-        if (existingPackage) {
-            return APIResponse.conflict(c, "Package with this name already exists");
+        const { version, arch } = c.req.valid("param");
+
+        try {
+            await AptlyAPI.Packages.uploadAndVerify(
+                "leios-archive",
+                // @ts-ignore
+                (c.get("package") as DB.Models.Package).name,
         }
-
-        const result = DB.instance().insert(DB.Schema.packages).values({
-            ...packageData,
-            owner_user_id: session.user_id
-        }).returning().get();
-
-        return APIResponse.created(c, "Package created successfully", { name: result.name });
     }
 );
 

@@ -53,7 +53,7 @@ router.post('/',
 
     async (c) => {
         // @ts-ignore
-        const session = c.get("session") as DB.Models.Session;
+        const authContext = c.get("authContext") as AuthHandler.AuthContext;
 
         const packageData = c.req.valid("json");
 
@@ -64,7 +64,7 @@ router.post('/',
 
         const result = DB.instance().insert(DB.Schema.packages).values({
             ...packageData,
-            owner_user_id: session.user_id
+            owner_user_id: authContext.user_id
         }).returning().get();
 
         return APIResponse.created(c, "Package created successfully", { name: result.name });
@@ -84,11 +84,11 @@ router.use('/:packageName/*',
         const { packageName } = c.req.valid("param");
 
         // @ts-ignore
-        const session = c.get("session") as DB.Models.Session;
+        const authContext = c.get("authContext") as AuthHandler.AuthContext;
 
         const packageData = DB.instance().select().from(DB.Schema.packages).where(and(
             eq(DB.Schema.packages.name, packageName),
-            eq(DB.Schema.packages.owner_user_id, session.user_id)
+            eq(DB.Schema.packages.owner_user_id, authContext.user_id)
         )).get();
 
         if (!packageData) {

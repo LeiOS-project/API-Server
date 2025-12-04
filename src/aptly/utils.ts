@@ -123,4 +123,23 @@ export class AptlyUtils {
         return version;
     }
 
+    static getPackageIdentifier(packageName: string, fullPackageVersion: string, architecture: string): string;
+    static getPackageIdentifier(packageName: string, packageVersion: string, leiosPatch: number | undefined, architecture: string): string;
+    static getPackageIdentifier(packageName: string, versionOrFullVersion: string, leiosPatchOrArch: number | string | undefined, architectureOpt?: string) {
+
+        let fullPackageVersion: string;
+
+        if (typeof leiosPatchOrArch === "number" || leiosPatchOrArch === undefined) {
+            // Called with (packageName, packageVersion, leiosPatch, architecture)
+            fullPackageVersion = this.buildVersionWithLeiOSSuffix(versionOrFullVersion, leiosPatchOrArch as number | undefined);
+        } else {
+            // Called with (packageName, fullPackageVersion, architecture)
+            fullPackageVersion = versionOrFullVersion;
+        }
+
+        const architecture = typeof leiosPatchOrArch === "string" ? leiosPatchOrArch : architectureOpt!;
+
+        return `${packageName}_${fullPackageVersion}_${architecture}`;
+    }
+
 }
