@@ -6,6 +6,8 @@ import { APIResponseSpec, APIRouteSpec } from "../../../../utils/specHelpers";
 import z from "zod";
 import { DB } from "../../../../../db";
 import { AptlyAPI } from "../../../../../aptly/api";
+import { AuthHandler } from "../../../../utils/authHandler";
+import { eq } from "drizzle-orm";
 
 export const router = new Hono().basePath('/releases');
 
@@ -57,14 +59,50 @@ router.post('/:version/:arch',
 
         const file = c.req.valid("form");
 
+        // @ts-ignore
+        const packageData = c.get("package") as DB.Models.Package;
+
         const { version, arch } = c.req.valid("param");
 
-        try {
-            await AptlyAPI.Packages.uploadAndVerify(
-                "leios-archive",
-                // @ts-ignore
-                (c.get("package") as DB.Models.Package).name,
+        const owner = DB.instance().select().from(DB.Schema.users).where(
+            eq(DB.Schema.users.id, packageData.owner_user_id)
+        ).get();
+        if (!owner) {
+            return APIResponse.serverError(c, "Package owner not found");
         }
+
+        const existingRelease = await AptlyAPI.Packages.existsInRepo("leios-archive", packageData.name, version, undefined, arch);
+        if (existingRelease) {
+            return APIResponse.conflict(c, "Package release with this version already exists");
+        }
+
+        try {
+            const result = await AptlyAPI.Packages.uploadAndVerify(
+                "leios-archive",
+                {
+                    name: packageData.name,
+                    version,
+                    architecture: arch,
+                    maintainerName: owner.display_name,
+                    maintainerEmail: owner.email,
+                },
+                file
+            );
+
+            if (!result) {
+                return APIResponse.serverError(c, "Failed to upload and verify package release");
+            }
+
+            const copyResult = await AptlyAPI.Packages.copyIntoRepo("leios-testing", packageData.name, version, undefined, arch);
+            if (!copyResult) {
+                return APIResponse.serverError(c, "Failed to copy package release into testing repository");
+            }
+
+        } catch (error) {
+            return APIResponse.serverError(c, "Failed to upload and verify package release: " + error);
+        }
+
+        return APIResponse.created(c, "Package release created successfully", { version, arch });
     }
 );
 
