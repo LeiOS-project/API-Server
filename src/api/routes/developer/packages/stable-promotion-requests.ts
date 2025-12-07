@@ -53,12 +53,13 @@ router.post('/',
 
         responses: APIResponseSpec.describeWithWrongInputs(
             APIResponseSpec.created("Stable promotion request submitted", StablePromotionRequestsModel.Create.Response),
+            APIResponseSpec.badRequest("Owner user ID does not correspond to a developer account / Bad Request: Syntax or validation error in request"),
             APIResponseSpec.notFound("Release not found in archive repository"),
             APIResponseSpec.conflict("A pending request already exists or the release is already stable")
         )
     }),
 
-
+)
 // router.post('/:packageID/stable-requests',
 
 //     APIRouteSpec.authenticated({
