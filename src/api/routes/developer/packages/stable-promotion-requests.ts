@@ -67,12 +67,12 @@ router.post('/',
         // @ts-ignore
         const packageData = c.get("package") as DB.Models.Package;
 
-        const existingRelease = DB.instance().select().from(DB.Schema.packageReleases).where(and(
+        const releaseExists = DB.instance().select().from(DB.Schema.packageReleases).where(and(
             eq(DB.Schema.packageReleases.id, requestData.package_release_id),
             eq(DB.Schema.packageReleases.package_id, packageData.id)
         )).get();
 
-        if (!existingRelease) {
+        if (!releaseExists) {
             return APIResponse.notFound(c, "Release not found in archive repository");
         }
 
