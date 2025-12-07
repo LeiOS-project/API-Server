@@ -6,10 +6,9 @@ import { eq, and } from "drizzle-orm";
 import { APIResponse } from "../../../utils/api-res";
 import { APIResponseSpec, APIRouteSpec } from "../../../utils/specHelpers";
 import { AuthHandler } from "../../../utils/authHandler";
-import z from "zod";
-import { AptlyAPI } from "../../../../aptly/api";
-import { StableRequestModel } from "../../shared/stableRequests";
+import { z } from "zod";
 import { router as releasesRouter } from "./releases/index";
+import { router as stableRequestsRouter } from "./stable-promotion-requests/index";
 import { DOCS_TAGS } from "../../../docs";
 
 export const router = new Hono().basePath('/packages');
@@ -154,139 +153,5 @@ router.put('/:packageID',
     }
 );
 
-
-router.get('/:packageID/stable-requests',
-
-    APIRouteSpec.authenticated({
-        summary: "List stable promotion requests",
-        description: "View stable promotion requests for the selected package.",
-        tags: [DOCS_TAGS.DEV_API.PACKAGES_STABLE_REQUESTS],
-
-        responses: APIResponseSpec.describeBasic(
-            APIResponseSpec.success("Stable promotion requests retrieved successfully", StableRequestModel.List.Response),
-            APIResponseSpec.notFound("Package with specified ID not found")
-        )
-    }),
-
-    zValidator("query", StableRequestModel.List.Query),
-
-    async (c) => {
-        // @ts-ignore
-        const packageData = c.get("package") as DB.Models.Package;
-        const filters = c.req.valid("query") as z.infer<typeof StableRequestModel.List.Query>;
-
-        let query = DB.instance().select().from(DB.Schema.stablePromotionRequests).where(
-            eq(DB.Schema.stablePromotionRequests.package_name, packageData.name)
-        ).$dynamic();
-
-        if (filters.status) {
-            query = query.where(eq(DB.Schema.stablePromotionRequests.status, filters.status));
-        }
-
-        const requests = await query;
-
-        return APIResponse.success(c, "Stable promotion requests retrieved successfully", requests);
-    }
-);
-
-
-router.post('/:packageID/stable-requests',
-
-    APIRouteSpec.authenticated({
-        summary: "Request promotion to stable",
-        description: "Submit a request for an existing release to be copied into the stable repository.",
-        tags: [DOCS_TAGS.DEV_API.PACKAGES_STABLE_REQUESTS],
-
-        responses: APIResponseSpec.describeWithWrongInputs(
-            APIResponseSpec.created("Stable promotion request submitted", StableRequestModel.Create.Response),
-            APIResponseSpec.notFound("Release not found in archive repository"),
-            APIResponseSpec.conflict("A pending request already exists or the release is already stable")
-        )
-    }),
-
-    zValidator("json", StableRequestModel.Create.Body),
-
-    async (c) => {
-        // @ts-ignore
-        const packageData = c.get("package") as DB.Models.Package;
-        // @ts-ignore
-        const authContext = c.get("authContext") as AuthHandler.AuthContext;
-
-        const { version, arch, leios_patch } = c.req.valid("json") as StableRequestModel.Create.Body;
-
-        const existsInArchive = await AptlyAPI.Packages.existsInRepo(
-            "leios-archive",
-            packageData.name,
-            version,
-            leios_patch,
-            arch
-        );
-
-        if (!existsInArchive) {
-            return APIResponse.notFound(c, "Release not found in archive repository");
-        }
-
-        const alreadyStable = await AptlyAPI.Packages.existsInRepo(
-            "leios-stable",
-            packageData.name,
-            version,
-            leios_patch,
-            arch
-        );
-
-        if (alreadyStable) {
-            return APIResponse.conflict(c, "Release already available in stable repository");
-        }
-
-        const existingPending = DB.instance().select().from(DB.Schema.stablePromotionRequests).where(and(
-            eq(DB.Schema.stablePromotionRequests.package_name, packageData.name),
-            eq(DB.Schema.stablePromotionRequests.version, version),
-            eq(DB.Schema.stablePromotionRequests.architecture, arch),
-            eq(DB.Schema.stablePromotionRequests.status, 'pending')
-        )).get();
-
-        if (existingPending) {
-            return APIResponse.conflict(c, "A pending request already exists for this version and architecture");
-        }
-
-        const inserted = DB.instance().insert(DB.Schema.stablePromotionRequests).values({
-            package_name: packageData.name,
-            version,
-            leios_patch,
-            architecture: arch,
-            requested_by: authContext.user_id,
-        }).returning().get();
-
-        return APIResponse.created(c, "Stable promotion request submitted", { id: inserted.id });
-    }
-);
-
-// Only admins can delete packages for now
-// router.delete('/:packageID',
-
-//     APIRouteSpec.authenticated({
-//         summary: "Delete a package",
-//         description: "Delete a specific package owned by the authenticated developer.",
-//         tags: [DOCS_TAGS.DEV_API.PACKAGES],
-
-//         responses: APIResponseSpec.describeBasic(
-//             APIResponseSpec.successNoData("Package deleted successfully"),
-//             APIResponseSpec.notFound("Package with specified name not found")
-//         )
-//     }),
-
-//     async (c) => {
-//         // @ts-ignore
-//         const packageData = c.get("package") as DB.Models.Package;
-
-//         await AptlyAPI.Packages.deleteAllInAllRepos(packageData.name);
-
-//         await DB.instance().delete(DB.Schema.packages).where(
-//             eq(DB.Schema.packages.name, packageData.name)
-//         );
-
-//         return APIResponse.successNoData(c, "Package deleted successfully");
-//     }
-// );
-
 router.route('/:packageID', releasesRouter);
+router.route('/:packageID', stableRequestsRouter);

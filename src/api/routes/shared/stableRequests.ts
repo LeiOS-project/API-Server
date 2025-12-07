@@ -2,7 +2,7 @@ import { createSelectSchema } from "drizzle-zod";
 import z from "zod";
 import { DB } from "../../../db";
 
-export namespace StableRequestModel {
+export namespace StablePromotionRequestsModel {
 
     export const Status = z.enum(["pending", "approved", "denied"]);
     export type Status = z.infer<typeof Status>;
@@ -10,7 +10,23 @@ export namespace StableRequestModel {
     export const Entity = createSelectSchema(DB.Schema.stablePromotionRequests);
     export type Entity = z.infer<typeof Entity>;
 
-    export namespace List {
+    export const Pending = Entity.extend({
+        status: z.literal("pending")
+    });
+    export type Pending = z.infer<typeof Pending>;
+
+    export const Approved = Entity.extend({
+        status: z.literal("approved")
+    });
+    export type Approved = z.infer<typeof Approved>;
+
+    export const Denied = Entity.extend({
+        status: z.literal("denied"),
+        decision_reason: z.string()
+    });
+    export type Denied = z.infer<typeof Denied>;
+
+    export namespace GetAll {
         export const Query = z.object({
             status: Status.optional()
         });

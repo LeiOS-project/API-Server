@@ -8,6 +8,13 @@
       "when": 1765122923774,
       "tag": "0000_fast_junta",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1765127295740,
+      "tag": "0001_awesome_big_bertha",
+      "breakpoints": true
     }
   ]
 }

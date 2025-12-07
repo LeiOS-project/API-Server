@@ -77,12 +77,12 @@ export const DOCS_TAGS = {
         BASE: "Developer API",
         PACKAGES: "Developer API / Packages",
         PACKAGES_RELEASES: "Developer API / Packages / Releases",
-        PACKAGES_STABLE_REQUESTS: "Developer API / Packages / Stable Requests",
+        PACKAGES_STABLE_REQUESTS: "Developer API / Packages / Stable Promotion Requests",
     },
     ADMIN_API: {
         BASE: "Admin API",
         PACKAGES: "Admin API / Packages",
         PACKAGES_RELEASES: "Admin API / Packages / Releases",
-        PACKAGES_STABLE_REQUESTS: "Admin API / Packages / Stable Requests",
+        PACKAGES_STABLE_REQUESTS: "Admin API / Packages / Stable Promotion Requests",
     }
 }
