@@ -9,6 +9,29 @@ CREATE TABLE `api_keys` (
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `api_keys_token_unique` ON `api_keys` (`token`);--> statement-breakpoint
+CREATE TABLE `package_releases` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`package_id` integer NOT NULL,
+	`version` text NOT NULL,
+	`leios_patch` integer,
+	`architecture` text NOT NULL,
+	FOREIGN KEY (`package_id`) REFERENCES `packages`(`id`) ON UPDATE no action ON DELETE no action
+);
+--> statement-breakpoint
+CREATE TABLE `packages` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`name` text NOT NULL,
+	`owner_user_id` integer NOT NULL,
+	`description` text NOT NULL,
+	`homepage_url` text NOT NULL,
+	`latest_stable_release_amd64` text,
+	`latest_stable_release_arm64` text,
+	`latest_testing_release_amd64` text,
+	`latest_testing_release_arm64` text,
+	FOREIGN KEY (`owner_user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `packages_name_unique` ON `packages` (`name`);--> statement-breakpoint
 CREATE TABLE `password_resets` (
 	`token` text PRIMARY KEY NOT NULL,
 	`user_id` integer NOT NULL,
@@ -25,12 +48,23 @@ CREATE TABLE `sessions` (
 	FOREIGN KEY (`user_role`) REFERENCES `users`(`role`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
+CREATE TABLE `stable_promotion_requests` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`package_release_id` integer NOT NULL,
+	`status` text DEFAULT 'pending' NOT NULL,
+	`reviewed_by` integer,
+	`decision_reason` text,
+	FOREIGN KEY (`package_release_id`) REFERENCES `package_releases`(`id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`reviewed_by`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action
+);
+--> statement-breakpoint
 CREATE TABLE `users` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`username` text NOT NULL,
+	`display_name` text NOT NULL,
 	`email` text NOT NULL,
 	`password_hash` text NOT NULL,
-	`role` text
+	`role` text DEFAULT 'user' NOT NULL
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `users_username_unique` ON `users` (`username`);--> statement-breakpoint

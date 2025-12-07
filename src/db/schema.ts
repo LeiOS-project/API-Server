@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import {
     sqliteTable,
     int,
@@ -54,24 +55,38 @@ export const apiKeys = sqliteTable('api_keys', {
 
 
 /**
- * this is only used for linking a package to a owner, and setting defaults, anything other in handled by aptly
  * @deprecated Use DB.Schema.packages instead
  */
 export const packages = sqliteTable('packages', {
-    // for security reasons, the package name cannot be changed once created
-    name: text().primaryKey(),
+    id: int().primaryKey({ autoIncrement: true }),
+    name: text().notNull().unique(),
     owner_user_id: int().notNull().references(() => users.id),
     description: text().notNull(),
     homepage_url: text().notNull(),
+    // version strings of version + leios patch if exists
+    latest_stable_release_amd64: text(),
+    latest_stable_release_arm64: text(),
+    latest_testing_release_amd64: text(),
+    latest_testing_release_arm64: text(),
 });
 
-export const stableInclusionRequests = sqliteTable('stable_inclusion_requests', {
+/**
+ * @deprecated Use DB.Schema.packageReleases instead
+ */
+export const packageReleases = sqliteTable('package_releases', {
     id: int().primaryKey({ autoIncrement: true }),
-    package_name: text().notNull().references(() => packages.name),
+    package_id: int().notNull().references(() => packages.id),
     version: text().notNull(),
     leios_patch: int(),
     architecture: text({ enum: ['amd64', 'arm64'] }).notNull(),
-    requested_by: int().notNull().references(() => users.id),
+});
+
+/**
+ * @deprecated Use DB.Schema.stablePromotionRequests instead
+ */
+export const stablePromotionRequests = sqliteTable('stable_promotion_requests', {
+    id: int().primaryKey({ autoIncrement: true }),
+    package_release_id: int().notNull().references(() => packageReleases.id),
     status: text({ enum: ['pending', 'approved', 'denied'] }).default('pending').notNull(),
     reviewed_by: int().references(() => users.id),
     decision_reason: text(),

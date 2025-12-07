@@ -5,22 +5,8 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1764596550145,
-      "tag": "0000_easy_bedlam",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1764596590125,
-      "tag": "0001_bizarre_wallow",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1764682691475,
-      "tag": "0002_soft_korg",
+      "when": 1765122923774,
+      "tag": "0000_fast_junta",
       "breakpoints": true
     }
   ]

@@ -1,8 +1,7 @@
 import { Hono } from "hono";
 import { validator as zValidator } from "hono-openapi";
-import z from "zod";
+import { z } from "zod";
 import { and, eq } from "drizzle-orm";
-
 import { APIResponse } from "../../../utils/api-res";
 import { APIResponseSpec, APIRouteSpec } from "../../../utils/specHelpers";
 import { DB } from "../../../../db";
@@ -15,6 +14,23 @@ const ADMIN_PACKAGES_TAG = "Admin API / Packages";
 const ADMIN_STABLE_REQUESTS_TAG = "Admin API / Stable Requests";
 
 export const router = new Hono().basePath('/packages');
+
+router.get('/',
+
+    APIRouteSpec.authenticated({
+        summary: "List packages",
+        description: "Retrieve all packages registered across the platform.",
+        tags: [ADMIN_PACKAGES_TAG],
+        responses: APIResponseSpec.describeBasic(
+            APIResponseSpec.success("Packages retrieved successfully", AdminPackageModel.ListResponse)
+        )
+    }),
+
+    async (c) => {
+        const packages = await DB.instance().select().from(DB.Schema.packages);
+        return APIResponse.success(c, "Packages retrieved successfully", packages);
+    }
+);
 
 router.get('/stable-requests',
 
@@ -127,23 +143,6 @@ router.post('/stable-requests/:requestId/decision',
         ).get();
 
         return APIResponse.success(c, "Stable inclusion request updated", updatedRequest!);
-    }
-);
-
-router.get('/',
-
-    APIRouteSpec.authenticated({
-        summary: "List packages",
-        description: "Retrieve all packages registered across the platform.",
-        tags: [ADMIN_PACKAGES_TAG],
-        responses: APIResponseSpec.describeBasic(
-            APIResponseSpec.success("Packages retrieved successfully", AdminPackageModel.ListResponse)
-        )
-    }),
-
-    async (c) => {
-        const packages = await DB.instance().select().from(DB.Schema.packages);
-        return APIResponse.success(c, "Packages retrieved successfully", packages);
     }
 );
 
