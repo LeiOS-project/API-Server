@@ -86,6 +86,7 @@ export const packageReleases = sqliteTable('package_releases', {
  */
 export const stablePromotionRequests = sqliteTable('stable_promotion_requests', {
     id: int().primaryKey({ autoIncrement: true }),
+    package_id: int().notNull().references(() => packages.id),
     package_release_id: int().notNull().references(() => packageReleases.id),
     status: text({ enum: ['pending', 'approved', 'denied'] }).default('pending').notNull(),
     decision_reason: text(),

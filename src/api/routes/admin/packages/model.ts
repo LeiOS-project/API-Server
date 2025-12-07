@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { createInsertSchema } from "drizzle-zod";
 import { DB } from "../../../../db";
-import { PackageModel } from "../../developer/packages/model";
+import { PackageModel } from "../../../utils/shared-models/package";
 
 export namespace AdminPackageModel.CreatePackage {
 

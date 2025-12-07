@@ -5,12 +5,12 @@ import { and, eq, or } from "drizzle-orm";
 import { APIResponse } from "../../../utils/api-res";
 import { APIResponseSpec, APIRouteSpec } from "../../../utils/specHelpers";
 import { DB } from "../../../../db";
-import { StableRequestModel } from "../../shared/stableRequests";
 import { AdminPackageModel } from "./model";
 import { AptlyAPI } from "../../../../aptly/api";
 import { AuthHandler } from "../../../utils/authHandler";
 import { DOCS_TAGS } from "../../../docs";
-import { PackageModel } from "../../developer/packages/model";
+import { PackageModel } from "../../../utils/shared-models/package";
+import { PackagesService } from "../../../utils/services/packages";
 
 export const router = new Hono().basePath('/packages');
 
@@ -27,14 +27,7 @@ router.get('/',
     }),
 
     async (c) => {
-        // @ts-ignore
-        const authContext = c.get("authContext") as AuthHandler.AuthContext;
-
-        const packages = await DB.instance().select().from(DB.Schema.packages).where(
-            eq(DB.Schema.packages.owner_user_id, authContext.user_id)
-        );
-
-        return APIResponse.success(c, "Packages retrieved successfully", packages);
+        return await PackagesService.getAllPackages(c, true);
     }
 );
 
@@ -55,24 +48,9 @@ router.post('/',
     zValidator("json", AdminPackageModel.CreatePackage.Body),
 
     async (c) => {
-
         const packageData = c.req.valid("json");
 
-        const owner = DB.instance().select().from(DB.Schema.users).where(
-            eq(DB.Schema.users.id, packageData.owner_user_id),
-        ).get();
-        if (!owner || (owner.role !== 'developer' && owner.role !== 'admin')) {
-            return APIResponse.badRequest(c, "Owner user ID does not correspond to a developer account");
-        }
-
-        const existingPackage = DB.instance().select().from(DB.Schema.packages).where(eq(DB.Schema.packages.name, packageData.name)).get();
-        if (existingPackage) {
-            return APIResponse.conflict(c, "Package with this name already exists");
-        }
-
-        const result = DB.instance().insert(DB.Schema.packages).values(packageData).returning().get();
-
-        return APIResponse.created(c, "Package created successfully", { id: result.id });
+        return await PackagesService.createPackage(c, packageData, true);
     }
 );
 
@@ -84,19 +62,9 @@ router.use('/:packageID/*',
 
     async (c, next) => {
         // @ts-ignore
-        const { packageID } = c.req.valid("param");
+        const { packageID } = c.req.valid("param") as { packageID: number };
 
-        const packageData = DB.instance().select().from(DB.Schema.packages).where(
-            eq(DB.Schema.packages.id, packageID)
-        ).get();
-
-        if (!packageData) {
-            return APIResponse.notFound(c, "Package with specified ID not found");
-        }
-        // @ts-ignore
-        c.set("package", packageData);
-
-        await next();
+        return await PackagesService.packageMiddleware(c, next, packageID, true);
     }
 );
 
@@ -114,10 +82,7 @@ router.get('/:packageID',
     }),
 
     async (c) => {
-        // @ts-ignore
-        const packageData = c.get("package") as DB.Models.Package;
-
-        return APIResponse.success(c, "Package retrieved successfully", packageData);
+        return await PackagesService.getPackageAfterMiddleware(c);
     }
 );
 
@@ -137,16 +102,9 @@ router.put('/:packageID',
     zValidator("json", PackageModel.UpdatePackage.Body),
 
     async (c) => {
-        // @ts-ignore
-        const packageData = c.get("package") as DB.Models.Package;
-
         const updateData = c.req.valid("json");
 
-        await DB.instance().update(DB.Schema.packages).set(updateData).where(
-            eq(DB.Schema.packages.id, packageData.id)
-        );
-
-        return APIResponse.successNoData(c, "Package updated successfully");
+        return await PackagesService.updatePackageAfterMiddleware(c, updateData);
     }
 );
 
@@ -164,16 +122,7 @@ router.delete('/:packageID',
     }),
 
     async (c) => {
-        // @ts-ignore
-        const packageData = c.get("package") as DB.Models.Package;
-
-        await DB.instance().delete(DB.Schema.packages).where(
-            eq(DB.Schema.packages.id, packageData.id)
-        );
-
-        await AptlyAPI.Packages.deleteAllInAllRepos(packageData.name);
-
-        return APIResponse.successNoData(c, "Package deleted successfully");
+        return await PackagesService.deletePackageAfterMiddlewareAsAdmin(c);
     }
 );
 
@@ -183,7 +132,7 @@ router.get('/stable-requests',
     APIRouteSpec.authenticated({
         summary: "List stable promotion requests",
         description: "Retrieve stable promotion requests with optional status filtering.",
-        tags: [ADMIN_STABLE_REQUESTS_TAG],
+        tags: [DOCS_TAGS.ADMIN_API.PACKAGES_STABLE_REQUESTS],
         responses: APIResponseSpec.describeBasic(
             APIResponseSpec.success("Stable promotion requests retrieved successfully", StableRequestModel.List.Response)
         )

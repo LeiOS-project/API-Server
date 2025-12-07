@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { StableRequestModel } from "../src/api/routes/shared/stableRequests";
+import { StableRequestModel } from "../src/api/utils/shared-models/stableRequests";
 
 describe("StableRequestModel schemas", () => {
 

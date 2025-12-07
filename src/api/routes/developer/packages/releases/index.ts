@@ -3,11 +3,11 @@ import { PackageReleaseModel } from './model'
 import { validator as zValidator } from "hono-openapi";
 import { APIResponse } from "../../../../utils/api-res";
 import { APIResponseSpec, APIRouteSpec } from "../../../../utils/specHelpers";
-import z from "zod";
+import { z } from "zod";
 import { DB } from "../../../../../db";
 import { AptlyAPI } from "../../../../../aptly/api";
 import { AuthHandler } from "../../../../utils/authHandler";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 export const router = new Hono().basePath('/releases');
 
@@ -114,23 +114,24 @@ router.post('/:version/:arch',
 
 
 
-router.use('/:version/*',
+router.use('/:releaseID/*',
 
     zValidator("param", z.object({
-        version: z.string().min(1)
+        releaseID: z.int().positive()
     })),
 
     async (c, next) => {
         // @ts-ignore
-        const { version } = c.req.valid("param");
+        const { releaseID } = c.req.valid("param") as { releaseID: number };
 
         // @ts-ignore
         const packageData = c.get("package") as DB.Models.Package;
-        const releaseData = await AptlyAPI.Packages.getVersionInRepo("leios-archive", packageData.name, version);
-        if (!releaseData) {
-            return APIResponse.notFound(c, "Release with specified version not found");
-        }
         
+        const releaseData = DB.instance().select().from(DB.Schema.packageReleases).where(and(
+            eq(DB.Schema.packageReleases.id, releaseID),
+            eq(DB.Schema.packageReleases.package_id, packageData.id)
+        )).get();
+
         // @ts-ignore
         c.set("release", releaseData);
 
@@ -139,7 +140,7 @@ router.use('/:version/*',
 );
 
 
-router.get('/:packageName',
+router.get('/:releaseID',
 
     APIRouteSpec.authenticated({
         summary: "Get package release details",

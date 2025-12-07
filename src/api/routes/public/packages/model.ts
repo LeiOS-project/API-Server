@@ -1,5 +1,5 @@
 import z from "zod";
-import { PackageModel } from "../../developer/packages/model";
+import { PackageModel } from "../../../utils/shared-models/package";
 import { AptlyAPI } from "../../../../aptly/api";
 
 export namespace PackagesModel {

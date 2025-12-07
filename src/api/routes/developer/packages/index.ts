@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { PackageModel } from './model'
+import { PackageModel } from '../../../utils/shared-models/package'
 import { validator as zValidator } from "hono-openapi";
 import { DB } from "../../../../db";
 import { eq, and } from "drizzle-orm";
@@ -8,8 +8,9 @@ import { APIResponseSpec, APIRouteSpec } from "../../../utils/specHelpers";
 import { AuthHandler } from "../../../utils/authHandler";
 import { z } from "zod";
 import { router as releasesRouter } from "./releases/index";
-import { router as stableRequestsRouter } from "./stable-promotion-requests/index";
+import { router as stableRequestsRouter } from "./stable-promotion-requests";
 import { DOCS_TAGS } from "../../../docs";
+import { PackagesService } from "../../../utils/services/packages";
 
 export const router = new Hono().basePath('/packages');
 
@@ -26,14 +27,7 @@ router.get('/',
     }),
 
     async (c) => {
-        // @ts-ignore
-        const authContext = c.get("authContext") as AuthHandler.AuthContext;
-
-        const packages = await DB.instance().select().from(DB.Schema.packages).where(
-            eq(DB.Schema.packages.owner_user_id, authContext.user_id)
-        );
-
-        return APIResponse.success(c, "Packages retrieved successfully", packages);
+        return await PackagesService.getAllPackages(c, false);
     }
 );
 
@@ -53,22 +47,9 @@ router.post('/',
     zValidator("json", PackageModel.CreatePackage.Body),
 
     async (c) => {
-        // @ts-ignore
-        const authContext = c.get("authContext") as AuthHandler.AuthContext;
-
         const packageData = c.req.valid("json");
 
-        const existingPackage = DB.instance().select().from(DB.Schema.packages).where(eq(DB.Schema.packages.name, packageData.name)).get();
-        if (existingPackage) {
-            return APIResponse.conflict(c, "Package with this name already exists");
-        }
-
-        const result = DB.instance().insert(DB.Schema.packages).values({
-            ...packageData,
-            owner_user_id: authContext.user_id
-        }).returning().get();
-
-        return APIResponse.created(c, "Package created successfully", { id: result.id });
+        return await PackagesService.createPackage(c, packageData, false);
     }
 );
 
@@ -82,23 +63,9 @@ router.use('/:packageID/*',
 
     async (c, next) => {
         // @ts-ignore
-        const { packageID } = c.req.valid("param");
+        const { packageID } = c.req.valid("param") as { packageID: number };
 
-        // @ts-ignore
-        const authContext = c.get("authContext") as AuthHandler.AuthContext;
-
-        const packageData = DB.instance().select().from(DB.Schema.packages).where(and(
-            eq(DB.Schema.packages.id, packageID),
-            eq(DB.Schema.packages.owner_user_id, authContext.user_id)
-        )).get();
-
-        if (!packageData) {
-            return APIResponse.notFound(c, "Package with specified ID not found");
-        }
-        // @ts-ignore
-        c.set("package", packageData);
-
-        await next();
+        return await PackagesService.packageMiddleware(c, next, packageID, false);
     }
 );
 
@@ -117,10 +84,7 @@ router.get('/:packageID',
     }),
 
     async (c) => {
-        // @ts-ignore
-        const packageData = c.get("package") as DB.Models.Package;
-
-        return APIResponse.success(c, "Package retrieved successfully", packageData);
+        return await PackagesService.getPackageAfterMiddleware(c);
     }
 );
 
@@ -140,16 +104,9 @@ router.put('/:packageID',
     zValidator("json", PackageModel.UpdatePackage.Body),
 
     async (c) => {
-        // @ts-ignore
-        const packageData = c.get("package") as DB.Models.Package;
-
         const updateData = c.req.valid("json");
 
-        await DB.instance().update(DB.Schema.packages).set(updateData).where(
-            eq(DB.Schema.packages.id, packageData.id)
-        );
-
-        return APIResponse.successNoData(c, "Package updated successfully");
+        return await PackagesService.updatePackageAfterMiddleware(c, updateData);
     }
 );
 
