@@ -19,7 +19,8 @@ export class Logger {
     }
 
     static getLogLevel(): Logger.LogLevel {
-        return Object.entries(this.logLevelMap).find(([_, value]) => value === this.logLevel) as any;
+        const match = Object.entries(this.logLevelMap).find(([_, value]) => value === this.logLevel);
+        return (match ? match[0] : "info") as Logger.LogLevel;
     }
 
     static debug(...args: any[]) {

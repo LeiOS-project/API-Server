@@ -32,6 +32,10 @@ export class Main {
                 prefix: config.LRA_S3_PREFIX,
                 accessKeyId: config.LRA_S3_ACCESS_KEY_ID,
                 secretAccessKey: config.LRA_S3_SECRET_ACCESS_KEY
+            },
+            keySettings: {
+                publicKeyPath: config.LRA_PUBLIC_KEY_PATH ?? "./data/keys/public-key.gpg",
+                privateKeyPath: config.LRA_PRIVATE_KEY_PATH ?? "./data/keys/private-key.gpg",
             }
         });
 

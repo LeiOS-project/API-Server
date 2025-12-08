@@ -15,6 +15,10 @@ export interface AptlyAPISettings {
         accessKeyId?: string;
         secretAccessKey?: string;
     };
+    keySettings: {
+        publicKeyPath: string;
+        privateKeyPath: string;
+    };
 }
 
 export class AptlyAPIServer {
@@ -36,6 +40,10 @@ export class AptlyAPIServer {
     }
     static get aptlyConfigPath() {
         return this.settings.aptlyRoot + "/.config/aptly.conf";
+    }
+
+    static get dearmoredKeysDir() {
+        return this.settings.aptlyRoot + "/.keys";
     }
 
     // public static aptlyRoot: string;
@@ -69,6 +77,9 @@ export class AptlyAPIServer {
                 "api", "serve",
                 "-listen=127.0.0.1:" + this.settings.aptlyPort.toString()
             ],
+            env: {
+                PATH: process.env.PATH
+            },
             stdin: 'ignore',
             stdout: 'pipe',
             // stdout: 'ignore',
@@ -101,6 +112,7 @@ export class AptlyAPIServer {
             const config = {
                 "rootDir": this.aptlyDataDir,
                 "logLevel": Logger.getLogLevel(),
+                "gpgProvider": "internal",
                 // "EnableSwaggerEndpoint": true,
                 "S3PublishEndpoints": {
                     "leios-live-repo": {

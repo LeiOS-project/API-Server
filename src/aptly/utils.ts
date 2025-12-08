@@ -57,6 +57,42 @@ export class AptlyUtils {
         }
     }
 
+    static async ensureBinaryGpgKeyring(sourcePath: string, outputPath: string) {
+        const fileExists = await fs.access(sourcePath).then(() => true).catch(() => false);
+        if (!fileExists) {
+            throw new Error(`GPG key file not found at ${sourcePath}`);
+        }
+
+        await fs.mkdir(path.dirname(outputPath), { recursive: true });
+
+        const buffer = await fs.readFile(sourcePath);
+        const header = buffer.slice(0, 64).toString("utf8");
+        const isArmored = header.includes("BEGIN PGP");
+
+        if (!isArmored) {
+            if (sourcePath !== outputPath) {
+                await fs.copyFile(sourcePath, outputPath);
+            }
+            return outputPath;
+        }
+
+        const dearmorProcess = Bun.spawn({
+            cmd: ["gpg", "--dearmor", "--yes", "--output", outputPath, sourcePath],
+            stdin: "ignore",
+            stdout: "pipe",
+            stderr: "pipe",
+        });
+
+        const exitCode = await dearmorProcess.exited;
+        if (exitCode !== 0) {
+            const stderrText = dearmorProcess.stderr ? await new Response(dearmorProcess.stderr).text() : "";
+            throw new Error(`Failed to dearmor GPG key at ${sourcePath}: ${stderrText}`);
+        }
+
+        Logger.info(`GPG key at ${sourcePath} dearmored to ${outputPath}`);
+        return outputPath;
+    }
+
     static forwardAptlyOutput(stream: ReadableStream<Uint8Array> | null, logFn: (message: string) => void) {
         if (!stream) return;
 
@@ -153,6 +189,16 @@ export class AptlyUtils {
 
     static async initialRepoPublishIfNeeded() {
 
+        const publicKeyringPath = await this.ensureBinaryGpgKeyring(AptlyAPIServer.settings.keySettings.publicKeyPath, path.join(AptlyAPIServer.dearmoredKeysDir, "public-key.dearmored.gpg"));
+        const secretKeyringPath = await this.ensureBinaryGpgKeyring(AptlyAPIServer.settings.keySettings.privateKeyPath, path.join(AptlyAPIServer.dearmoredKeysDir, "private-key.dearmored.gpg"));
+
+        const signingConfig = {
+            Keyring: publicKeyringPath,
+            SecretKeyring: secretKeyringPath,
+        } as const;
+
+        const publishPrefix = "s3:leios-live-repo:";
+
 
         const existingPublishedReposResult = await AptlyAPIServer.getClient().getApiPublish({});
         if (!existingPublishedReposResult.data) {
@@ -163,7 +209,7 @@ export class AptlyUtils {
         if (!existingPublishedRepos.some(pub => pub.Storage === "s3:leios-live-repo" && pub.Distribution === "testing")) {
             const testingPublishResult = await AptlyAPIServer.getClient().postApiPublishByPrefix({
                 path: {
-                    prefix: "s3:leios-live-repo",
+                    prefix: publishPrefix,
                 },
                 body: {
                     SourceKind: "local",
@@ -173,11 +219,16 @@ export class AptlyUtils {
                             Component: "main"
                         }
                     ],
-                    Distribution: "testing"
+                    Distribution: "testing",
+                    Architectures: [
+                        "amd64",
+                        "arm64"
+                    ],
+                    Signing: signingConfig,
                 }
             });
 
-            Logger.info("Pubklished initial state of 'leios-testing' repository.");
+            Logger.info("Published initial state of 'leios-testing' repository.");
             if (!testingPublishResult.data) {
                 throw new Error("Failed to publish 'leios-testing' repository: " + testingPublishResult.error.error);
             }
@@ -194,12 +245,17 @@ export class AptlyUtils {
                 }
             });
             if (!createSnapshotResult.data) {
-                throw new Error("Failed to create initial snapshot for 'leios-stable' repository: " + createSnapshotResult.error.error);
+                const errMsg = createSnapshotResult.error?.error || "";
+                if (errMsg.includes("already exists")) {
+                    Logger.info("Initial 'leios-stable-0000.00.0' snapshot already exists, skipping creation.");
+                } else {
+                    throw new Error("Failed to create initial snapshot for 'leios-stable' repository: " + errMsg);
+                }
             }
 
             const stablePublishResult = await AptlyAPIServer.getClient().postApiPublishByPrefix({
                 path: {
-                    prefix: "s3:leios-live-repo",
+                    prefix: publishPrefix,
                 },
                 body: {
                     SourceKind: "snapshot",
@@ -209,7 +265,12 @@ export class AptlyUtils {
                             Component: "main"
                         }
                     ],
-                    Distribution: "stable"
+                    Distribution: "stable",
+                    Architectures: [
+                        "amd64",
+                        "arm64"
+                    ],
+                    Signing: signingConfig,
                 }
             });
 
