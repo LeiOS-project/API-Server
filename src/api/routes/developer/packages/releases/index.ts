@@ -1,13 +1,8 @@
 import { Hono } from "hono";
 import { PackageReleaseModel } from '../../../../utils/shared-models/pkg-releases'
 import { validator as zValidator } from "hono-openapi";
-import { APIResponse } from "../../../../utils/api-res";
 import { APIResponseSpec, APIRouteSpec } from "../../../../utils/specHelpers";
 import { z } from "zod";
-import { DB } from "../../../../../db";
-import { AptlyAPI } from "../../../../../aptly/api";
-import { AuthHandler } from "../../../../utils/authHandler";
-import { eq, and } from "drizzle-orm";
 import { PkgReleasesService } from "../../../../utils/services/pkg-releases";
 
 export const router = new Hono().basePath('/releases');
