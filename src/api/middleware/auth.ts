@@ -11,7 +11,7 @@ export const authMiddleware = createMiddleware(async (c, next) => {
         c.req.path.startsWith("/favicon.ico") ||
         c.req.path === "/"
     ) {
-        await next();
+        return await next();
     }
 
     const authHeader = c.req.header("Authorization");
@@ -30,6 +30,6 @@ export const authMiddleware = createMiddleware(async (c, next) => {
 
     c.set("authContext", authContext);
 
-    await next();
+    return await next();
 
 });

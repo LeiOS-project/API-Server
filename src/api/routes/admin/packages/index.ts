@@ -57,7 +57,7 @@ router.post('/',
 router.use('/:packageID/*',
 
     zValidator("param", z.object({
-        packageID: z.int().positive()
+        packageID: z.coerce.number().int().positive()
     })),
 
     async (c, next) => {

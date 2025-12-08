@@ -37,7 +37,9 @@ router.post('/:version/:arch',
         )
     }),
 
-    zValidator("form", z.file()),
+    zValidator("form", z.object({
+        file: z.file()
+    })),
 
     zValidator("param", z.object({
         version: z.string().min(1),
@@ -49,7 +51,7 @@ router.post('/:version/:arch',
     })),
 
     async (c) => {
-        const file = c.req.valid("form");
+        const { file } = c.req.valid("form");
 
         const { version, arch } = c.req.valid("param");
         const { leios_patch } = c.req.valid("query");
@@ -63,7 +65,7 @@ router.post('/:version/:arch',
 router.use('/:releaseID/*',
 
     zValidator("param", z.object({
-        releaseID: z.int().positive()
+        releaseID: z.coerce.number().int().positive()
     })),
 
     async (c, next) => {

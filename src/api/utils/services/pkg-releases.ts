@@ -74,6 +74,13 @@ export class PkgReleasesService {
                 return APIResponse.serverError(c, "Failed to copy package release into testing repository");
             }
 
+            await DB.instance().insert(DB.Schema.packageReleases).values({
+                package_id: packageData.id,
+                version,
+                leios_patch: leios_patch ?? null,
+                architecture: arch
+            });
+
             if (arch === "amd64") {
                 await DB.instance().update(DB.Schema.packages).set({
                     latest_stable_release_amd64: AptlyUtils.buildVersionWithLeiOSSuffix(version, leios_patch)
