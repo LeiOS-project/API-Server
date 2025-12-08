@@ -7,6 +7,14 @@ import { AptlyUtils } from './utils';
 export interface AptlyAPISettings {
     aptlyRoot: string;
     aptlyPort: number;
+    s3Settings: {
+        endpoint: string;
+        region: string;
+        bucket: string;
+        prefix?: string;
+        accessKeyId?: string;
+        secretAccessKey?: string;
+    };
 }
 
 export class AptlyAPIServer {
@@ -15,23 +23,33 @@ export class AptlyAPIServer {
 
     public static aptlyProcess: Bun.Subprocess<"ignore", "pipe", "pipe">;
 
-    public static aptlyRoot: string;
-    public static aptlyDataDir: string;
-    public static aptlyUploadDir: string;
-    public static aptlyBinaryPath: string;
-    public static aptlyConfigPath: string;
-    public static aptlyPort: number;
+    public static settings: AptlyAPISettings;
+
+    static get aptlyDataDir() {
+        return this.settings.aptlyRoot + "/data";
+    }
+    static get aptlyUploadDir() {
+        return this.aptlyDataDir + "/upload";
+    }
+    static get aptlyBinaryPath() {
+        return this.settings.aptlyRoot + "/bin/aptly";
+    }
+    static get aptlyConfigPath() {
+        return this.settings.aptlyRoot + "/.config/aptly.conf";
+    }
+
+    // public static aptlyRoot: string;
+    // public static aptlyDataDir: string;
+    // public static aptlyUploadDir: string;
+    // public static aptlyBinaryPath: string;
+    // public static aptlyConfigPath: string;
+    // public static aptlyPort: number;
 
     static async init(settings: AptlyAPISettings) {
         if (this.isInitialized) return;
         this.isInitialized = true;
 
-        this.aptlyRoot = settings.aptlyRoot;
-        this.aptlyDataDir = settings.aptlyRoot + "/data";
-        this.aptlyUploadDir = this.aptlyDataDir + "/upload";
-        this.aptlyBinaryPath = settings.aptlyRoot + "/bin/aptly";
-        this.aptlyConfigPath = settings.aptlyRoot + "/.config/aptly.conf";
-        this.aptlyPort = settings.aptlyPort;
+        this.settings = settings;
 
         await AptlyUtils.downloadAptlyBinaryIfNeeded(this.aptlyBinaryPath);
 
@@ -49,7 +67,7 @@ export class AptlyAPIServer {
                 this.aptlyBinaryPath,
                 "-config=" + this.aptlyConfigPath,
                 "api", "serve",
-                "-listen=127.0.0.1:" + this.aptlyPort.toString()
+                "-listen=127.0.0.1:" + this.settings.aptlyPort.toString()
             ],
             stdin: 'ignore',
             stdout: 'pipe',
@@ -69,7 +87,7 @@ export class AptlyAPIServer {
         }
 
         client.setConfig({
-            baseUrl: `http://127.0.0.1:${this.aptlyPort}`
+            baseUrl: `http://127.0.0.1:${this.settings.aptlyPort}`
         });
 
         await this.createDefaultRepositoriesIfNeeded();
@@ -83,7 +101,16 @@ export class AptlyAPIServer {
                 "rootDir": this.aptlyDataDir,
                 "logLevel": Logger.getLogLevel(),
                 // "EnableSwaggerEndpoint": true,
-                "S3PublishEndpoints": null,
+                "S3PublishEndpoints": {
+                    "leios-live-repo": {
+                        "region": this.settings.s3Settings.region,
+                        "awsAccessKeyID": this.settings.s3Settings.accessKeyId,
+                        "awsSecretAccessKey": this.settings.s3Settings.secretAccessKey,
+                        "endpoint": this.settings.s3Settings.endpoint,
+                        "bucket": this.settings.s3Settings.bucket,
+                        "prefix": this.settings.s3Settings.prefix || "",
+                    }
+                },
                 "FileSystemPublishEndpoints": null,
                 "SwiftPublishEndpoints": null,
                 "AzurePublishEndpoints": null,

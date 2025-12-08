@@ -115,6 +115,14 @@ export class ConfigHandler {
         .add("LRA_APTLY_ROOT", false)
         .add("LRA_APTLY_PORT", false)
 
+        .add("LRA_S3_ENDPOINT", true)
+        .add("LRA_S3_REGION", true)
+        .add("LRA_S3_BUCKET", true)
+        .add("LRA_S3_PREFIX", false)
+        .add("LRA_S3_ACCESS_KEY_ID", true)
+        .add("LRA_S3_SECRET_ACCESS_KEY", true)
+    ;
+
 
     private static config: ParsedConfig | null = null;
 

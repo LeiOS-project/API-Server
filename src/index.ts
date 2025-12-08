@@ -19,6 +19,14 @@ export class Main {
         await AptlyAPIServer.init({
             aptlyRoot: config.LRA_APTLY_ROOT ?? "./data/aptly",
             aptlyPort: parseInt(config.LRA_APTLY_PORT ?? "12150"),
+            s3Settings: {
+                endpoint: config.LRA_S3_ENDPOINT,
+                region: config.LRA_S3_REGION,
+                bucket: config.LRA_S3_BUCKET,
+                prefix: config.LRA_S3_PREFIX,
+                accessKeyId: config.LRA_S3_ACCESS_KEY_ID,
+                secretAccessKey: config.LRA_S3_SECRET_ACCESS_KEY
+            }
         });
 
         await API.init();

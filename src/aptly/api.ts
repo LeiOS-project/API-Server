@@ -288,3 +288,4 @@ export namespace AptlyAPI.Packages.Models {
     export type getAllInAllReposResponse = z.infer<typeof getAllInAllReposResponse>;
 
 }
+
