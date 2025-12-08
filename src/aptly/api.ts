@@ -258,10 +258,18 @@ export namespace AptlyAPI.Packages {
 export namespace AptlyAPI.Publishing {
 
     // testing repo is updated continuously without snapshots
-    export function updateLiveTestingRepo() {
+    export async function updateLiveTestingRepo() {
+        const result = await AptlyAPIServer.getClient().postApiPublishByPrefixByDistributionUpdate({
+            path: {
+                prefix: "s3:leios-live-repo",
+                distribution: "leios-testing"
+            },
+            body: {}
+        });
 
-        const result = AptlyAPIServer.getClient().post
-
+        if (!result.data) {
+            throw new Error("Failed to update live testing repository: " + result.error);
+        }
     }
 
 }

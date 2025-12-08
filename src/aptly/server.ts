@@ -91,6 +91,7 @@ export class AptlyAPIServer {
         });
 
         await AptlyUtils.createDefaultRepositoriesIfNeeded();
+        await AptlyUtils.initialRepoPublishIfNeeded();
     }
 
     protected static async setupAptlyConfig(overrideConfig: Record<string, any> = {}) {

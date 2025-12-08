@@ -64,7 +64,7 @@ router.get('/:requestID',
         tags: [DOCS_TAGS.ADMIN_API.STABLE_PROMOTION_REQUESTS],
 
         responses: APIResponseSpec.describeBasic(
-            APIResponseSpec.success("Stable promotion request retrieved successfully", AdminStablePromotionRequestModel.Get.Response),
+            APIResponseSpec.success("Stable promotion request retrieved successfully", AdminStablePromotionRequestModel.GetById.Response),
             APIResponseSpec.notFound("Stable promotion request not found")
         )
     }),

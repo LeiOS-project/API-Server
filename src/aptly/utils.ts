@@ -152,7 +152,7 @@ export class AptlyUtils {
 
     }
 
-    static async initialRepoPublish() {
+    static async initialRepoPublishIfNeeded() {
 
         try {
 
