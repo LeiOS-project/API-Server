@@ -146,7 +146,6 @@ export class AptlyUtils {
             }
 
         } catch (error) {
-            Logger.error("Failed to create default repositories: ", error);
             throw new Error("Failed to create default repositories: " + error);
         }
 
@@ -223,9 +222,8 @@ export class AptlyUtils {
             }
 
 
-        } catch (error) {
-            Logger.error("Failed to perform initial repository publish: ", error);
-            throw new Error("Failed to perform initial repository publish: " + error);
+        } catch (error: any) {
+            throw new Error("Failed to perform initial repository publish: " + error.message);
         }
 
     }
