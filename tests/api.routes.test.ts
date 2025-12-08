@@ -21,7 +21,6 @@ const PACKAGE_ARCH: Arch = "amd64";
 const PACKAGE_MAINTAINER_NAME = "Carter Li";
 const PACKAGE_MAINTAINER_EMAIL = "zhangsongcui@live.cn";
 
-type Repo = AptlyAPI.Utils.Repos;
 type Arch = AptlyAPI.Utils.Architectures;
 
 const createdAptPackages = new Set<string>();
