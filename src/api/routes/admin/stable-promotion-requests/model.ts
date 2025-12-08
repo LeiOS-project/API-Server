@@ -1,0 +1,19 @@
+import { createInsertSchema, createSelectSchema, createUpdateSchema } from "drizzle-zod";
+import { DB } from "../../../../db";
+import z from "zod";
+
+export namespace AdminStablePromotionRequestModel.GetById {
+
+    export const Response = createSelectSchema(DB.Schema.stablePromotionRequests)
+
+    export type Response = z.infer<typeof Response>;
+
+}
+
+export namespace AdminStablePromotionRequestModel.GetAll {
+
+    export const Response = z.array(AdminStablePromotionRequestModel.GetById.Response);
+
+    export type Response = z.infer<typeof Response>;
+
+}

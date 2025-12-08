@@ -17,4 +17,5 @@ router.use("*", async (c, next) => {
 
 router.route("/", (await import('./users')).router);
 router.route("/", (await import('./packages')).router);
+router.route("/", (await import('./stable-promotion-requests')).router);
 

@@ -6,9 +6,9 @@ import { APIResponse } from "../../../utils/api-res";
 import { APIResponseSpec, APIRouteSpec } from "../../../utils/specHelpers";
 import { AdminUsersModel } from "./model";
 import { AuthHandler, SessionHandler } from "../../../utils/authHandler";
+import { DOCS_TAGS } from "../../../docs";
 
 const TARGET_USER_KEY = "adminTargetUser";
-const ADMIN_USERS_TAG = "Admin API / Users";
 
 const sanitizeUser = (user: DB.Models.User) => AdminUsersModel.SafeUser.parse(user);
 
@@ -19,7 +19,7 @@ router.get('/',
     APIRouteSpec.authenticated({
         summary: "List users",
         description: "Retrieve LeiOS accounts with optional role and search filters.",
-        tags: [ADMIN_USERS_TAG],
+        tags: [DOCS_TAGS.ADMIN_API.USERS],
 
         responses: APIResponseSpec.describeBasic(
             APIResponseSpec.success("Users retrieved successfully", AdminUsersModel.GetAll.Response)
@@ -73,7 +73,7 @@ router.post('/',
     APIRouteSpec.authenticated({
         summary: "Create user",
         description: "Provision a new LeiOS account with the desired role.",
-        tags: [ADMIN_USERS_TAG],
+        tags: [DOCS_TAGS.ADMIN_API.USERS],
 
         responses: APIResponseSpec.describeWithWrongInputs(
             APIResponseSpec.created("User created successfully", AdminUsersModel.Create.Response),
@@ -136,7 +136,7 @@ router.get('/:userId',
     APIRouteSpec.authenticated({
         summary: "Get user",
         description: "Retrieve details for a specific LeiOS account.",
-        tags: [ADMIN_USERS_TAG],
+        tags: [DOCS_TAGS.ADMIN_API.USERS],
 
         responses: APIResponseSpec.describeBasic(
             APIResponseSpec.success("User retrieved successfully", AdminUsersModel.Create.Response),
@@ -156,7 +156,7 @@ router.put('/:userId',
     APIRouteSpec.authenticated({
         summary: "Update user",
         description: "Modify profile fields or role for a LeiOS account.",
-        tags: [ADMIN_USERS_TAG],
+        tags: [DOCS_TAGS.ADMIN_API.USERS],
 
         responses: APIResponseSpec.describeWithWrongInputs(
             APIResponseSpec.success("User updated successfully", AdminUsersModel.Create.Response),
@@ -227,7 +227,7 @@ router.put('/:userId/password',
     APIRouteSpec.authenticated({
         summary: "Reset user password",
         description: "Set a new password for a LeiOS account and revoke active sessions.",
-        tags: [ADMIN_USERS_TAG],
+        tags: [DOCS_TAGS.ADMIN_API.USERS],
 
         responses: APIResponseSpec.describeWithWrongInputs(
             APIResponseSpec.successNoData("Password reset successfully"),
@@ -261,7 +261,7 @@ router.delete('/:userId',
     APIRouteSpec.authenticated({
         summary: "Delete user",
         description: "Permanently remove a LeiOS account after verifying it has no owned packages.",
-        tags: [ADMIN_USERS_TAG],
+        tags: [DOCS_TAGS.ADMIN_API.USERS],
 
         responses: APIResponseSpec.describeBasic(
             APIResponseSpec.successNoData("User deleted successfully"),

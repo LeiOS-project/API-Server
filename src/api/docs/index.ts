@@ -84,5 +84,8 @@ export const DOCS_TAGS = {
         PACKAGES: "Admin API / Packages",
         PACKAGES_RELEASES: "Admin API / Packages / Releases",
         PACKAGES_STABLE_REQUESTS: "Admin API / Packages / Stable Promotion Requests",
+
+        USERS: "Admin API / Users",
+        STABLE_PROMOTION_REQUESTS: "Admin API / Stable Promotion Requests",
     }
 }

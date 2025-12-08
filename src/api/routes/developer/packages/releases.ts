@@ -4,6 +4,7 @@ import { validator as zValidator } from "hono-openapi";
 import { APIResponseSpec, APIRouteSpec } from "../../../utils/specHelpers";
 import { z } from "zod";
 import { PkgReleasesService } from "../../../utils/services/pkg-releases";
+import { DOCS_TAGS } from "../../../docs";
 
 export const router = new Hono().basePath('/releases');
 
@@ -12,7 +13,7 @@ router.get('/',
     APIRouteSpec.authenticated({
         summary: "List all package releases",
         description: "Retrieve a list of all releases for the specified package.",
-        tags: ['Developer API / Packages / Releases'],
+        tags: [DOCS_TAGS.DEV_API.PACKAGES_RELEASES],
 
         responses: APIResponseSpec.describeBasic(
             APIResponseSpec.success("Package releases retrieved successfully", PackageReleaseModel.GetAll.Response)
@@ -29,7 +30,7 @@ router.post('/:version/:arch',
     APIRouteSpec.authenticated({
         summary: "Create a new package release",
         description: "Create a new release for the specified package.",
-        tags: ['Developer API / Packages / Releases'],
+        tags: [DOCS_TAGS.DEV_API.PACKAGES_RELEASES],
 
         responses: APIResponseSpec.describeWithWrongInputs(
             APIResponseSpec.created("Package release created successfully", PackageReleaseModel.CreateRelease.Response),
@@ -82,7 +83,7 @@ router.get('/:releaseID',
     APIRouteSpec.authenticated({
         summary: "Get package release details",
         description: "Retrieve details of a specific package release.",
-        tags: ['Developer API / Packages / Releases'],
+        tags: [DOCS_TAGS.DEV_API.PACKAGES_RELEASES],
 
         responses: APIResponseSpec.describeBasic(
             APIResponseSpec.success("Package release retrieved successfully", PackageReleaseModel.GetReleaseByVersion.Response),

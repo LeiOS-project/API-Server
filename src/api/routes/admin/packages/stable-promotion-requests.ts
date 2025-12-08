@@ -15,7 +15,7 @@ router.get('/',
     APIRouteSpec.authenticated({
         summary: "List stable promotion requests for a package",
         description: "Retrieve a list of stable promotion requests for the specified package.",
-        tags: [DOCS_TAGS.DEV_API.PACKAGES_STABLE_REQUESTS],
+        tags: [DOCS_TAGS.ADMIN_API.PACKAGES_STABLE_REQUESTS],
 
         responses: APIResponseSpec.describeBasic(
             APIResponseSpec.success("Stable promotion requests retrieved successfully", StablePromotionRequestsModel.GetAll.Response)
@@ -49,7 +49,7 @@ router.post('/',
     APIRouteSpec.authenticated({
         summary: "Create a stable promotion request for a package",
         description: "Submit a request for an existing release of the specified package to be promoted to stable.",
-        tags: [DOCS_TAGS.DEV_API.PACKAGES_STABLE_REQUESTS],
+        tags: [DOCS_TAGS.ADMIN_API.PACKAGES_STABLE_REQUESTS],
 
         responses: APIResponseSpec.describeWithWrongInputs(
             APIResponseSpec.created("Stable promotion request submitted", StablePromotionRequestsModel.Create.Response),
