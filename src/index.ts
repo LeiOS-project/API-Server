@@ -54,7 +54,7 @@ export class Main {
             process.exit(code);
         } catch {
             Logger.critical("Error during shutdown, forcing exit");
-            this.forceShutdown();
+            Main.forceShutdown();
         }
     }
 
@@ -65,16 +65,16 @@ export class Main {
 
     private static async handleUncaughtException(error: Error) {
         Logger.critical(`Uncaught Exception:\n${error.stack}`);
-        this.gracefulShutdown("SIGTERM", 1);
+        Main.gracefulShutdown("SIGTERM", 1);
     }
 
     private static async handleUnhandledRejection(reason: any) {
         if (reason.stack) {
             // reason is an error
-            return this.handleUncaughtException(reason);
+            return Main.handleUncaughtException(reason);
         }
         Logger.critical(`Unhandled Rejection:\n${reason}`);
-        this.gracefulShutdown("SIGTERM", 1);
+        Main.gracefulShutdown("SIGTERM", 1);
     }
 
 }
