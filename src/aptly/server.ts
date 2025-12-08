@@ -88,7 +88,14 @@ export class AptlyAPIServer {
         });
 
         AptlyUtils.forwardAptlyOutput(this.aptlyProcess.stdout, (line: string) => Logger.info(`[APTLY] ${line}`));
-        AptlyUtils.forwardAptlyOutput(this.aptlyProcess.stderr, (line: string) => Logger.error(`[APTLY] ${line}`));
+        // Aptly sends DBG messages to stderr; route them to debug to avoid noisy errors
+        AptlyUtils.forwardAptlyOutput(this.aptlyProcess.stderr, (line: string) => {
+            if (line.includes("DBG")) {
+                Logger.debug(`[APTLY] ${line}`);
+            } else {
+                Logger.error(`[APTLY] ${line}`);
+            }
+        });
 
 
         await Utils.sleep(1000);
