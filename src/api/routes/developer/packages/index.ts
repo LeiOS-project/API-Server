@@ -3,7 +3,7 @@ import { PackageModel } from '../../../utils/shared-models/package'
 import { validator as zValidator } from "hono-openapi";
 import { APIResponseSpec, APIRouteSpec } from "../../../utils/specHelpers";
 import { z } from "zod";
-import { router as releasesRouter } from "./releases/index";
+import { router as releasesRouter } from "./releases";
 import { router as stableRequestsRouter } from "./stable-promotion-requests";
 import { DOCS_TAGS } from "../../../docs";
 import { PackagesService } from "../../../utils/services/packages";

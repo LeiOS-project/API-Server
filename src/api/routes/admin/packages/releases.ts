@@ -1,9 +1,9 @@
 import { Hono } from "hono";
-import { PackageReleaseModel } from '../../../../utils/shared-models/pkg-releases'
+import { PackageReleaseModel } from '../../../utils/shared-models/pkg-releases'
 import { validator as zValidator } from "hono-openapi";
-import { APIResponseSpec, APIRouteSpec } from "../../../../utils/specHelpers";
+import { APIResponseSpec, APIRouteSpec } from "../../../utils/specHelpers";
 import { z } from "zod";
-import { PkgReleasesService } from "../../../../utils/services/pkg-releases";
+import { PkgReleasesService } from "../../../utils/services/pkg-releases";
 
 export const router = new Hono().basePath('/releases');
 

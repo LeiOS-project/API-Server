@@ -1,13 +1,7 @@
 import { Hono } from "hono";
 import { validator as zValidator } from "hono-openapi";
 import { z } from "zod";
-import { and, eq, or } from "drizzle-orm";
-import { APIResponse } from "../../../utils/api-res";
 import { APIResponseSpec, APIRouteSpec } from "../../../utils/specHelpers";
-import { DB } from "../../../../db";
-import { AdminPackageModel } from "./model";
-import { AptlyAPI } from "../../../../aptly/api";
-import { AuthHandler } from "../../../utils/authHandler";
 import { DOCS_TAGS } from "../../../docs";
 import { PackageModel } from "../../../utils/shared-models/package";
 import { PackagesService } from "../../../utils/services/packages";
@@ -39,13 +33,13 @@ router.post('/',
         tags: [DOCS_TAGS.ADMIN_API.PACKAGES],
 
         responses: APIResponseSpec.describeWithWrongInputs(
-            APIResponseSpec.created("Package created successfully", AdminPackageModel.CreatePackage.Response),
+            APIResponseSpec.created("Package created successfully", PackageModel.CreatePackageAsAdmin.Response),
             APIResponseSpec.badRequest("Owner user ID does not correspond to a developer account"),
             APIResponseSpec.conflict("Package with this name already exists")
         )
     }),
 
-    zValidator("json", AdminPackageModel.CreatePackage.Body),
+    zValidator("json", PackageModel.CreatePackageAsAdmin.Body),
 
     async (c) => {
         const packageData = c.req.valid("json");
