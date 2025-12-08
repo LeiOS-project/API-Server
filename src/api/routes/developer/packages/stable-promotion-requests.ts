@@ -84,5 +84,12 @@ router.post('/',
             return APIResponse.conflict(c, "A request already for this release already exists or the release is already stable");
         }
 
+        const result = await DB.instance().insert(DB.Schema.stablePromotionRequests).values({
+            package_id: packageData.id,
+            package_release_id: requestData.package_release_id,
+            status: "pending"
+        }).returning().get();
+
+        return APIResponse.created(c, "Stable promotion request submitted", { id: result.id } );
     }
 )
