@@ -3,7 +3,7 @@ import { API } from "../../src/api";
 import z, { ZodType } from "zod";
 import { Logger } from "../../src/utils/logger";
 
-export async function makeAPIRequest<ReturnBody>(
+export async function makeAPIRequest<ReturnBody = null>(
     path: string,
     opts: {
         method?: "GET" | "POST" | "PUT" | "DELETE",
@@ -24,38 +24,30 @@ export async function makeAPIRequest<ReturnBody>(
         body: opts.body ? JSON.stringify(opts.body) : undefined
     };
 
-    try {
-        const res = await API.getApp().request(path, options);
 
-        if (!expectedCode) {
-            expect(res.status).toBeOneOf([200, 201, 202, 204]);
-        } else {
-            expect(res.status).toBe(expectedCode);
-        }
+    const res = await API.getApp().request(path, options);
+
+    if (!expectedCode) {
+        expect(res.status).toBeOneOf([200, 201, 202, 204]);
+    } else {
+        expect(res.status).toBe(expectedCode);
+    }
+
+    if (opts.expectedBodySchema) {
 
         const resBody = await res.json();
 
-        if (opts.expectedBodySchema) {
-            const parseResult = opts.expectedBodySchema.safeParse(resBody.data || {});
-            if (parseResult.success) {
-                expect(parseResult.success).toBe(true);
-                return parseResult.data;
-            } else {
-                Logger.error("Response body did not match expected schema:", parseResult.error.message);
-                //@ts-ignore
-                expect(parseResult.success).toBe(true);
-            }
+        const parseResult = opts.expectedBodySchema.safeParse(resBody.data || {});
+        if (parseResult.success) {
+            expect(parseResult.success).toBe(true);
+            return parseResult.data;
+        } else {
+            Logger.error("Response body did not match expected schema:", parseResult.error.message);
+            //@ts-ignore
+            expect(parseResult.success).toBe(true);
         }
-
-        return resBody as ReturnBody;
-        
-    } catch (err) {
-        // let the test fail if an error occurs
-        if (!err) {
-            throw new Error("Unknown error occurred during API request");
-        }
-        expect(err).toBeUndefined();
-
-        return null as any as ReturnBody;
     }
+
+    return null as any as ReturnBody;
+
 }

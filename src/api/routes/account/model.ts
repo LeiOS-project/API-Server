@@ -21,7 +21,8 @@ export namespace AccountModel.UpdateInfo {
         email: z.email('Invalid email'),
     }).omit({
         id: true,
-        password_hash: true
+        password_hash: true,
+        role: true
     }).partial();
 
     export type Body = z.infer<typeof Body>;

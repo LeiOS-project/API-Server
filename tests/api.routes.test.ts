@@ -30,13 +30,19 @@ async function seedUser(role: "admin" | "developer" | "user", overrides: Partial
     return { ...user, password } as Omit<typeof user & { password: string }, "password_hash">;
 }
 
+async function seedSession(user_id: number) {
+    const session = await SessionHandler.createSession(user_id);
+    return session;
+    
+}
+
 const testAdmin = await seedUser("admin", { username: "testadmin" }, "AdminP@ss1");
 const testDeveloper = await seedUser("developer", { username: "testdeveloper" }, "DevP@ss1");
 const testUser = await seedUser("user", { username: "testuser" }, "UserP@ss1");
 
-let session_token: string;
+describe("Auth routes and access checks", async () => {
 
-describe("Auth routes and access checks", () => {
+    let session_token: string;
 
     test("POST /auth/login authenticates and creates session", async () => {
 
@@ -119,7 +125,10 @@ describe("Auth routes and access checks", () => {
     });
 });
 
-describe("Account routes", () => {
+describe("Account routes", async () => {
+
+    const session_token = await seedSession(testUser.id).then(s => s.token);
+
     test("GET /account returns current user", async () => {
 
         const data = await makeAPIRequest("/account", {
@@ -136,12 +145,35 @@ describe("Account routes", () => {
 
     test("PUT /account updates profile fields", async () => {
         
-        const newDisplayName = "Updated Name";
-        const newEmail = "updated@example.com";
-        const data = await makeAPIRequest("/account", {
-            
+        const newUserData = {
+            display_name: "Updated Name",
+            username: "updatedusername",
+            email: "updated@example.com"
+        }
+
+        await makeAPIRequest("/account", {
+            method: "PUT",
+            authToken: session_token,
+            body: newUserData
         });
 
+        const dbresult = DB.instance().select().from(DB.Schema.users).where(eq(DB.Schema.users.id, testUser.id)).get();
+
+        expect(dbresult?.display_name).toBe(newUserData.display_name);
+        expect(dbresult?.username).toBe(newUserData.username);
+        expect(dbresult?.email).toBe(newUserData.email);
+    });
+
+    test("PUT /account try updating role fails", async () => {
+        
+        await makeAPIRequest("/account", {
+            method: "PUT",
+            authToken: session_token,
+            body: { role: "admin" }
+        }, 400);
+        
+        const dbresult = DB.instance().select().from(DB.Schema.users).where(eq(DB.Schema.users.id, testUser.id)).get();
+        expect(dbresult?.role).toBe("user");
     });
 
     test("PUT /account/password rotates credentials and invalidates old sessions", async () => {
