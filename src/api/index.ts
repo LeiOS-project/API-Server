@@ -54,6 +54,7 @@ export class API {
 				}, err.status)
 			}
 
+			Logger.error("API Error:", err);
 			return c.json({ success: false, message: 'Internal Server Error' }, 500);
 		})
 

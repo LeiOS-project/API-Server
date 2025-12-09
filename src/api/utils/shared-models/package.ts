@@ -48,10 +48,13 @@ export namespace PackageModel.CreatePackage {
 
 export namespace PackageModel.UpdatePackage {
 
-    export const Body = createUpdateSchema(DB.Schema.packages).partial().omit({
+    export const Body = createUpdateSchema(DB.Schema.packages).omit({
         name: true,
         owner_user_id: true
-    });
+    }).partial().refine(
+        (data) => Object.values(data).some((value) => value !== undefined),
+        { message: "At least one field must be provided" }
+    );
 
     export type Body = z.infer<typeof Body>;
 

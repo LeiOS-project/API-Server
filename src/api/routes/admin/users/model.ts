@@ -42,10 +42,13 @@ export namespace AdminUsersModel {
     }
 
     export namespace Update {
-        export const Body = createUpdateSchema(DB.Schema.users).partial().omit({
+        export const Body = createUpdateSchema(DB.Schema.users).omit({
             id: true,
             password_hash: true,
-        });
+        }).partial().refine(
+            (data) => Object.values(data).some((value) => value !== undefined),
+            { message: "At least one field must be provided" }
+        );
         export type Body = z.infer<typeof Body>;
     }
 

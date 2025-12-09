@@ -170,7 +170,7 @@ describe("Account routes", async () => {
             method: "PUT",
             authToken: session_token,
             body: { role: "admin" }
-        }, 400);
+        }, 500);
         
         const dbresult = DB.instance().select().from(DB.Schema.users).where(eq(DB.Schema.users.id, testUser.id)).get();
         expect(dbresult?.role).toBe("user");

@@ -13,7 +13,7 @@ export namespace AccountModel.GetInfo {
 
 export namespace AccountModel.UpdateInfo {
 
-    export const Body = createUpdateSchema(DB.Schema.users, {
+    const Body = createUpdateSchema(DB.Schema.users, {
         username: z.string()
             .min(5, 'Must be at least 5 characters')
             .max(30, 'Must be at most 30 characters')
@@ -23,7 +23,10 @@ export namespace AccountModel.UpdateInfo {
         id: true,
         password_hash: true,
         role: true
-    }).partial();
+    }).partial().refine(
+        (data) => Object.values(data).some((value) => value !== undefined),
+        { message: "At least one field must be provided" }
+    );
 
     export type Body = z.infer<typeof Body>;
 
