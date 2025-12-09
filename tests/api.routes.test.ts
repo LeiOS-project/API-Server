@@ -36,9 +36,9 @@ async function seedSession(user_id: number) {
     
 }
 
-const testAdmin = await seedUser("admin", { username: "testadmin" }, "AdminP@ss1");
-const testDeveloper = await seedUser("developer", { username: "testdeveloper" }, "DevP@ss1");
-const testUser = await seedUser("user", { username: "testuser" }, "UserP@ss1");
+let testAdmin = await seedUser("admin", { username: "testadmin" }, "AdminP@ss1");
+let testDeveloper = await seedUser("developer", { username: "testdeveloper" }, "DevP@ss1");
+let testUser = await seedUser("user", { username: "testuser" }, "UserP@ss1");
 
 describe("Auth routes and access checks", async () => {
 
@@ -127,7 +127,7 @@ describe("Auth routes and access checks", async () => {
 
 describe("Account routes", async () => {
 
-    const session_token = await seedSession(testUser.id).then(s => s.token);
+    let session_token = await seedSession(testUser.id).then(s => s.token);
 
     test("GET /account returns current user", async () => {
 
@@ -156,6 +156,10 @@ describe("Account routes", async () => {
             authToken: session_token,
             body: newUserData
         });
+
+        testUser.display_name = newUserData.display_name;
+        testUser.username = newUserData.username;
+        testUser.email = newUserData.email;
 
         const dbresult = DB.instance().select().from(DB.Schema.users).where(eq(DB.Schema.users.id, testUser.id)).get();
 
@@ -190,6 +194,8 @@ describe("Account routes", async () => {
             }
         });
 
+        testUser.password = newPassword;
+
         // Old session should be invalidated
         await makeAPIRequest("/account", {
             authToken: session_token,
@@ -198,7 +204,7 @@ describe("Account routes", async () => {
         // Login with old password should fail
         await makeAPIRequest("/auth/login", {
             method: "POST",
-            body: { username: testUser.username, password: oldPassword },
+            body: { username: testUser.username, password: oldPassword }
         }, 401);
 
         // Login with new password should succeed
@@ -209,19 +215,44 @@ describe("Account routes", async () => {
         });
 
         expect(data.token.startsWith("lra_sess_")).toBe(true);
+
+        session_token = data.token;
     });
 
     test("DELETE /account prevents removal while packages exist", async () => {
-        const { user } = await seedUser("user");
-        const session = await SessionHandler.createSession(user.id);
-        await seedPackage(user.id);
+        
+        const tempPkg = await DB.instance().insert(DB.Schema.packages).values({
+            name: "temp-package",
+            owner_user_id: testUser.id,
+            description: "Temporary package",
+            homepage_url: "https://temp.example.com",
+            requires_patching: false
+        }).returning().get();
 
-        const res = await API.getApp().request("/account", {
+        await makeAPIRequest("/account", {
             method: "DELETE",
-            headers: authHeaders(session.token)
+            authToken: session_token
+        }, 400);
+
+        const dbresult = DB.instance().select().from(DB.Schema.users).where(eq(DB.Schema.users.id, testUser.id)).get();
+        expect(dbresult).toBeDefined();
+
+        // Cleanup
+        await DB.instance().delete(DB.Schema.packages).where(eq(DB.Schema.packages.id, tempPkg.id));
+    });
+
+    test("DELETE /account removes user without packages", async () => {
+        
+        await makeAPIRequest("/account", {
+            method: "DELETE",
+            authToken: session_token
         });
 
-        expect(res.status).toBe(400);
+        const dbresult = DB.instance().select().from(DB.Schema.users).where(eq(DB.Schema.users.id, testUser.id)).get();
+        expect(dbresult).toBeUndefined();
+
+        // recreate test user for further tests
+        testUser = await seedUser("user", { username: "testuser" }, "UserP@ss1");
     });
 });
 
