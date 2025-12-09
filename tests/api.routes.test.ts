@@ -3,7 +3,7 @@ import { API } from "../src/api";
 import { DB } from "../src/db";
 import { SessionHandler } from "../src/api/utils/authHandler";
 import { AptlyAPI } from "../src/aptly/api";
-import { AptlyAPIServer } from "../src/aptly/server";
+import { uploadFixtureToArchive } from "./helpers/aptlyTestUtils";
 import { migrate } from "drizzle-orm/bun-sqlite/migrator";
 import { drizzle } from "drizzle-orm/bun-sqlite";
 import { Database } from "bun:sqlite";
@@ -12,8 +12,6 @@ import { randomUUID } from "crypto";
 import { eq } from "drizzle-orm";
 
 const TEST_DB_PATH = "./data/test-api.sqlite";
-const APTLY_ROOT = `./data/test-aptly-${randomUUID().slice(0, 8)}`;
-const APTLY_PORT = 18111;
 const PACKAGE_FILE_PATH = "./testdata/fastfetch_2.55.0_amd64.deb";
 const PACKAGE_NAME = "fastfetch";
 const PACKAGE_VERSION = "2.55.0";
@@ -22,8 +20,6 @@ const PACKAGE_MAINTAINER_NAME = "Carter Li";
 const PACKAGE_MAINTAINER_EMAIL = "zhangsongcui@live.cn";
 
 type Arch = AptlyAPI.Utils.Architectures;
-
-const createdAptPackages = new Set<string>();
 
 let app: any;
 async function resetDatabase() {
@@ -34,14 +30,6 @@ async function resetDatabase() {
     await DB.instance().delete(DB.Schema.sessions).run();
     await DB.instance().delete(DB.Schema.passwordResets).run();
     await DB.instance().delete(DB.Schema.users).run();
-}
-
-async function cleanupAptly() {
-    for (const name of createdAptPackages) {
-        await AptlyAPI.Packages.deleteAllInAllRepos(name);
-    }
-    await AptlyAPI.DB.cleanup();
-    createdAptPackages.clear();
 }
 
 async function seedUser(role: "admin" | "developer" | "user", overrides: Partial<DB.Models.User> = {}, password = "TestP@ssw0rd") {
@@ -88,30 +76,6 @@ beforeAll(async () => {
     if (existsSync(TEST_DB_PATH)) {
         unlinkSync(TEST_DB_PATH);
     }
-
-    if (existsSync(APTLY_ROOT)) {
-        rmSync(APTLY_ROOT, { recursive: true, force: true });
-    }
-    mkdirSync(APTLY_ROOT, { recursive: true });
-
-    await AptlyAPIServer.init({
-        aptlyRoot: APTLY_ROOT,
-        aptlyPort: APTLY_PORT,
-        s3Settings: {
-            endpoint: "http://localhost:9000",
-            region: "us-east-1",
-            bucket: "leios-test-bucket",
-            prefix: "test-prefix",
-            accessKeyId: "test-access-key",
-            secretAccessKey: "test-secret-key"
-        },
-        keySettings: {
-            publicKeyPath: "./data/keys/public-key.gpg",
-            privateKeyPath: "./data/keys/private-key.gpg",
-        }
-    });
-    await AptlyAPIServer.start();
-
     const sqlite = new Database(TEST_DB_PATH);
     const drizzleDb = drizzle(sqlite);
     await migrate(drizzleDb, { migrationsFolder: "drizzle" });
@@ -123,37 +87,13 @@ beforeAll(async () => {
 
 afterEach(async () => {
     await resetDatabase();
-    await cleanupAptly();
 });
 
 afterAll(async () => {
-    await AptlyAPIServer.stop("SIGINT");
-    if (existsSync(APTLY_ROOT)) {
-        rmSync(APTLY_ROOT, { recursive: true, force: true });
-    }
     if (existsSync(TEST_DB_PATH)) {
         unlinkSync(TEST_DB_PATH);
     }
 });
-
-async function uploadFixtureToArchive(packageName: string, version: string, arch: Arch) {
-    const file = new File([await Bun.file(PACKAGE_FILE_PATH).arrayBuffer()], "package.deb");
-
-    await AptlyAPI.Packages.uploadAndVerify(
-        "leios-archive",
-        {
-            name: packageName,
-            version,
-            architecture: arch,
-            maintainer_name: PACKAGE_MAINTAINER_NAME,
-            maintainer_email: PACKAGE_MAINTAINER_EMAIL,
-        },
-        file,
-        true
-    );
-
-    createdAptPackages.add(packageName);
-}
 
 describe("Auth routes", () => {
     test("POST /auth/login authenticates and creates session", async () => {
@@ -269,7 +209,7 @@ describe("Public package routes", () => {
         const { user } = await seedUser("developer");
         const pkg = await seedPackage(user.id, { name: PACKAGE_NAME });
 
-        await uploadFixtureToArchive(PACKAGE_NAME, PACKAGE_VERSION, PACKAGE_ARCH);
+        await uploadFixtureToArchive();
 
         const listRes = await app.request("/public/packages");
         expect(listRes.status).toBe(200);
@@ -353,7 +293,6 @@ describe("Developer package routes", () => {
         expect(createRes.status).toBe(201);
         expect(createBody.message).toBe("Package release created successfully");
 
-        createdAptPackages.add(PACKAGE_NAME);
 
         const dbRelease = DB.instance().select().from(DB.Schema.packageReleases).where(eq(DB.Schema.packageReleases.package_id, pkg.id)).get();
         expect(dbRelease?.version).toBe(PACKAGE_VERSION);
