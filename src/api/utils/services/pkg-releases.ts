@@ -45,7 +45,7 @@ export class PkgReleasesService {
         }
 
         try {
-            const result = await AptlyAPI.Packages.uploadAndVerify(
+            const result = await AptlyAPI.Packages.uploadAndVerifyIntoArchiveRepo(
                 {
                     name: packageData.name,
                     version,
@@ -73,6 +73,8 @@ export class PkgReleasesService {
                 return APIResponse.serverError(c, "Failed to copy package release into testing repository");
             }
 
+            const updatePublishResult = await AptlyAPI.Publishing.updateLiveTestingRepo();
+
             await DB.instance().insert(DB.Schema.packageReleases).values({
                 package_id: packageData.id,
                 version,
@@ -82,13 +84,13 @@ export class PkgReleasesService {
 
             if (arch === "amd64") {
                 await DB.instance().update(DB.Schema.packages).set({
-                    latest_stable_release_amd64: AptlyUtils.buildVersionWithLeiOSSuffix(version, leios_patch)
+                    latest_testing_release_amd64: AptlyUtils.buildVersionWithLeiOSSuffix(version, leios_patch)
                 }).where(
                     eq(DB.Schema.packages.id, packageData.id)
                 );
             } else if (arch === "arm64") {
                 await DB.instance().update(DB.Schema.packages).set({
-                    latest_stable_release_arm64: AptlyUtils.buildVersionWithLeiOSSuffix(version, leios_patch)
+                    latest_testing_release_arm64: AptlyUtils.buildVersionWithLeiOSSuffix(version, leios_patch)
                 }).where(
                     eq(DB.Schema.packages.id, packageData.id)
                 );

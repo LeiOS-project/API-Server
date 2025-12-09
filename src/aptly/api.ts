@@ -34,7 +34,7 @@ export namespace AptlyAPI.Response {
         error: T;
     };
 
-    // export type 
+    export type Combined<TData, TError extends string> = Success<TData> | Error<TError>;
 
 }
 
@@ -171,7 +171,16 @@ export namespace AptlyAPI.Packages {
         return refs.length > 0;
     }
 
-    export async function uploadAndVerify(
+    /**
+     * Uploads a Debian package to the repository, validates its metadata, and adds it if verification succeeds.
+     *
+     * @param packageData - Metadata describing the package, including name, maintainer data, version, optional LeiOS patch, and architecture.
+     * @param file - The Debian package file to upload.
+     * @param skipMaintainerCheck - When `true`, bypasses maintainer validation; defaults to `false`.
+     * @returns A promise that resolves to `true` once the package is successfully added.
+     * @throws If the package already exists, fails validation, or cannot be added to the repository.
+     */
+    export async function uploadAndVerifyIntoArchiveRepo(
         packageData: {
             name: string;
             maintainer_name: string;
@@ -244,6 +253,9 @@ export namespace AptlyAPI.Packages {
     }
 
     export async function copyIntoRepo(targetRepo: "leios-stable" | "leios-testing", packageName: string, packageVersion: string, leios_patch: string | undefined, packageArch: AptlyAPI.Utils.Architectures) {
+        
+        const 
+        
         const result = await AptlyAPIServer.getClient().postApiReposByNameCopyBySrcByFile({
             path: {
                 name: targetRepo,

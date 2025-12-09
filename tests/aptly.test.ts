@@ -16,7 +16,7 @@ describe("Aptly Package Tests", () => {
             architecture: "amd64"
         } as const;
 
-        const uploadResult = await AptlyAPI.Packages.uploadAndVerify(packageData, fileData);
+        const uploadResult = await AptlyAPI.Packages.uploadAndVerifyIntoArchiveRepo(packageData, fileData);
         expect(uploadResult).toBe(true);
 
     });
