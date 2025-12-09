@@ -2,7 +2,7 @@ import z from "zod";
 import { PackageModel } from "../../../utils/shared-models/package";
 import { AptlyAPI } from "../../../../aptly/api";
 
-export namespace PackagesModel {
+export namespace PublicPackagesModel {
 
     export const PackageParams = z.object({
         packageName: z.string().min(1)

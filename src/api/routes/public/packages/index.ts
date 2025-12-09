@@ -7,7 +7,7 @@ import { DB } from "../../../../db";
 import { APIResponse } from "../../../utils/api-res";
 import { APIResponseSpec, APIRouteSpec } from "../../../utils/specHelpers";
 import { AptlyAPI } from "../../../../aptly/api";
-import { PackagesModel } from "./model";
+import { PublicPackagesModel } from "./model";
 
 const PUBLIC_PACKAGES_TAG = "Public API / Packages";
 
@@ -21,7 +21,7 @@ router.get('/',
         description: "Retrieve all packages registered in LeiOS Repo.",
         tags: [PUBLIC_PACKAGES_TAG],
         responses: APIResponseSpec.describeBasic(
-            APIResponseSpec.success("Packages retrieved successfully", PackagesModel.GetAll.Response)
+            APIResponseSpec.success("Packages retrieved successfully", PublicPackagesModel.GetAll.Response)
         )
     }),
 
@@ -39,18 +39,18 @@ router.get('/:packageName',
         description: "Retrieve a package and all releases across archive/testing/stable.",
         tags: [PUBLIC_PACKAGES_TAG],
         responses: APIResponseSpec.describeBasic(
-            APIResponseSpec.success("Package retrieved successfully", PackagesModel.PackageDetails.Response),
+            APIResponseSpec.success("Package retrieved successfully", PublicPackagesModel.PackageDetails.Response),
             APIResponseSpec.notFound("Package not found")
         )
     }),
 
-    zValidator("param", PackagesModel.PackageParams),
-    zValidator("query", PackagesModel.RepoQuery),
+    zValidator("param", PublicPackagesModel.PackageParams),
+    zValidator("query", PublicPackagesModel.RepoQuery),
 
     async (c) => {
         // @ts-ignore
-        const { packageName } = c.req.valid("param") as z.infer<typeof PackagesModel.PackageParams>;
-        const { repo } = c.req.valid("query") as z.infer<typeof PackagesModel.RepoQuery>;
+        const { packageName } = c.req.valid("param") as z.infer<typeof PublicPackagesModel.PackageParams>;
+        const { repo } = c.req.valid("query") as z.infer<typeof PublicPackagesModel.RepoQuery>;
 
         const pkg = DB.instance().select().from(DB.Schema.packages).where(
             eq(DB.Schema.packages.name, packageName)
@@ -91,18 +91,18 @@ router.get('/:packageName/releases',
         description: "List package releases in archive/testing/stable repositories.",
         tags: [PUBLIC_PACKAGES_TAG],
         responses: APIResponseSpec.describeBasic(
-            APIResponseSpec.success("Package releases retrieved successfully", PackagesModel.PackageReleases.Response),
+            APIResponseSpec.success("Package releases retrieved successfully", PublicPackagesModel.PackageReleases.Response),
             APIResponseSpec.notFound("Package not found")
         )
     }),
 
-    zValidator("param", PackagesModel.PackageParams),
-    zValidator("query", PackagesModel.RepoQuery),
+    zValidator("param", PublicPackagesModel.PackageParams),
+    zValidator("query", PublicPackagesModel.RepoQuery),
 
     async (c) => {
         // @ts-ignore
         const { packageName } = c.req.valid("param") as z.infer<typeof PublicModel.PackageParams>;
-        const { repo } = c.req.valid("query") as z.infer<typeof PackagesModel.RepoQuery>;
+        const { repo } = c.req.valid("query") as z.infer<typeof PublicPackagesModel.RepoQuery>;
 
         const exists = DB.instance().select().from(DB.Schema.packages).where(
             eq(DB.Schema.packages.name, packageName)
