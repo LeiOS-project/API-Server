@@ -100,6 +100,13 @@ export const scheduled_tasks = sqliteTable('scheduled_tasks', {
     trigger: text({ enum: ["manual"] }).notNull(),
     function: text().notNull(),
     payload: text({ mode: 'json' }).notNull(),
+    status: text({ enum: ["queued", "running", "failed", "completed"] }).notNull().default('queued'),
+    error: text(),
+    result: text({ mode: 'json' }),
+    created_at: int(),
+    updated_at: int(),
+    started_at: int(),
+    completed_at: int(),
 });
 
 /**

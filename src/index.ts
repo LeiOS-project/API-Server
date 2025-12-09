@@ -3,6 +3,8 @@ import { AptlyAPIServer } from "./aptly/server";
 import { DB } from "./db";
 import { ConfigHandler } from "./utils/config";
 import { Logger } from "./utils/logger";
+import { registerOsReleaseTasks } from "./tasks/osRelease";
+import { TaskScheduler } from "./tasks";
 
 export class Main {
 
@@ -21,6 +23,10 @@ export class Main {
         await DB.init(
             config.LRA_DB_PATH ?? "./data/db.sqlite"
         );
+
+        registerOsReleaseTasks();
+        // Pick up any tasks queued before restart
+        void TaskScheduler.processQueue();
 
         await AptlyAPIServer.init({
             aptlyRoot: config.LRA_APTLY_ROOT ?? "./data/aptly",

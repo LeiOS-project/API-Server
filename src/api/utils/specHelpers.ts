@@ -79,6 +79,19 @@ export class APIResponseSpec {
         }
     }
 
+    static accepted<Data extends z.ZodType<APIResponse.Types.RequiredReturnData>>(description: string, dataSchema: Data) {
+        return {
+            202: {
+                description,
+                content: {
+                    "application/json": {
+                        schema: resolver(APIResponse.Schema.accepted(description, dataSchema))
+                    },
+                },
+            }
+        }
+    }
+
     /**
      * @deprecated Use more specific error methods like `badRequest`, `unauthorized`, etc. instead.
      */

@@ -4,7 +4,7 @@ import z from "zod";
 
 export namespace OSReleases.GetById {
 
-    export const Response = createSelectSchema(DB.Schema.stablePromotionRequests)
+    export const Response = createSelectSchema(DB.Schema.os_releases)
 
     export type Response = z.infer<typeof Response>;
 

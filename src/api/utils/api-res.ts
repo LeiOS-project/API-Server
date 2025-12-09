@@ -7,6 +7,10 @@ export class APIResponse {
         return c.json({ success: true, code: 200, message, data }, 200);
     }
 
+    static accepted<Data extends APIResponse.Types.RequiredReturnData>(c: Context, message: string, data: Data) {
+        return c.json({ success: true, code: 202, message, data }, 202);
+    }
+
     static successNoData(c: Context, message: string) {
         return c.json({ success: true, code: 200, message, data: null }, 200);
     }
@@ -66,6 +70,15 @@ export namespace APIResponse.Schema {
         });
     }
 
+    export function accepted<Message extends string, Data extends z.ZodType<APIResponse.Types.RequiredReturnData>>(message: Message, data: Data) {
+        return z.object({
+            success: z.literal(true),
+            code: z.literal(202),
+            message: z.literal(message),
+            data
+        });
+    }
+
     export function created<Message extends string, Data extends z.ZodType<APIResponse.Types.RequiredReturnData>>(message: Message, data: Data) {
         return z.object({
             success: z.literal(true),
@@ -91,6 +104,7 @@ export namespace APIResponse.Types {
 
     export type BasicResponseSchema =
         | z.infer<ReturnType<typeof APIResponse.Schema.success<any, z.ZodType<NonRequiredReturnData>>>>
+        | z.infer<ReturnType<typeof APIResponse.Schema.accepted<any, z.ZodType<RequiredReturnData>>>>
         | z.infer<ReturnType<typeof APIResponse.Schema.created<any, z.ZodType<RequiredReturnData>>>>
         | z.infer<ReturnType<typeof APIResponse.Schema.serverError<any>>>
         | z.infer<ReturnType<typeof APIResponse.Schema.unauthorized<any>>>
