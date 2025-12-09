@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LeIOS Package Repository</title>
+    <link
+        rel="preconnect"
+        href="https://fonts.googleapis.com"
+    />
+    <link
+        rel="preconnect"
+        href="https://fonts.gstatic.com"
+        crossorigin
+    />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
+        rel="stylesheet"
+    />
+    <style>
+        :root {
+            color-scheme: dark;
+            --bg: #030814;
+            --bg-2: #0a1424;
+            --glow: #00bcff;
+            --glow-2: #19cfff;
+            --accent: #f7c266;
+            --text: #e4f0ff;
+            --muted: #9bb4d4;
+            --card: rgba(12, 20, 36, 0.75);
+            --stroke: rgba(255, 255, 255, 0.07);
+            --shadow: 0 25px 80px rgba(0, 0, 0, 0.4);
+            font-family: "Space Grotesk", "Segoe UI", system-ui, -apple-system, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            background: radial-gradient(circle at 50% 8%, rgba(0, 188, 255, 0.18), transparent 32%),
+                radial-gradient(circle at 18% 22%, rgba(0, 188, 255, 0.08), transparent 35%),
+                linear-gradient(160deg, var(--bg) 0%, var(--bg-2) 100%);
+            color: var(--text);
+            padding: 2.5rem 1.5rem;
+        }
+
+        .frame {
+            position: relative;
+            width: min(980px, 100%);
+            background: var(--card);
+            border: 1px solid var(--stroke);
+            border-radius: 24px;
+            padding: clamp(1.5rem, 3vw, 2.5rem);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .frame::before,
+        .frame::after {
+            content: "";
+            position: absolute;
+            inset: -40% -20% auto auto;
+            width: 320px;
+            height: 320px;
+            background: radial-gradient(circle, rgba(0, 188, 255, 0.12), transparent 50%);
+            filter: blur(10px);
+            transform: rotate(12deg);
+            pointer-events: none;
+        }
+
+        .frame::after {
+            inset: auto auto -50% -10%;
+            width: 420px;
+            height: 420px;
+            background: radial-gradient(circle, rgba(0, 188, 255, 0.08), transparent 55%);
+            transform: rotate(-8deg);
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            border-bottom: 1px solid var(--stroke);
+            padding-bottom: 1.25rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            padding: 0.45rem 0.85rem;
+            border-radius: 999px;
+            background: rgba(0, 188, 255, 0.15);
+            color: var(--glow);
+            font-weight: 600;
+            font-size: 0.95rem;
+            letter-spacing: 0.02em;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: clamp(2.3rem, 5vw, 3.4rem);
+            letter-spacing: 0.02em;
+        }
+
+        p {
+            margin: 0.35rem 0 0;
+            color: var(--muted);
+            font-size: 1.05rem;
+            line-height: 1.6;
+        }
+
+        .actions {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            margin-top: 1.6rem;
+        }
+
+        .btn {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.9rem 1.4rem;
+            border-radius: 14px;
+            text-decoration: none;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+            color: #071019;
+            background: linear-gradient(120deg, var(--glow), var(--glow-2) 55%, #7fe6ff);
+            box-shadow: 0 18px 40px rgba(0, 188, 255, 0.28);
+            transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 22px 48px rgba(92, 225, 230, 0.35);
+        }
+
+        .ghost {
+            color: var(--text);
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid var(--stroke);
+            box-shadow: none;
+        }
+
+        .ghost:hover {
+            transform: translateY(-2px);
+            border-color: rgba(247, 194, 102, 0.8);
+            color: var(--accent);
+        }
+
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--muted);
+            margin-top: 0.9rem;
+            font-size: 0.95rem;
+        }
+
+        .pulse {
+            width: 10px;
+            height: 10px;
+            border-radius: 999px;
+            background: var(--glow);
+            box-shadow: 0 0 0 0 rgba(92, 225, 230, 0.6);
+            animation: pulse 1.8s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(92, 225, 230, 0.6);
+            }
+            70% {
+                box-shadow: 0 0 0 12px rgba(92, 225, 230, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(92, 225, 230, 0);
+            }
+        }
+
+        @media (max-width: 720px) {
+            header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="frame">
+        <header>
+            <div>
+                <div class="tag">pkg.leios.dev</div>
+                <h1>LeIOS Package Repository</h1>
+                <p>This is the official package Repository for LeIOS</p>
+            </div>
+            <div class="status">
+                <span class="pulse"></span>
+                Status: Online
+            </div>
+        </header>
+        <div class="actions">
+            <a class="btn" href="https://leios.dev" target="_blank" rel="noopener">Visit leios.dev</a>
+        </div>
+    </main>
+</body>
+</html>
