@@ -13,7 +13,7 @@ export namespace AccountModel.GetInfo {
 
 export namespace AccountModel.UpdateInfo {
 
-    const Body = createUpdateSchema(DB.Schema.users, {
+    export const Body = createUpdateSchema(DB.Schema.users, {
         username: z.string()
             .min(5, 'Must be at least 5 characters')
             .max(30, 'Must be at most 30 characters')
