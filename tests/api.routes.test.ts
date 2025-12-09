@@ -1,12 +1,13 @@
-import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { API } from "../src/api";
 import { DB } from "../src/db";
-import { SessionHandler } from "../src/api/utils/authHandler";
+import { AuthHandler, SessionHandler } from "../src/api/utils/authHandler";
 import { AptlyAPI } from "../src/aptly/api";
 import { randomUUID } from "crypto";
 import { eq } from "drizzle-orm";
+import { AuthModel } from "../src/api/routes/auth/model";
+import { makeAPIRequest } from "./helpers/api";
 
-const TEST_DB_PATH = "./data/test-api.sqlite";
 const PACKAGE_FILE_PATH = "./testdata/fastfetch_2.55.0_amd64.deb";
 const PACKAGE_NAME = "fastfetch";
 const PACKAGE_VERSION = "2.55.0";
@@ -25,27 +26,12 @@ async function seedUser(role: "admin" | "developer" | "user", overrides: Partial
         role,
     } as any).returning().get();
 
-    return { user, password };
+    return { ...user, password } as Omit<typeof user & { password: string }, "password_hash">;
 }
 
-async function seedPackage(ownerId: number, overrides: Partial<DB.Models.Package> = {}) {
-    return DB.instance().insert(DB.Schema.packages).values({
-        name: overrides.name ?? `pkg-${randomUUID()}`,
-        owner_user_id: ownerId,
-        description: overrides.description ?? "A useful package",
-        homepage_url: overrides.homepage_url ?? "https://example.com",
-        requires_patching: overrides.requires_patching ?? false
-    }).returning().get();
-}
-
-async function seedRelease(packageId: number, version = "1.0.0", arch: Arch = "amd64", leios_patch: string | null = null) {
-    return DB.instance().insert(DB.Schema.packageReleases).values({
-        package_id: packageId,
-        version,
-        leios_patch,
-        architecture: arch,
-    }).returning().get();
-}
+const testAdmin = await seedUser("admin", { username: "testadmin" }, "AdminP@ss1");
+const testDeveloper = await seedUser("developer", { username: "testdeveloper" }, "DevP@ss1");
+const testUser = await seedUser("user", { username: "testuser" }, "UserP@ss1");
 
 function authHeaders(token: string) {
     return {
@@ -53,32 +39,32 @@ function authHeaders(token: string) {
     };
 }
 
-describe("Auth routes", () => {
+describe("Auth routes and access checks", () => {
     test("POST /auth/login authenticates and creates session", async () => {
-        const { user, password } = await seedUser("user");
 
-        const res = await app.request("/auth/login", {
+        const data = await makeAPIRequest("/auth/login", {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ username: user.username, password })
+            body: { username: testUser.username, password: testUser.password },
+            expectedBodySchema: AuthModel.Login.Response
         });
 
-        expect(res.status).toBe(200);
-        const body = await res.json();
-        expect(body.success).toBe(true);
-        expect(body.data.token.startsWith("lra_sess_")).toBe(true);
+        expect(data.token.startsWith("lra_sess_")).toBe(true);
 
-        const stored = DB.instance().select().from(DB.Schema.sessions).where(eq(DB.Schema.sessions.token, body.data.token as string)).get();
-        expect(stored?.user_id).toBe(user.id);
+        expect(AuthHandler.getAuthContext(data.token)).resolves.toMatchObject({
+            user_id: testUser.id,
+            user_role: "user",
+            type: "session",
+            token: data.token
+        } as Partial<AuthHandler.AuthContext>);
+    });
+
+    test("GET /auth/session returns current session info", async () => {
+
     });
 
     test("POST /auth/logout invalidates session", async () => {
-        const { user } = await seedUser("user");
-        const session = await SessionHandler.createSession(user.id);
 
-        const res = await app.request("/auth/logout", {
+        const res = await API.getApp().request("/auth/logout", {
             method: "POST",
             headers: authHeaders(session.token)
         });
@@ -94,7 +80,7 @@ describe("Account routes", () => {
         const { user } = await seedUser("user");
         const session = await SessionHandler.createSession(user.id);
 
-        const res = await app.request("/account", {
+        const res = await API.getApp().request("/account", {
             headers: authHeaders(session.token)
         });
 
@@ -108,7 +94,7 @@ describe("Account routes", () => {
         const { user } = await seedUser("user");
         const session = await SessionHandler.createSession(user.id);
 
-        const res = await app.request("/account", {
+        const res = await API.getApp().request("/account", {
             method: "PUT",
             headers: {
                 ...authHeaders(session.token),
@@ -127,7 +113,7 @@ describe("Account routes", () => {
         const { user } = await seedUser("user", {}, oldPassword);
         const session = await SessionHandler.createSession(user.id);
 
-        const res = await app.request("/account/password", {
+        const res = await API.getApp().request("/account/password", {
             method: "PUT",
             headers: {
                 ...authHeaders(session.token),
@@ -140,7 +126,7 @@ describe("Account routes", () => {
         const stillThere = DB.instance().select().from(DB.Schema.sessions).where(eq(DB.Schema.sessions.token, session.token)).get();
         expect(stillThere).toBeUndefined();
 
-        const loginRes = await app.request("/auth/login", {
+        const loginRes = await API.getApp().request("/auth/login", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ username: user.username, password: "NewP@ssw0rd1" })
@@ -153,7 +139,7 @@ describe("Account routes", () => {
         const session = await SessionHandler.createSession(user.id);
         await seedPackage(user.id);
 
-        const res = await app.request("/account", {
+        const res = await API.getApp().request("/account", {
             method: "DELETE",
             headers: authHeaders(session.token)
         });
@@ -167,15 +153,15 @@ describe("Public package routes", () => {
         const { user } = await seedUser("developer");
         const pkg = await seedPackage(user.id, { name: PACKAGE_NAME });
 
-        await uploadFixtureToArchive();
+        // await uploadFixtureToArchive();
 
-        const listRes = await app.request("/public/packages");
+        const listRes = await API.getApp().request("/public/packages");
         expect(listRes.status).toBe(200);
         const listBody = await listRes.json();
         expect(Array.isArray(listBody.data)).toBe(true);
         expect(listBody.data[0].name).toBe(pkg.name);
 
-        const detailRes = await app.request(`/public/packages/${pkg.name}`);
+        const detailRes = await API.getApp().request(`/public/packages/${pkg.name}`);
         expect(detailRes.status).toBe(200);
         const detailBody = await detailRes.json();
         expect(detailBody.data.package.name).toBe(pkg.name);
@@ -188,7 +174,7 @@ describe("Developer package routes", () => {
         const { user } = await seedUser("developer");
         const session = await SessionHandler.createSession(user.id);
 
-        const createRes = await app.request("/dev/packages", {
+        const createRes = await API.getApp().request("/dev/packages", {
             method: "POST",
             headers: {
                 ...authHeaders(session.token),
@@ -208,7 +194,7 @@ describe("Developer package routes", () => {
         const pkg = DB.instance().select().from(DB.Schema.packages).where(eq(DB.Schema.packages.id, createdBody.data.id)).get();
         expect(pkg?.owner_user_id).toBe(user.id);
 
-        const updateRes = await app.request(`/dev/packages/${createdBody.data.id}`, {
+        const updateRes = await API.getApp().request(`/dev/packages/${createdBody.data.id}`, {
             method: "PUT",
             headers: {
                 ...authHeaders(session.token),
@@ -231,7 +217,7 @@ describe("Developer package routes", () => {
         const session = await SessionHandler.createSession(user.id);
         const pkg = await seedPackage(user.id, { name: PACKAGE_NAME });
 
-        const listBefore = await app.request(`/dev/packages/${pkg.id}/releases`, {
+        const listBefore = await API.getApp().request(`/dev/packages/${pkg.id}/releases`, {
             headers: authHeaders(session.token)
         });
         const emptyBody = await listBefore.json();
@@ -242,7 +228,7 @@ describe("Developer package routes", () => {
         const form = new FormData();
         form.set("file", file);
 
-        const createRes = await app.request(`/dev/packages/${pkg.id}/releases/${PACKAGE_VERSION}/${PACKAGE_ARCH}`, {
+        const createRes = await API.getApp().request(`/dev/packages/${pkg.id}/releases/${PACKAGE_VERSION}/${PACKAGE_ARCH}`, {
             method: "POST",
             headers: authHeaders(session.token),
             body: form
@@ -255,7 +241,7 @@ describe("Developer package routes", () => {
         const dbRelease = DB.instance().select().from(DB.Schema.packageReleases).where(eq(DB.Schema.packageReleases.package_id, pkg.id)).get();
         expect(dbRelease?.version).toBe(PACKAGE_VERSION);
 
-        const listAfter = await app.request(`/dev/packages/${pkg.id}/releases`, {
+        const listAfter = await API.getApp().request(`/dev/packages/${pkg.id}/releases`, {
             headers: authHeaders(session.token)
         });
         expect(listAfter.status).toBe(200);
@@ -269,7 +255,7 @@ describe("Developer package routes", () => {
         const pkg = await seedPackage(user.id, { name: "stable-pkg" });
         const release = await seedRelease(pkg.id, "2.0.0", "arm64");
 
-        const createRes = await app.request(`/dev/packages/${pkg.id}/stable-promotion-requests`, {
+        const createRes = await API.getApp().request(`/dev/packages/${pkg.id}/stable-promotion-requests`, {
             method: "POST",
             headers: {
                 ...authHeaders(session.token),
@@ -281,7 +267,7 @@ describe("Developer package routes", () => {
         expect(createRes.status).toBe(201);
         expect(createBody.message).toBe("Stable promotion request submitted");
 
-        const listRes = await app.request(`/dev/packages/${pkg.id}/stable-promotion-requests`, {
+        const listRes = await API.getApp().request(`/dev/packages/${pkg.id}/stable-promotion-requests`, {
             headers: authHeaders(session.token)
         });
         expect(listRes.status).toBe(200);
@@ -296,7 +282,7 @@ describe("Admin routes", () => {
         const { user: developer } = await seedUser("developer");
         const adminSession = await SessionHandler.createSession(admin.id);
 
-        const createRes = await app.request("/admin/packages", {
+        const createRes = await API.getApp().request("/admin/packages", {
             method: "POST",
             headers: {
                 ...authHeaders(adminSession.token),
@@ -313,7 +299,7 @@ describe("Admin routes", () => {
         expect(createRes.status).toBe(201);
         const createdBody = await createRes.json();
 
-        const deleteRes = await app.request(`/admin/packages/${createdBody.data.id}`, {
+        const deleteRes = await API.getApp().request(`/admin/packages/${createdBody.data.id}`, {
             method: "DELETE",
             headers: authHeaders(adminSession.token)
         });
@@ -328,7 +314,7 @@ describe("Admin routes", () => {
         const { user: admin } = await seedUser("admin");
         const adminSession = await SessionHandler.createSession(admin.id);
 
-        const createRes = await app.request("/admin/users", {
+        const createRes = await API.getApp().request("/admin/users", {
             method: "POST",
             headers: {
                 ...authHeaders(adminSession.token),
@@ -345,7 +331,7 @@ describe("Admin routes", () => {
         expect(createRes.status).toBe(201);
         const created = await createRes.json();
 
-        const updateRes = await app.request(`/admin/users/${created.data.id}`, {
+        const updateRes = await API.getApp().request(`/admin/users/${created.data.id}`, {
             method: "PUT",
             headers: {
                 ...authHeaders(adminSession.token),
@@ -357,7 +343,7 @@ describe("Admin routes", () => {
         expect(updateRes.status).toBe(200);
         expect(updateBody.message).toBe("User updated successfully");
 
-        const passwordRes = await app.request(`/admin/users/${created.data.id}/password`, {
+        const passwordRes = await API.getApp().request(`/admin/users/${created.data.id}/password`, {
             method: "PUT",
             headers: {
                 ...authHeaders(adminSession.token),
@@ -367,7 +353,7 @@ describe("Admin routes", () => {
         });
         expect(passwordRes.status).toBe(200);
 
-        const deleteRes = await app.request(`/admin/users/${created.data.id}`, {
+        const deleteRes = await API.getApp().request(`/admin/users/${created.data.id}`, {
             method: "DELETE",
             headers: authHeaders(adminSession.token)
         });

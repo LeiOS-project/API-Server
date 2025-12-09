@@ -95,4 +95,11 @@ export class API {
 		}
 	}
 
+	static getApp(): typeof API.app {
+		if (!this.app) {
+			throw new Error("API not initialized. Call API.init() first.");
+		}
+		return this.app;
+	}
+
 }
