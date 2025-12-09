@@ -93,3 +93,19 @@ export const stablePromotionRequests = sqliteTable('stable_promotion_requests', 
     status: text({ enum: ['pending', 'approved', 'denied'] }).default('pending').notNull(),
     decision_reason: text(),
 });
+
+export const scheduled_tasks = sqliteTable('scheduled_tasks', {
+    id: int().primaryKey({ autoIncrement: true }),
+    job_type: text().notNull(),
+    trigger: text({ enum: ["manual"] }).notNull(),
+    function: text().notNull(),
+    payload: text({ mode: 'json' }).notNull(),
+});
+
+/**
+ * @deprecated Use DB.Models.os_releases instead
+ */
+export const os_releases = sqliteTable('os_releases', {
+    id: int().primaryKey({ autoIncrement: true }),
+    version: text().notNull().unique(),
+});

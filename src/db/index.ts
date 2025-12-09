@@ -56,6 +56,8 @@ export namespace DB.Schema {
     export const packages = TableSchema.packages;
     export const packageReleases = TableSchema.packageReleases;
     export const stablePromotionRequests = TableSchema.stablePromotionRequests;
+    export const scheduled_tasks = TableSchema.scheduled_tasks;
+    export const os_releases = TableSchema.os_releases;
 }
 
 export namespace DB.Models {
@@ -67,4 +69,6 @@ export namespace DB.Models {
     export type Package = typeof DB.Schema.packages.$inferSelect;
     export type PackageRelease = typeof DB.Schema.packageReleases.$inferSelect;
     export type StablePromotionRequest = typeof DB.Schema.stablePromotionRequests.$inferSelect;
+    export type ScheduledTask = typeof DB.Schema.scheduled_tasks.$inferSelect;
+    export type OSRelease = typeof DB.Schema.os_releases.$inferSelect;
 }
