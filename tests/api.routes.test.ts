@@ -3,11 +3,6 @@ import { API } from "../src/api";
 import { DB } from "../src/db";
 import { SessionHandler } from "../src/api/utils/authHandler";
 import { AptlyAPI } from "../src/aptly/api";
-import { uploadFixtureToArchive } from "./helpers/aptlyTestUtils";
-import { migrate } from "drizzle-orm/bun-sqlite/migrator";
-import { drizzle } from "drizzle-orm/bun-sqlite";
-import { Database } from "bun:sqlite";
-import { mkdirSync, unlinkSync, existsSync, rmSync } from "fs";
 import { randomUUID } from "crypto";
 import { eq } from "drizzle-orm";
 
@@ -20,17 +15,6 @@ const PACKAGE_MAINTAINER_NAME = "Carter Li";
 const PACKAGE_MAINTAINER_EMAIL = "zhangsongcui@live.cn";
 
 type Arch = AptlyAPI.Utils.Architectures;
-
-let app: any;
-async function resetDatabase() {
-    await DB.instance().delete(DB.Schema.stablePromotionRequests).run();
-    await DB.instance().delete(DB.Schema.packageReleases).run();
-    await DB.instance().delete(DB.Schema.packages).run();
-    await DB.instance().delete(DB.Schema.apiKeys).run();
-    await DB.instance().delete(DB.Schema.sessions).run();
-    await DB.instance().delete(DB.Schema.passwordResets).run();
-    await DB.instance().delete(DB.Schema.users).run();
-}
 
 async function seedUser(role: "admin" | "developer" | "user", overrides: Partial<DB.Models.User> = {}, password = "TestP@ssw0rd") {
     const user = DB.instance().insert(DB.Schema.users).values({
@@ -68,32 +52,6 @@ function authHeaders(token: string) {
         Authorization: `Bearer ${token}`
     };
 }
-
-beforeAll(async () => {
-    if (!existsSync("./data")) {
-        mkdirSync("./data");
-    }
-    if (existsSync(TEST_DB_PATH)) {
-        unlinkSync(TEST_DB_PATH);
-    }
-    const sqlite = new Database(TEST_DB_PATH);
-    const drizzleDb = drizzle(sqlite);
-    await migrate(drizzleDb, { migrationsFolder: "drizzle" });
-    // @ts-ignore - inject test database directly
-    DB["db"] = drizzleDb;
-    await API.init();
-    app = (API as any).app;
-});
-
-afterEach(async () => {
-    await resetDatabase();
-});
-
-afterAll(async () => {
-    if (existsSync(TEST_DB_PATH)) {
-        unlinkSync(TEST_DB_PATH);
-    }
-});
 
 describe("Auth routes", () => {
     test("POST /auth/login authenticates and creates session", async () => {

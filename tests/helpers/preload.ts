@@ -1,12 +1,15 @@
+import fs from "fs/promises";
+import path from "path";
 import { afterAll, beforeAll } from "bun:test";
-import { cleanupAptlyPackages, getSharedAptlyHarness } from "./aptlyTestUtils";
 import { AptlyAPIServer } from "../../src/aptly/server";
 import { ConfigHandler } from "../../src/utils/config";
 import { DB } from "../../src/db";
 import { API } from "../../src/api";
+import { drizzle } from "drizzle-orm/bun-sqlite";
+import { migrate } from "drizzle-orm/bun-sqlite/migrator";
 
 // Allow overriding the env file used for tests without clobbering existing env vars.
-const TEST_ENV_FILE = process.env.TEST_ENV_FILE ?? ".env";
+const TEST_ENV_FILE = process.env.TEST_ENV_FILE ?? ".env.test.local";
 
 async function loadTestEnv(filePath: string) {
     try {
@@ -26,23 +29,30 @@ async function loadTestEnv(filePath: string) {
     }
 }
 
-// Start the shared Aptly server once for all tests and centralize cleanup.
-let harnessPromise: ReturnType<typeof getSharedAptlyHarness> | null = null;
+async function createIsolatedDataDir(): Promise<string> {
+    const root = await fs.mkdtemp(path.join(process.cwd(), "tmp-data-"));
+    return root;
+}
+
+let TMP_ROOT: string | null = null;
 
 beforeAll(async () => {
     await loadTestEnv(TEST_ENV_FILE);
 
     const config = await ConfigHandler.loadConfig();
 
-    const tempDataDir = "";
+    TMP_ROOT = await createIsolatedDataDir();
+
+    const drizzleDb = drizzle(path.join(TMP_ROOT, "db.sqlite"));
+    migrate(drizzleDb, { migrationsFolder: "drizzle" });
 
     await DB.init(
-        config.LRA_DB_PATH ?? "./data/db.sqlite"
+        path.join(TMP_ROOT, "db.sqlite")
     );
 
     await AptlyAPIServer.init({
-        aptlyRoot: config.LRA_APTLY_ROOT ?? "./data/aptly",
-        aptlyPort: parseInt(config.LRA_APTLY_PORT ?? "12150"),
+        aptlyRoot: path.join(TMP_ROOT, "aptly"),
+        aptlyPort: 12150,
         s3Settings: {
             endpoint: config.LRA_S3_ENDPOINT,
             region: config.LRA_S3_REGION,
@@ -52,8 +62,8 @@ beforeAll(async () => {
             secretAccessKey: config.LRA_S3_SECRET_ACCESS_KEY
         },
         keySettings: {
-            publicKeyPath: config.LRA_PUBLIC_KEY_PATH ?? "./data/keys/public-key.gpg",
-            privateKeyPath: config.LRA_PRIVATE_KEY_PATH ?? "./data/keys/private-key.gpg",
+            publicKeyPath: config.LRA_PUBLIC_KEY_PATH,
+            privateKeyPath: config.LRA_PRIVATE_KEY_PATH
         }
     });
 
@@ -61,18 +71,13 @@ beforeAll(async () => {
 
     await AptlyAPIServer.start();
 
-    await API.start(
-        parseInt(config.LRA_API_PORT ?? "12151"),
-        config.LRA_API_HOST ?? "::"
-    );
+    await API.start(12151, "::");
 
 });
 
 afterAll(async () => {
-    await cleanupAptlyPackages();
-    if (harnessPromise) {
-        const harness = await harnessPromise;
-        await harness.stop();
-        await harness.cleanup();
+    if (TMP_ROOT) {
+
+        await fs.rm(TMP_ROOT, { recursive: true, force: true });
     }
 });
