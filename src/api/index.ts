@@ -66,7 +66,7 @@ export class API {
 		}
 
 		this.app.get("/health", (c) => {
-			return c.json({ status: "LeiOS Repo API is running" });
+			return c.json({ status: "LeiOS API is running" });
 		});
 
         this.app.get("/", (c) => {
