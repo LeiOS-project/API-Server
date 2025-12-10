@@ -116,5 +116,7 @@ export const scheduled_tasks = sqliteTable('scheduled_tasks', {
  */
 export const os_releases = sqliteTable('os_releases', {
     id: int().primaryKey({ autoIncrement: true }),
+    // YYYY.MM.(release_this_month) format
     version: text().notNull().unique(),
+    published_at: int().notNull(),
 });

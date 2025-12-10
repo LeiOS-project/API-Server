@@ -16,7 +16,8 @@ router.get('/',
 	APIRouteSpec.authenticated({
 		summary: "List OS releases",
 		description: "Retrieve all OS releases.",
-		tags: [DOCS_TAGS.ADMIN_API.BASE],
+		tags: [DOCS_TAGS.ADMIN_API.OS_RELEASES],
+
 		responses: APIResponseSpec.describeBasic(
 			APIResponseSpec.success("OS releases retrieved", OSReleases.GetAll.Response)
 		)
@@ -33,14 +34,10 @@ router.post('/',
 	APIRouteSpec.authenticated({
 		summary: "Create OS release (async)",
 		description: "Enqueue creation of an OS release and publishing to the live repo.",
-		tags: [DOCS_TAGS.ADMIN_API.BASE],
+		tags: [DOCS_TAGS.ADMIN_API.OS_RELEASES],
+
 		responses: APIResponseSpec.describeBasic(
-			APIResponseSpec.accepted("OS release queued", z.object({
-				taskId: z.number().int(),
-				status: z.literal("queued"),
-				pollUrl: z.string()
-			})),
-			APIResponseSpec.conflict("OS release with this version already exists")
+			// APIResponse
 		)
 	}),
 

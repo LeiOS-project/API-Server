@@ -67,10 +67,14 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
                 name: "Admin API",
                 tags: [
                     "Admin API / Users",
+
                     "Admin API / Packages",
                     "Admin API / Packages / Releases",
                     "Admin API / Packages / Stable Promotion Requests",
+
                     "Admin API / Stable Promotion Requests",
+
+                    "Admin API / OS Releases",
                 ]
             },
             {
@@ -223,6 +227,8 @@ export const DOCS_TAGS = {
 
         USERS: "Admin API / Users",
         STABLE_PROMOTION_REQUESTS: "Admin API / Stable Promotion Requests",
+
+        OS_RELEASES: "Admin API / OS Releases",
     },
     ACCOUNT: "Account",
     AUTHENTICATION: "Authentication",
