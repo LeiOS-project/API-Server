@@ -24,8 +24,6 @@ export class PkgReleasesService {
         // @ts-ignore
         const packageData = c.get("package") as DB.Models.Package;
 
-        const { version, leios_patch } = AptlyUtils.extractVersionAndPatchSuffix(versionWithLeiosPatch);
-
         const owner = DB.instance().select().from(DB.Schema.users).where(
             eq(DB.Schema.users.id, packageData.owner_user_id)
         ).get();
@@ -49,11 +47,10 @@ export class PkgReleasesService {
             const result = await AptlyAPI.Packages.uploadAndVerifyIntoArchiveRepo(
                 {
                     name: packageData.name,
-                    version,
+                    versionWithLeiosPatch: versionWithLeiosPatch,
                     architecture: arch,
                     maintainer_name: owner.display_name,
-                    maintainer_email: owner.email,
-                    leios_patch: leios_patch || undefined
+                    maintainer_email: owner.email
                 },
                 file,
                 isAdmin
@@ -69,7 +66,7 @@ export class PkgReleasesService {
                 return APIResponse.serverError(c, "Failed to clean up existing package releases in testing repository");
             }
 
-            const copyResult = await AptlyAPI.Packages.copyIntoRepo("leios-testing", packageData.name, version, undefined, arch);
+            const copyResult = await AptlyAPI.Packages.copyIntoRepo("leios-testing", packageData.name, versionWithLeiosPatch, arch);
             if (!copyResult) {
                 return APIResponse.serverError(c, "Failed to copy package release into testing repository");
             }
@@ -84,13 +81,13 @@ export class PkgReleasesService {
 
             if (arch === "amd64") {
                 await DB.instance().update(DB.Schema.packages).set({
-                    latest_testing_release_amd64: AptlyUtils.buildVersionWithLeiOSSuffix(version, leios_patch)
+                    latest_testing_release_amd64: versionWithLeiosPatch
                 }).where(
                     eq(DB.Schema.packages.id, packageData.id)
                 );
             } else if (arch === "arm64") {
                 await DB.instance().update(DB.Schema.packages).set({
-                    latest_testing_release_arm64: AptlyUtils.buildVersionWithLeiOSSuffix(version, leios_patch)
+                    latest_testing_release_arm64: versionWithLeiosPatch
                 }).where(
                     eq(DB.Schema.packages.id, packageData.id)
                 );
@@ -100,7 +97,7 @@ export class PkgReleasesService {
             return APIResponse.serverError(c, "Failed to upload and verify package release: " + error);
         }
 
-        return APIResponse.created(c, "Package release created successfully", { version, arch });
+        return APIResponse.createdNoData(c, "Package release created successfully");
 
     }
 
