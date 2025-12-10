@@ -12,7 +12,7 @@ describe("Aptly Package Tests", () => {
             name: "fastfetch",
             maintainer_name: "Carter Li",
             maintainer_email: "zhangsongcui@live.cn",
-            version: "2.55.0",
+            versionWithLeiosPatch: "2.55.0",
             architecture: "amd64"
         } as const;
 
@@ -22,7 +22,7 @@ describe("Aptly Package Tests", () => {
     });
 
     test("Copy Package into Testing", async () => {
-        const copyResult = await AptlyAPI.Packages.copyIntoRepo("leios-testing", "fastfetch", "2.55.0", undefined, "amd64");
+        const copyResult = await AptlyAPI.Packages.copyIntoRepo("leios-testing", "fastfetch", "2.55.0", "amd64");
         expect(copyResult).toBe(true);
 
         const packageRefs = await AptlyAPI.Packages.getRefInRepo("leios-testing", "fastfetch");
@@ -35,16 +35,15 @@ describe("Aptly Package Tests", () => {
     });
 
     test("Check Package Existence", async () => {
-        const exists = await AptlyAPI.Packages.existsInRepo("leios-archive", "fastfetch", "2.55.0", undefined, "amd64");
+        const exists = await AptlyAPI.Packages.existsInRepo("leios-archive", "fastfetch", "2.55.0", "amd64");
         expect(exists).toBe(true);
     });
 
     test("Get Package Details", async () => {
-        const result = (await AptlyAPI.Packages.getInRepo("leios-archive", "fastfetch", "2.55.0", undefined, "amd64"))[0];
+        const result = (await AptlyAPI.Packages.getInRepo("leios-archive", "fastfetch", "2.55.0", "amd64"))[0];
         expect(result).toBeDefined();
         expect(result.name).toBe("fastfetch");
-        expect(result.version).toBe("2.55.0");
-        expect(result.leios_patch).toBeUndefined();
+        expect(result.versionWithLeiosPatch).toBe("2.55.0");
         expect(result.architecture).toBe("amd64");
         expect(result.maintainer).toBe("Carter Li <zhangsongcui@live.cn>");
     });

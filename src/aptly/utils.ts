@@ -282,11 +282,12 @@ export class AptlyUtils {
     }
 
     static extractVersionAndPatchSuffix(fullVersion: string) {
-        const leiosSuffixMatch = fullVersion.match(/(.*)leios(\d+)$/);
+        // Allow up to four numeric segments in the leios suffix (e.g. leios1, leios1.2.3.4)
+        const leiosSuffixMatch = fullVersion.match(/(.*)leios(\d+(?:\.\d+){0,2})$/);
         if (leiosSuffixMatch) {
             return {
                 version: leiosSuffixMatch[1],
-                leios_patch: parseInt(leiosSuffixMatch[2])
+                leios_patch: leiosSuffixMatch[2]
             };
         }
         return {

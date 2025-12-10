@@ -50,14 +50,13 @@ export namespace AptlyAPI.DB {
 
 export namespace AptlyAPI.Packages {
 
-    export async function getRefInRepo(repoName: AptlyAPI.Utils.Repos, packageName: string, packageVersion?: string, leios_patch?: string, packageArch?: AptlyAPI.Utils.Architectures) {
-        const fullPackageVersion = packageVersion ? AptlyUtils.buildVersionWithLeiOSSuffix(packageVersion, leios_patch) : undefined;
+    export async function getRefInRepo(repoName: AptlyAPI.Utils.Repos, packageName: string, packageVersionWithLeiosPatch?: string, packageArch?: AptlyAPI.Utils.Architectures) {
         const refsResult = await AptlyAPIServer.getClient().getApiReposByNamePackages({
             path: {
                 name: repoName
             },
             query: {
-                q: `Name (${packageName})` + (fullPackageVersion ? `, Version (${fullPackageVersion})` : "") + (packageArch ? `, Architecture (${packageArch})` : ""),
+                q: `Name (${packageName})` + (packageVersionWithLeiosPatch ? `, Version (${packageVersionWithLeiosPatch})` : "") + (packageArch ? `, Architecture (${packageArch})` : ""),
                 withDeps: "",
                 format: "",
                 maximumVersion: ""
@@ -71,14 +70,13 @@ export namespace AptlyAPI.Packages {
         return refsResult.data as any as string[] || [];
     }
 
-    export async function getInRepo(repoName: AptlyAPI.Utils.Repos, packageName: string, packageVersion?: string, leios_patch?: string, packageArch?: AptlyAPI.Utils.Architectures) {
-        const fullPackageVersion = packageVersion ? AptlyUtils.buildVersionWithLeiOSSuffix(packageVersion, leios_patch) : undefined;
+    export async function getInRepo(repoName: AptlyAPI.Utils.Repos, packageName: string, packageVersionWithLeiosPatch?: string, packageArch?: AptlyAPI.Utils.Architectures) {
         const result = await AptlyAPIServer.getClient().getApiReposByNamePackages({
             path: {
                 name: repoName
             },
             query: {
-                q: `Name (${packageName})` + (fullPackageVersion ? `, Version (${fullPackageVersion})` : "") + (packageArch ? `, Architecture (${packageArch})` : ""),
+                q: `Name (${packageName})` + (packageVersionWithLeiosPatch ? `, Version (${packageVersionWithLeiosPatch})` : "") + (packageArch ? `, Architecture (${packageArch})` : ""),
                 withDeps: "",
                 format: "details",
                 maximumVersion: ""
@@ -102,18 +100,15 @@ export namespace AptlyAPI.Packages {
             }
 
             if (pkg.Package !== packageName ||
-                (fullPackageVersion && pkg.Version !== fullPackageVersion) ||
+                (packageVersionWithLeiosPatch && pkg.Version !== packageVersionWithLeiosPatch) ||
                 (packageArch && pkg.Architecture !== packageArch)) {
                 throw new Error("Package data mismatch from Aptly server.");
             }
 
-            const versionInfo = AptlyUtils.extractVersionAndPatchSuffix(pkg.Version);
-
             returnedPackages.push({
                 name: pkg.Package as string,
                 key: pkg.Key as string,
-                version: versionInfo.version as string,
-                leios_patch: versionInfo.leios_patch as string | undefined,
+                versionWithLeiosPatch: pkg.Version as string,
                 architecture: pkg.Architecture as AptlyAPI.Utils.Architectures,
                 maintainer: pkg.Maintainer as string,
                 description: pkg.Description as string,
@@ -123,8 +118,8 @@ export namespace AptlyAPI.Packages {
         return returnedPackages;
     }
 
-    export async function getVersionInRepo(repoName: AptlyAPI.Utils.Repos, packageName: string, packageVersion: string, leios_patch?: string) {
-        const pkgs = await getInRepo(repoName, packageName, packageVersion, leios_patch);
+    export async function getVersionInRepo(repoName: AptlyAPI.Utils.Repos, packageName: string, packageVersionWithLeiosPatch: string) {
+        const pkgs = await getInRepo(repoName, packageName, packageVersionWithLeiosPatch);
         const returnData: {
             "amd64"?: AptlyAPI.Packages.Models.PackageInfo,
             "arm64"?: AptlyAPI.Packages.Models.PackageInfo
@@ -146,10 +141,10 @@ export namespace AptlyAPI.Packages {
         } = {};
 
         for (const pkg of pkgs) {
-            if (!returnData[pkg.version]) {
-                returnData[pkg.version] = {};
+            if (!returnData[pkg.versionWithLeiosPatch]) {
+                returnData[pkg.versionWithLeiosPatch] = {};
             }
-            returnData[pkg.version][pkg.architecture] = pkg;
+            returnData[pkg.versionWithLeiosPatch][pkg.architecture] = pkg;
         }
         return returnData satisfies AptlyAPI.Packages.Models.getAllInRepoResponse;
     }
@@ -166,8 +161,8 @@ export namespace AptlyAPI.Packages {
         } satisfies AptlyAPI.Packages.Models.getAllInAllReposResponse;
     }
 
-    export async function existsInRepo(repoName: AptlyAPI.Utils.Repos, packageName: string, packageVersion?: string, leios_patch?: string, packageArch?: AptlyAPI.Utils.Architectures) {
-        const refs = await getRefInRepo(repoName, packageName, packageVersion, leios_patch, packageArch);
+    export async function existsInRepo(repoName: AptlyAPI.Utils.Repos, packageName: string, packageVersionWithLeiosPatch?: string, packageArch?: AptlyAPI.Utils.Architectures) {
+        const refs = await getRefInRepo(repoName, packageName, packageVersionWithLeiosPatch, packageArch);
         return refs.length > 0;
     }
 
@@ -185,16 +180,15 @@ export namespace AptlyAPI.Packages {
             name: string;
             maintainer_name: string;
             maintainer_email: string;
-            version: string;
-            leios_patch?: string;
+            versionWithLeiosPatch: string;
             architecture: AptlyAPI.Utils.Architectures;
         },
         file: File,
         skipMaintainerCheck = false
     ) {
-        const fullPackageVersion = AptlyUtils.buildVersionWithLeiOSSuffix(packageData.version, packageData.leios_patch);
+        const fullPackageVersion = AptlyUtils.buildVersionWithLeiOSSuffix(packageData.versionWithLeiosPatch);
 
-        const existsPackage = await existsInRepo("leios-archive", packageData.name, packageData.version, packageData.leios_patch, packageData.architecture);
+        const existsPackage = await existsInRepo("leios-archive", packageData.name, packageData.versionWithLeiosPatch, packageData.architecture);
         if (existsPackage) {
             throw new Error("Package already exists in repository.");
         }
@@ -252,13 +246,13 @@ export namespace AptlyAPI.Packages {
         }
     }
 
-    export async function copyIntoRepo(targetRepo: "leios-stable" | "leios-testing", packageName: string, packageVersion: string, leios_patch: string | undefined, packageArch: AptlyAPI.Utils.Architectures) {
+    export async function copyIntoRepo(targetRepo: "leios-stable" | "leios-testing", packageName: string, packageVersionWithLeiosPatch: string, packageArch: AptlyAPI.Utils.Architectures) {
         
         const result = await AptlyAPIServer.getClient().postApiReposByNameCopyBySrcByFile({
             path: {
                 name: targetRepo,
                 src: "leios-archive",
-                file: AptlyUtils.getPackageIdentifier(packageName, packageVersion, leios_patch, packageArch)
+                file: AptlyUtils.getPackageIdentifier(packageName, packageVersionWithLeiosPatch, packageArch)
             }
         });
         const parsedResult = (result.data as any as { "Report": { "Added": string[] } })["Report"]["Added"][0] || "error";
@@ -269,8 +263,8 @@ export namespace AptlyAPI.Packages {
         return true;
     }
 
-    export async function deleteInRepo(repoName: AptlyAPI.Utils.Repos, packageName: string, packageVersion?: string, leios_patch?: string, packageArch?: AptlyAPI.Utils.Architectures, doCleanup = true) {
-        const refs = await getRefInRepo(repoName, packageName, packageVersion, leios_patch, packageArch);
+    export async function deleteInRepo(repoName: AptlyAPI.Utils.Repos, packageName: string, packageVersionWithLeiosPatch?: string, packageArch?: AptlyAPI.Utils.Architectures, doCleanup = true) {
+        const refs = await getRefInRepo(repoName, packageName, packageVersionWithLeiosPatch, packageArch);
         const result = await AptlyAPIServer.getClient().deleteApiReposByNamePackages({
             body: {
                 PackageRefs: refs
@@ -287,10 +281,10 @@ export namespace AptlyAPI.Packages {
         return (result.data && !result.error) ? true : false;
     }
 
-    export async function deleteAllInAllRepos(packageName: string, packageVersion?: string, leios_patch?: string, packageArch?: AptlyAPI.Utils.Architectures) {
+    export async function deleteAllInAllRepos(packageName: string, packageVersionWithLeiosPatch?: string, packageArch?: AptlyAPI.Utils.Architectures) {
         let result = true;
         for (const repo of AptlyAPI.Utils.REPOS) {
-            result = await deleteInRepo(repo, packageName, packageVersion, leios_patch, packageArch, false) && result;
+            result = await deleteInRepo(repo, packageName, packageVersionWithLeiosPatch, packageArch, false) && result;
         }
         await AptlyAPI.DB.cleanup();
         return result;
@@ -322,8 +316,7 @@ export namespace AptlyAPI.Packages.Models {
     export const PackageInfo = z.object({
         name: z.string(),
         key: z.string(),
-        version: z.string(),
-        leios_patch: z.string().optional(),
+        versionWithLeiosPatch: z.string(),
         architecture: z.enum(AptlyAPI.Utils.ARCHITECTURES),
         maintainer: z.string(),
         description: z.string(),

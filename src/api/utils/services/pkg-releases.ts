@@ -20,9 +20,11 @@ export class PkgReleasesService {
         return APIResponse.success(c, "Package releases retrieved successfully", releases);
     }
 
-    static async createRelease(c: Context, file: File, version: string, arch: "amd64" | "arm64", leios_patch: string | null, isAdmin = false) {
+    static async createRelease(c: Context, file: File, versionWithLeiosPatch: string, arch: "amd64" | "arm64", isAdmin = false) {
         // @ts-ignore
         const packageData = c.get("package") as DB.Models.Package;
+
+        const { version, leios_patch } = AptlyUtils.extractVersionAndPatchSuffix(versionWithLeiosPatch);
 
         const owner = DB.instance().select().from(DB.Schema.users).where(
             eq(DB.Schema.users.id, packageData.owner_user_id)
@@ -34,9 +36,8 @@ export class PkgReleasesService {
         const existingRelease = DB.instance().select().from(DB.Schema.packageReleases).where(
             and(
                 eq(DB.Schema.packageReleases.package_id, packageData.id),
-                eq(DB.Schema.packageReleases.version, version),
+                eq(DB.Schema.packageReleases.versionWithLeiosPatch, versionWithLeiosPatch),
                 eq(DB.Schema.packageReleases.architecture, arch),
-                leios_patch ? eq(DB.Schema.packageReleases.leios_patch, leios_patch) : sql`1=1`
             )
         ).get();
 
@@ -77,8 +78,7 @@ export class PkgReleasesService {
 
             await DB.instance().insert(DB.Schema.packageReleases).values({
                 package_id: packageData.id,
-                version,
-                leios_patch: leios_patch ?? null,
+                versionWithLeiosPatch,
                 architecture: arch
             });
 
@@ -104,13 +104,14 @@ export class PkgReleasesService {
 
     }
 
-    static async pkgReleaseMiddleware(c: Context, next: () => Promise<void>, releaseID: number) {
+    static async pkgReleaseMiddleware(c: Context, next: () => Promise<void>, versionWithLeiosPatch: string, arch: "amd64" | "arm64") {
         // @ts-ignore
         const packageData = c.get("package") as DB.Models.Package;
         
         const releaseData = DB.instance().select().from(DB.Schema.packageReleases).where(and(
             eq(DB.Schema.packageReleases.package_id, packageData.id),
-            eq(DB.Schema.packageReleases.id, releaseID),
+            eq(DB.Schema.packageReleases.versionWithLeiosPatch, versionWithLeiosPatch),
+            eq(DB.Schema.packageReleases.architecture, arch),
         )).get();
 
         // @ts-ignore
@@ -136,7 +137,7 @@ export class PkgReleasesService {
         await DB.instance().delete(DB.Schema.packageReleases).where(
             eq(DB.Schema.packageReleases.id, releaseData.id)
         );
-        await AptlyAPI.Packages.deleteAllInAllRepos(packageData.name, releaseData.version, releaseData.leios_patch || undefined, releaseData.architecture);
+        await AptlyAPI.Packages.deleteAllInAllRepos(packageData.name, releaseData.versionWithLeiosPatch, releaseData.architecture);
         
         return APIResponse.successNoData(c, "Package release deleted successfully");
     }

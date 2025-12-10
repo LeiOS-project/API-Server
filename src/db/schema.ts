@@ -78,8 +78,7 @@ export const packages = sqliteTable('packages', {
 export const packageReleases = sqliteTable('package_releases', {
     id: int().primaryKey({ autoIncrement: true }),
     package_id: int().notNull().references(() => packages.id),
-    version: text().notNull(),
-    leios_patch: text(),
+    versionWithLeiosPatch: text().notNull(),
     architecture: text({ enum: ['amd64', 'arm64'] }).notNull(),
 });
 
@@ -94,6 +93,9 @@ export const stablePromotionRequests = sqliteTable('stable_promotion_requests', 
     decision_reason: text(),
 });
 
+/**
+ * @deprecated Use DB.Schema.scheduled_tasks instead
+ */
 export const scheduled_tasks = sqliteTable('scheduled_tasks', {
     id: int().primaryKey({ autoIncrement: true }),
     job_type: text().notNull(),
