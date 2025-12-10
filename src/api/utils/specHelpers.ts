@@ -66,7 +66,7 @@ export class APIResponseSpec {
         return this.success(description, z.null());
     }
 
-    static created<Data extends z.ZodType<APIResponse.Types.RequiredReturnData>>(description: string, dataSchema: Data) {
+    static created<Data extends z.ZodType<APIResponse.Types.NonRequiredReturnData>>(description: string, dataSchema: Data) {
         return {
             201: {
                 description,
@@ -77,6 +77,10 @@ export class APIResponseSpec {
                 },
             }
         }
+    }
+
+    static createdNoData(description: string) {
+        return this.created(description, z.null());
     }
 
     static accepted<Data extends z.ZodType<APIResponse.Types.RequiredReturnData>>(description: string, dataSchema: Data) {

@@ -109,8 +109,8 @@ export class PkgReleasesService {
         const packageData = c.get("package") as DB.Models.Package;
         
         const releaseData = DB.instance().select().from(DB.Schema.packageReleases).where(and(
+            eq(DB.Schema.packageReleases.package_id, packageData.id),
             eq(DB.Schema.packageReleases.id, releaseID),
-            eq(DB.Schema.packageReleases.package_id, packageData.id)
         )).get();
 
         // @ts-ignore

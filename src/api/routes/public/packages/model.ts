@@ -15,13 +15,13 @@ export namespace PublicPackagesModel {
     export type RepoQuery = z.infer<typeof RepoQuery>;
 
     export namespace GetAll {
-        export const Response = z.array(PackageModel.GetPackageById.Response);
+        export const Response = z.array(PackageModel.GetPackageByName.Response);
         export type Response = z.infer<typeof Response>;
     }
 
     export namespace PackageDetails {
         export const Response = z.object({
-            package: PackageModel.GetPackageById.Response,
+            package: PackageModel.GetPackageByName.Response,
             releases: AptlyAPI.Packages.Models.getAllInAllReposResponse
         });
         export type Response = z.infer<typeof Response>;

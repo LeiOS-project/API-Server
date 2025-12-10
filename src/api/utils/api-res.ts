@@ -7,10 +7,6 @@ export class APIResponse {
         return c.json({ success: true, code: 200, message, data }, 200);
     }
 
-    static accepted<Data extends APIResponse.Types.RequiredReturnData>(c: Context, message: string, data: Data) {
-        return c.json({ success: true, code: 202, message, data }, 202);
-    }
-
     static successNoData(c: Context, message: string) {
         return c.json({ success: true, code: 200, message, data: null }, 200);
     }
@@ -18,6 +14,15 @@ export class APIResponse {
     static created<Data extends APIResponse.Types.RequiredReturnData>(c: Context, message: string, data: Data) {
         return c.json({ success: true, code: 201, message, data }, 201);
     }
+
+    static createdNoData(c: Context, message: string) {
+        return c.json({ success: true, code: 201, message, data: null }, 201);
+    }
+
+    static accepted<Data extends APIResponse.Types.RequiredReturnData>(c: Context, message: string, data: Data) {
+        return c.json({ success: true, code: 202, message, data }, 202);
+    }
+
 
     static serverError(c: Context, message: string) {
         return c.json({ success: false, code: 500, message }, 500);
@@ -79,7 +84,7 @@ export namespace APIResponse.Schema {
         });
     }
 
-    export function created<Message extends string, Data extends z.ZodType<APIResponse.Types.RequiredReturnData>>(message: Message, data: Data) {
+    export function created<Message extends string, Data extends z.ZodType<APIResponse.Types.NonRequiredReturnData>>(message: Message, data: Data) {
         return z.object({
             success: z.literal(true),
             code: z.literal(201),

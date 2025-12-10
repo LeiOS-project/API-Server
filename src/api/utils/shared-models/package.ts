@@ -2,8 +2,8 @@ import { createInsertSchema, createSelectSchema, createUpdateSchema } from "driz
 import { DB } from "../../../db";
 import z from "zod";
 
-export namespace PackageModel.GetPackageById {
-
+export namespace PackageModel.GetPackageByName {
+    
     export const Response = createSelectSchema(DB.Schema.packages);
     export type Response = z.infer<typeof Response>;
 
@@ -11,7 +11,7 @@ export namespace PackageModel.GetPackageById {
 
 export namespace PackageModel.GetAll {
 
-    export const Response = z.array(PackageModel.GetPackageById.Response);
+    export const Response = z.array(PackageModel.GetPackageByName.Response);
     export type Response = z.infer<typeof Response>;
 
 }
@@ -27,11 +27,6 @@ export namespace PackageModel.CreatePackageAsAdmin {
 
     export type Body = z.infer<typeof Body>;
 
-    export const Response = z.object({
-        id: z.int().positive()
-    });
-    export type Response = z.infer<typeof Response>;
-
 }
 
 export namespace PackageModel.CreatePackage {
@@ -41,9 +36,6 @@ export namespace PackageModel.CreatePackage {
     });
 
     export type Body = z.infer<typeof Body>;
-
-    export const Response = PackageModel.CreatePackageAsAdmin.Response;
-    export type Response = z.infer<typeof Response>;
 }
 
 export namespace PackageModel.UpdatePackage {
