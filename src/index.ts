@@ -56,11 +56,11 @@ export class Main {
 
     }
 
-    private static gracefulShutdown(type: NodeJS.Signals, code: number) {
+    private static async gracefulShutdown(type: NodeJS.Signals, code: number) {
         try {
             Logger.log(`Received ${type}, shutting down...`);
-            API.stop();
-            AptlyAPIServer.stop(type);
+            await API.stop();
+            await AptlyAPIServer.stop(type);
             process.exit(code);
         } catch {
             Logger.critical("Error during shutdown, forcing exit");
