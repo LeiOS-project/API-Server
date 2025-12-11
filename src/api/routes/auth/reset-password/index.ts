@@ -38,6 +38,10 @@ router.post('/',
             return APIResponse.badRequest(c, "Invalid reset token");
         }
 
+        if (checkToken.expires_at < Date.now()) {
+            return APIResponse.badRequest(c, "Invalid reset token");
+        }
+
         const user = DB.instance().select().from(DB.Schema.users).where(
             eq(DB.Schema.users.id, checkToken.user_id)
         ).get();

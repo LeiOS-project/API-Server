@@ -137,6 +137,10 @@ export class APIResponseSpec {
         return this.genericError(409, message);
     }
 
+    static tooManyRequests(message = "Too Many Requests: You have sent too many requests in a given amount of time") {
+        return this.genericError(429, message);
+    }
+
 }
 
 export namespace APIResponseSpec.Types {
@@ -156,6 +160,6 @@ export namespace APIResponseSpec.Types {
         responses: DescribeRouteOptions['responses'];
     }
 
-    export type HTTP_ERROR_CODES = 400 | 401 | 404 | 409 | 500;
+    export type HTTP_ERROR_CODES = 400 | 401 | 404 | 409 | 429 | 500;
 
 }

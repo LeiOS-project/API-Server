@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import type { Context } from "hono";
 import { AuthModel } from './model'
 import { validator as zValidator } from "hono-openapi";
 import { DB } from "../../../db";
@@ -8,6 +9,36 @@ import { AuthHandler, SessionHandler } from "../../utils/authHandler";
 import { APIResponseSpec, APIRouteSpec } from "../../utils/specHelpers";
 import { router as resetPasswordRouter } from "./reset-password";
 import { DOCS_TAGS } from "../../docs";
+
+// Simple in-memory rate limiter for login to reduce brute-force risk
+const LOGIN_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+const LOGIN_MAX_ATTEMPTS = 5;
+const loginAttempts = new Map<string, { count: number; resetAt: number }>();
+
+function getClientId(c: Context) {
+    // Prefer forwarded header, fallback to remote IP if available
+    const forwarded = c.req.header("x-forwarded-for")?.split(",")[0]?.trim();
+    // @ts-ignore bun/hono provides a native request with connection info
+    const remote = (c.req.raw as any)?.remoteAddr?.hostname;
+    return forwarded || remote || "unknown";
+}
+
+function isLoginRateLimited(clientId: string) {
+    const now = Date.now();
+    const entry = loginAttempts.get(clientId);
+
+    if (!entry || entry.resetAt <= now) {
+        loginAttempts.set(clientId, { count: 1, resetAt: now + LOGIN_WINDOW_MS });
+        return { limited: false };
+    }
+
+    if (entry.count >= LOGIN_MAX_ATTEMPTS) {
+        return { limited: true, retryAfterMs: entry.resetAt - now };
+    }
+
+    entry.count += 1;
+    return { limited: false };
+}
 
 export const router = new Hono().basePath('/auth');
 
@@ -21,6 +52,7 @@ router.post('/login',
         responses: APIResponseSpec.describeWithWrongInputs(
             APIResponseSpec.success("Login successful", AuthModel.Login.Response),
             APIResponseSpec.unauthorized("Unauthorized: Invalid username or password"),
+            APIResponseSpec.tooManyRequests("Too many login attempts. Try again later.")
         ),
 
     }),
@@ -28,6 +60,14 @@ router.post('/login',
     zValidator("json", AuthModel.Login.Body),
     
     async (c) => {
+        const clientId = getClientId(c);
+        const rate = isLoginRateLimited(clientId);
+        if (rate.limited) {
+            const retrySeconds = Math.max(1, Math.ceil((rate.retryAfterMs ?? LOGIN_WINDOW_MS) / 1000));
+            c.header("Retry-After", retrySeconds.toString());
+            return c.json({ success: false, code: 429, message: `Too many login attempts. Try again in ${retrySeconds}s` }, 429);
+        }
+
         const { username, password } = c.req.valid("json");
 
         const user = DB.instance().select().from(DB.Schema.users).where(eq(DB.Schema.users.username, username)).get();
