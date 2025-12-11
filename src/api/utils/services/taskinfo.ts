@@ -3,6 +3,7 @@ import { DB } from "../../../db";
 import { APIResponse } from "../api-res";
 import { eq, and, or } from "drizzle-orm";
 import { AuthHandler } from "../authHandler";
+import { ConfigHandler } from "../../../utils/config";
 
 export class TaskInfoService {
 
@@ -57,6 +58,22 @@ export class TaskInfoService {
         const taskData = c.get("task") as DB.Models.ScheduledTask;
 
         return APIResponse.success(c, "Task retrieved successfully", taskData);
+    }
+
+    static async getTaskLogsAfterMiddleware(c: Context) {
+        // @ts-ignore
+        const taskData = c.get("task") as DB.Models.ScheduledTask;
+
+        if (!taskData.storeLogs) {
+            return APIResponse.badRequest(c, "Logs are not stored for this task");
+        }
+
+        const logs = Bun.file((ConfigHandler.getConfig()?.LRA_LOG_DIR || "./data/logs") + `/tasks/task-${taskData.id}.log`);
+        if (!await logs.exists()) {
+            return APIResponse.notFound(c, "Log file not found for this task");
+        }
+
+        return APIResponse.success(c, "Task logs retrieved successfully", { logs: await logs.text() });
     }
 
 }

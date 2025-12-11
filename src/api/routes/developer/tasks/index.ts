@@ -55,3 +55,22 @@ router.get('/:taskID',
         return await TaskInfoService.getTaskAfterMiddleware(c);
     }
 );
+
+router.get('/:taskID/logs',
+
+    APIRouteSpec.authenticated({
+        summary: "Get scheduled task logs",
+        description: "Retrieve logs of a specific scheduled task by its ID.",
+        tags: [DOCS_TAGS.DEV_API.TASKS],
+
+        responses: APIResponseSpec.describeBasic(
+            APIResponseSpec.success("Task logs retrieved successfully", TaskStatusModel.GetLogsByID.Response),
+            APIResponseSpec.badRequest("Logs are not stored for this task"),
+            APIResponseSpec.notFound("Log file not found for this task")
+        )
+    }),
+
+    async (c) => {
+        return await TaskInfoService.getTaskLogsAfterMiddleware(c);
+    }
+);

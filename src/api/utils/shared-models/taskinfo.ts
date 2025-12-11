@@ -21,3 +21,13 @@ export namespace TaskStatusModel.GetAll {
     export type Response = z.infer<typeof Response>;
 
 }
+
+export namespace TaskStatusModel.GetLogsByID {
+
+    export const Response = z.object({
+        logs: z.string()
+    });
+
+    export type Response = z.infer<typeof Response>;
+
+}

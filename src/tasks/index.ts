@@ -150,7 +150,7 @@ class PersistentLogger implements TaskHandler.PersistentTaskLoggerLike {
 	private readonly writeStream: fs.WriteStream;
 
 	constructor(taskID: number) {
-		const filePath = ConfigHandler.getConfig()?.LRA_LOG_DIR + `/tasks/task-${taskID}.log`;
+		const filePath = (ConfigHandler.getConfig()?.LRA_LOG_DIR || "./data/logs") + `/tasks/task-${taskID}.log`;
 		this.writeStream = fs.createWriteStream(filePath, { flags: "a" });
 	}
 
