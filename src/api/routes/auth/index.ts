@@ -6,6 +6,8 @@ import { eq } from "drizzle-orm";
 import { APIResponse } from "../../utils/api-res";
 import { AuthHandler, SessionHandler } from "../../utils/authHandler";
 import { APIResponseSpec, APIRouteSpec } from "../../utils/specHelpers";
+import { router as resetPasswordRouter } from "./reset-password";
+import { DOCS_TAGS } from "../../docs";
 
 export const router = new Hono().basePath('/auth');
 
@@ -14,7 +16,7 @@ router.post('/login',
     APIRouteSpec.unauthenticated({
         summary: "User Login",
         description: "Authenticate a user with their username and password",
-        tags: ["Authentication"],
+        tags: [DOCS_TAGS.AUTHENTICATION],
 
         responses: APIResponseSpec.describeWithWrongInputs(
             APIResponseSpec.success("Login successful", AuthModel.Login.Response),
@@ -49,7 +51,7 @@ router.get('/session',
     APIRouteSpec.authenticated({
         summary: "Get Current Session",
         description: "Retrieve the current user's session information",
-        tags: ["Authentication"],
+        tags: [DOCS_TAGS.AUTHENTICATION],
 
         responses: APIResponseSpec.describeBasic(
             APIResponseSpec.success("Session info retrieved successfully", AuthModel.Session.Response),
@@ -78,7 +80,7 @@ router.post('/logout',
     APIRouteSpec.authenticated({
         summary: "User Logout",
         description: "Invalidate the current user's session",
-        tags: ["Authentication"],
+        tags: [DOCS_TAGS.AUTHENTICATION],
 
         responses: APIResponseSpec.describeBasic(
             APIResponseSpec.successNoData("Logout successful"),
@@ -100,3 +102,5 @@ router.post('/logout',
         return APIResponse.successNoData(c, "Logout successful");
     }
 );
+
+router.route('/', resetPasswordRouter);

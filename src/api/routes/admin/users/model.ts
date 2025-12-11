@@ -1,6 +1,7 @@
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "drizzle-zod";
 import { DB } from "../../../../db";
 import z from "zod";
+import { UserDataPolicys } from "../../../utils/shared-models/accountData";
 
 export namespace AdminUsersModel {
 
@@ -24,7 +25,7 @@ export namespace AdminUsersModel {
 
     export namespace Create {
         const InsertSchema = createInsertSchema(DB.Schema.users, {
-            username: z.string().min(3).max(32),
+            username: UserDataPolicys.Username,
             display_name: z.string().min(1).max(64),
             email: z.email(),
         }).omit({
@@ -54,7 +55,7 @@ export namespace AdminUsersModel {
 
     export namespace UpdatePassword {
         export const Body = z.object({
-            password: z.string().min(8).max(128),
+            password: UserDataPolicys.Password
         });
         export type Body = z.infer<typeof Body>;
     }
