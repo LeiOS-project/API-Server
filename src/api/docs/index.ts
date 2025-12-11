@@ -61,6 +61,8 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
                     "Developer API / Packages",
                     "Developer API / Packages / Releases",
                     "Developer API / Packages / Stable Promotion Requests",
+
+                    "Developer API / Tasks",
                 ],
             },
             {
@@ -75,6 +77,8 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
                     "Admin API / Stable Promotion Requests",
 
                     "Admin API / OS Releases",
+
+                    "Admin API / Tasks",
                 ]
             },
             {
@@ -137,6 +141,15 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
                 description: "Endpoints for managing stable promotion requests",
             },
 
+            {
+                name: "Developer API / Tasks",
+                // @ts-ignore
+                "x-displayName": "Tasks",
+                summary: "Tasks",
+                parent: "Developer API",
+                description: "Endpoints for managing scheduled tasks",
+            },
+
             // {
             //     name: "Admin API",
             //     description: "Endpoints for administrators",
@@ -183,7 +196,25 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
                 parent: "Admin API",
                 description: "Endpoints for managing stable promotion requests",
             },
+
+            {
+                name: "Admin API / OS Releases",
+                // @ts-ignore
+                "x-displayName": "OS Releases",
+                summary: "OS Releases",
+                parent: "Admin API",
+                description: "Endpoints for managing OS releases",
+            },
             
+            {
+                name: "Admin API / Tasks",
+                // @ts-ignore
+                "x-displayName": "Tasks",
+                summary: "Tasks",
+                parent: "Admin API",
+                description: "Endpoints for managing scheduled tasks",
+            },
+
             {
                 name: "Account",
                 description: "Endpoints for user account management",
