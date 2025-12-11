@@ -4,6 +4,7 @@ import { DB } from "./db";
 import { ConfigHandler } from "./utils/config";
 import { Logger } from "./utils/logger";
 import { TaskScheduler } from "./tasks";
+import { LiveRepoUtils } from "./utils/live-repo";
 
 export class Main {
 
@@ -26,6 +27,14 @@ export class Main {
         // start task scheduler
         await TaskScheduler.processQueue();
 
+        await LiveRepoUtils.uploadAdditionalFilesIfNeeded({
+            endpoint: config.LRA_S3_ENDPOINT,
+            region: config.LRA_S3_REGION,
+            bucket: config.LRA_S3_BUCKET,
+            accessKeyId: config.LRA_S3_ACCESS_KEY_ID,
+            secretAccessKey: config.LRA_S3_SECRET_ACCESS_KEY
+        }, config.LRA_PUBLIC_KEY_PATH ?? "./data/keys/public-key.gpg");
+
         await AptlyAPIServer.init({
             aptlyRoot: config.LRA_APTLY_ROOT ?? "./data/aptly",
             aptlyPort: parseInt(config.LRA_APTLY_PORT ?? "12150"),
@@ -33,7 +42,7 @@ export class Main {
                 endpoint: config.LRA_S3_ENDPOINT,
                 region: config.LRA_S3_REGION,
                 bucket: config.LRA_S3_BUCKET,
-                prefix: config.LRA_S3_PREFIX,
+                prefix: config.LRA_S3_PREFIX || "leios/",
                 accessKeyId: config.LRA_S3_ACCESS_KEY_ID,
                 secretAccessKey: config.LRA_S3_SECRET_ACCESS_KEY
             },
