@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { API } from "../src/api";
 import { DB } from "../src/db";
-import { AuthHandler, SessionHandler } from "../src/api/utils/authHandler";
+import { AuthHandler, AuthUtils, SessionHandler } from "../src/api/utils/authHandler";
 import { AptlyAPI } from "../src/aptly/api";
 import { randomUUID } from "crypto";
 import { eq } from "drizzle-orm";
@@ -64,7 +64,15 @@ describe("Auth routes and access checks", async () => {
         expect(session.user_id).toBe(testUser.id);
         expect(session.user_role).toBe("user");
         expect(session.type).toBe("session");
-        expect(session.token).toBe(data.token);
+        expect(session.expires_at).toBeGreaterThan(Date.now());
+
+        const tokenParts = AuthUtils.getTokenParts(data.token);
+        expect(tokenParts).toBeDefined();
+        if (!tokenParts) return;
+        
+        expect(await AuthUtils.verifyHashedTokenBase(tokenParts.base, session.hashed_token)).toBe(true);
+        expect(tokenParts.prefix).toBe("lra_sess_");
+        expect(tokenParts.id).toBe(session.id);
     });
 
     test("POST /auth/login with invalid credentials fails", async () => {
@@ -85,7 +93,6 @@ describe("Auth routes and access checks", async () => {
 
         expect(data.user_id).toBe(testUser.id);
         expect(data.user_role).toBe("user");
-        expect(data.token).toBe(session_token);
     });
 
     test("GET /auth/session with invalid token fails", async () => {

@@ -40,7 +40,7 @@ router.post('/login',
 
         const session = await SessionHandler.createSession(user.id);
 
-        return APIResponse.success(c, "Login successful", session);
+        return APIResponse.success(c, "Login successful", session satisfies AuthModel.Login.Response);
     }
 );
 
@@ -65,7 +65,11 @@ router.get('/session',
             return APIResponse.unauthorized(c, "Your Auth Context is not a session");
         }
 
-        return APIResponse.success(c, "Session info retrieved successfully", authContext);
+        return APIResponse.success(c, "Session info retrieved successfully", {
+            user_id: authContext.user_id,
+            user_role: authContext.user_role,
+            expires_at: authContext.expires_at
+        } satisfies AuthModel.Session.Response);
     }
 );
 
@@ -91,7 +95,7 @@ router.post('/logout',
             return APIResponse.unauthorized(c, "Your Auth Context is not a session");
         }
 
-        await SessionHandler.inValidateSession(authContext.token);
+        await SessionHandler.inValidateSession(authContext.id);
 
         return APIResponse.successNoData(c, "Logout successful");
     }

@@ -34,7 +34,8 @@ export const passwordResets = sqliteTable('password_resets', {
  * @deprecated Use DB.Schema.sessions instead
  */
 export const sessions = sqliteTable('sessions', {
-    token: text().primaryKey(),
+    id: text().primaryKey(),
+    hashed_token: text().notNull(),
     user_id: int().notNull().references(() => users.id),
     user_role: text({
         enum: ['admin', 'developer', 'user']
@@ -46,8 +47,8 @@ export const sessions = sqliteTable('sessions', {
  * @deprecated Use DB.Schema.apiKeys instead
  */
 export const apiKeys = sqliteTable('api_keys', {
-    id: int().primaryKey({ autoIncrement: true }),
-    token: text().notNull().unique(),
+    id: text().primaryKey(),
+    hashed_token: text().notNull(),
     user_id: int().notNull().references(() => users.id),
     user_role: text({
         enum: ['admin', 'developer', 'user']

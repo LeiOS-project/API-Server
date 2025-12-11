@@ -1,6 +1,6 @@
 CREATE TABLE `api_keys` (
-	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
-	`token` text NOT NULL,
+	`id` text PRIMARY KEY NOT NULL,
+	`hashed_token` text NOT NULL,
 	`user_id` integer NOT NULL,
 	`user_role` text NOT NULL,
 	`expires_at` integer,
@@ -8,7 +8,11 @@ CREATE TABLE `api_keys` (
 	FOREIGN KEY (`user_role`) REFERENCES `users`(`role`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `api_keys_token_unique` ON `api_keys` (`token`);--> statement-breakpoint
+CREATE TABLE `metadata` (
+	`key` text PRIMARY KEY NOT NULL,
+	`data` text NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE `os_releases` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`version` text NOT NULL,
@@ -69,7 +73,8 @@ CREATE TABLE `scheduled_tasks_paused_state` (
 );
 --> statement-breakpoint
 CREATE TABLE `sessions` (
-	`token` text PRIMARY KEY NOT NULL,
+	`id` text PRIMARY KEY NOT NULL,
+	`hashed_token` text NOT NULL,
 	`user_id` integer NOT NULL,
 	`user_role` text NOT NULL,
 	`expires_at` integer NOT NULL,
@@ -82,18 +87,12 @@ CREATE TABLE `stable_promotion_requests` (
 	`package_id` integer NOT NULL,
 	`package_release_id` integer NOT NULL,
 	`status` text DEFAULT 'pending' NOT NULL,
-	`decision_reason` text,
+	`admin_note` text,
 	FOREIGN KEY (`package_id`) REFERENCES `packages`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`package_release_id`) REFERENCES `package_releases`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `stable_promotion_requests_package_release_id_unique` ON `stable_promotion_requests` (`package_release_id`);--> statement-breakpoint
-CREATE TABLE `tmp_data` (
-	`key` text PRIMARY KEY NOT NULL,
-	`data` text NOT NULL,
-	`expires_at` integer NOT NULL
-);
---> statement-breakpoint
 CREATE TABLE `users` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`username` text NOT NULL,
