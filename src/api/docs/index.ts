@@ -7,7 +7,7 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
     documentation: {
         info: {
             title: "LeiOS API",
-            version: "1.0.0",
+            version: "1.1.0",
             description: "API for LeiOS Developers and Admins",
         },
         components: {
