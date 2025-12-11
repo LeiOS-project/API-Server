@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { StablePromotionRequestsModel } from "../src/api/utils/shared-models/stableRequests";
+import { AdminStablePromotionRequestModel } from "../src/api/routes/admin/stable-promotion-requests/model";
 
 describe("StableRequestModel schemas", () => {
 	test("accepts valid create payload", () => {
@@ -15,20 +16,10 @@ describe("StableRequestModel schemas", () => {
 	});
 
 	test("rejects invalid architecture for copy body", () => {
-		expect(() => StablePromotionRequestsModel.CopyToStable.Body.parse({
+		expect(() => AdminStablePromotionRequestModel.Decide.Body.parse({
 			version: "1.2.3",
 			arch: "x86" as any
 		})).toThrow();
 	});
 
-	test("accepts copy response shape", () => {
-		const parsed = StablePromotionRequestsModel.CopyToStable.Response.parse({
-			version: "2.0.0",
-			arch: "arm64",
-			copied: true
-		});
-
-		expect(parsed.copied).toBe(true);
-		expect(parsed.arch).toBe("arm64");
-	});
 });

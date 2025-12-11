@@ -17,3 +17,17 @@ export namespace AdminStablePromotionRequestModel.GetAll {
     export type Response = z.infer<typeof Response>;
 
 }
+
+export namespace AdminStablePromotionRequestModel.Decide {
+
+    export const Body = createUpdateSchema(DB.Schema.stablePromotionRequests, {
+        status: z.enum(["approved", "denied"]),
+        admin_note: z.string()
+    }).omit({
+        id: true,
+        package_id: true,
+        package_release_id: true
+    });
+
+    export type Body = z.infer<typeof Body>;
+}
