@@ -26,19 +26,32 @@ export class DB {
         if (!usersTableEmpty) return;
 
         const username = "admin";
-        const randomPassword = crypto_randomBytes(32).toString('hex');
 
-        await this.db.insert(DB.Schema.users).values({
+        const admin_user_id = await this.db.insert(DB.Schema.users).values({
             username,
             email: "admin@leios.local",
-            password_hash: await Bun.password.hash(randomPassword),
+            password_hash: await Bun.password.hash(crypto_randomBytes(32).toString('hex')),
             display_name: "Default Administrator",
             role: "admin"
+        }).returning().get().id;
+
+        const passwordResetToken = crypto_randomBytes(64).toString('hex');
+        await this.db.insert(DB.Schema.passwordResets).values({
+            token: passwordResetToken,
+            user_id: admin_user_id,
+            expires_at: Date.now() + 7 * 24 * 60 * 60 * 1000 // 7 Days
         });
 
-        Bun.file(`${configBaseDir}/initial_admin_credentials.txt`).write(`Username: ${username}\nPassword: ${randomPassword}\n`);
+        Bun.write(`${configBaseDir}/initial_admin_password_reset_token.txt`, `https://{DASHBOARD_URL}/auth/reset-password?token=${passwordResetToken}`, {
+            mode: 0o600,
+            createPath: true
+        });
 
-        Logger.info(`Initial admin user created with username: ${username} and password: ${randomPassword} (also saved to ${configBaseDir}/initial_admin_credentials.txt)`);
+        Logger.info(
+            `Initial admin user created with username: ${username}.\n` +
+            `You can set the password under https://{DASHBOARD_URL}/auth/reset-password?token=${passwordResetToken}\n` +
+            `The url is also safed at ${configBaseDir}/initial_admin_password_reset_token.txt\n`
+        );
     }
 
     static async createInitialReleasesMetaIfNeeded() {

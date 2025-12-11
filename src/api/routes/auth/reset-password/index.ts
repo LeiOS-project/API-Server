@@ -87,7 +87,7 @@ router.post('/request',
         ).get();
 
         if (user) {
-            const resetToken = Bun.randomUUIDv7();
+            const resetToken = crypto_randomBytes(64).toString('hex');
 
             // Delete any existing reset tokens for this user
             DB.instance().delete(DB.Schema.passwordResets).where(

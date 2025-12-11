@@ -47,7 +47,8 @@ beforeAll(async () => {
     migrate(drizzleDb, { migrationsFolder: "drizzle" });
 
     await DB.init(
-        path.join(TMP_ROOT, "db.sqlite")
+        path.join(TMP_ROOT, "db.sqlite"),
+        TMP_ROOT
     );
 
     await AptlyAPIServer.init({
