@@ -5,43 +5,8 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1765122923774,
-      "tag": "0000_fast_junta",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1765127295740,
-      "tag": "0001_awesome_big_bertha",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1765131639534,
-      "tag": "0002_eminent_punisher",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1765190002933,
-      "tag": "0003_unique_ma_gnuci",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "6",
-      "when": 1765372470491,
-      "tag": "0004_stiff_randall",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "6",
-      "when": 1765375028005,
-      "tag": "0005_bumpy_terrax",
+      "when": 1765477098208,
+      "tag": "0000_fearless_tomas",
       "breakpoints": true
     }
   ]

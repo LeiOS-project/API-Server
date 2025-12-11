@@ -1,1 +1,0 @@
-ALTER TABLE `stable_promotion_requests` ADD `package_id` integer NOT NULL REFERENCES packages(id);

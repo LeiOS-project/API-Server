@@ -8,7 +8,7 @@ import fs from "fs";
 import { UpdateTestingRepoTask } from "./updateTestingRepo";
 
 type AdditionalTaskMeta = {
-	created_by_user_id: number;
+	created_by_user_id: number | null;
 };
 type TaskData = TaskHandler.BaseTaskData<AdditionalTaskMeta>;
 
@@ -180,7 +180,7 @@ const Registry = new TaskHandler.TaskFNRegistry()
 .register(OsReleaseTask)
 .register(UpdateTestingRepoTask);
 
-export const TaskScheduler = new TaskHandler({
+export const TaskScheduler = new TaskHandler<typeof Registry["registry"], InstanceType<typeof TaskStorage>, TaskData, AdditionalTaskMeta>({
 	storage: new TaskStorage(),
 	defaultLogger: Logger,
 	persistentLogger: PersistentLogger

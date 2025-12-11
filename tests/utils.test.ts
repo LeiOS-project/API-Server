@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { AptlyUtils } from "../src/aptly/utils";
 import { PackageReleaseModel } from "../src/api/utils/shared-models/pkg-releases";
+import { OSReleaseUtils } from "../src/api/utils/os-release-utils";
 
 describe("Testing Aptly Utilities", () => {
 
@@ -73,6 +74,32 @@ describe("Testing Aptly Utilities", () => {
         expect("1.2.3~rc1+beta-2leios1.1.1.1").not.toMatch(PackageReleaseModel.versionWithLeiosPatchRegex);
         expect("a1.2.3leios1").not.toMatch(PackageReleaseModel.versionWithLeiosPatchRegex);
         expect("1.2.3leios1.1+beta").not.toMatch(PackageReleaseModel.versionWithLeiosPatchRegex);
+
+    });
+
+});
+
+describe("Testing OS Release Utilities", () => {
+
+    test("Generate Version String", () => {
+
+        const date1 = new Date(Date.UTC(2024, 6 - 1, 15)); // June 15, 2024
+        expect(OSReleaseUtils.getVersionString(date1, "2024.05.02")).toBe("2024.06.01");
+
+        const date2 = new Date(Date.UTC(2024, 6 - 1, 20)); // June 20, 2024
+        expect(OSReleaseUtils.getVersionString(date2, "2024.06.01")).toBe("2024.06.02");
+
+        const date3 = new Date(Date.UTC(2023, 12 - 1, 31)); // December 31, 2023
+        expect(OSReleaseUtils.getVersionString(date3, "2023.11.03")).toBe("2023.12.01");
+
+        const date4 = new Date(Date.UTC(2024, 1 - 1, 15)); // January 15, 2024
+        expect(OSReleaseUtils.getVersionString(date4, "2023.12.05")).toBe("2024.01.01");
+
+        const date5 = new Date(Date.UTC(2024, 6 - 1, 1)); // June 1, 2024
+        expect(OSReleaseUtils.getVersionString(date5)).toBe("2024.06.01");
+
+        const date6 = new Date(Date.UTC(2024, 11 - 1, 10)); // November 10, 2024
+        expect(OSReleaseUtils.getVersionString(date6, "2024.11.09")).toBe("2024.11.10");
 
     });
 

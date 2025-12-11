@@ -2,7 +2,15 @@ import { createInsertSchema, createSelectSchema, createUpdateSchema } from "driz
 import { DB } from "../../../../db";
 import { z } from "zod";
 
-export namespace OSReleases.GetById {
+export namespace OSReleasesModel {
+
+    export const Param = z.object({
+        version: z.string().regex(/^\d{4}\.\d{2}\.\d{2}$/),
+    });
+
+}
+
+export namespace OSReleasesModel.GetByVersion {
 
     export const Response = createSelectSchema(DB.Schema.os_releases)
 
@@ -10,26 +18,20 @@ export namespace OSReleases.GetById {
 
 }
 
-export namespace OSReleases.GetAll {
+export namespace OSReleasesModel.GetAll {
 
-    export const Response = z.array(OSReleases.GetById.Response);
+    export const Response = z.array(OSReleasesModel.GetByVersion.Response);
 
     export type Response = z.infer<typeof Response>;
 
 }
 
-export namespace OSReleases.CreateRelease {
+export namespace OSReleasesModel.CreateRelease {
 
-    export const Request = createInsertSchema(DB.Schema.os_releases).omit({
-        id: true,
-        version: true,
-        published_at: true
+    export const Response = z.object({
+        version: z.string(),
+        taskID: z.number(),
     });
 
-    export type Request = z.infer<typeof Request>;
-
-    export const Response = createSelectSchema(DB.Schema.os_releases);
-
     export type Response = z.infer<typeof Response>;
-
 }

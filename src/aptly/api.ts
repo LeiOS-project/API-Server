@@ -324,7 +324,7 @@ export namespace AptlyAPI.Publishing {
                 distribution: "testing"
             },
             body: {
-                Signing: AptlyUtils.Signing.SigningConfig
+                Signing: AptlyAPIServer.SigningConfig
             }
         });
 

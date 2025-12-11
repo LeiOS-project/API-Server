@@ -100,7 +100,7 @@ export const stablePromotionRequests = sqliteTable('stable_promotion_requests', 
 export const scheduled_tasks = sqliteTable('scheduled_tasks', {
     id: int().primaryKey({ autoIncrement: true }),
     function: text().notNull(),
-    created_by_user_id: int().notNull().references(() => users.id),
+    created_by_user_id: int().references(() => users.id),
     args: text({ mode: 'json' }).$type<Record<string, any>>().notNull(),
     autoDelete: int({ mode: 'boolean' }).notNull().default(sql`0`),
     storeLogs: int({ mode: 'boolean' }).notNull().default(sql`0`),
@@ -120,10 +120,12 @@ export const scheduled_tasks_paused_state = sqliteTable('scheduled_tasks_paused_
     data: text({ mode: 'json' }).$type<TaskHandler.TempPausedTaskState["data"]>().notNull(),
 });
 
-export const tmp_data = sqliteTable('tmp_data', {
+/**
+ * @deprecated Use DB.Schema.tmp_data instead
+ */
+export const metadata = sqliteTable('metadata', {
     key: text().primaryKey(),
-    data: text({ mode: 'json' }).$type<Record<string, any>>().notNull(),
-    expires_at: int().notNull()
+    data: text({ mode: 'json' }).$type<Record<string, any> | Array<any>>().notNull()
 });
 
 

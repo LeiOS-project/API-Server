@@ -172,7 +172,7 @@ export class AptlyUtils {
                         "amd64",
                         "arm64"
                     ],
-                    Signing: AptlyUtils.Signing.SigningConfig
+                    Signing: AptlyAPIServer.SigningConfig
                 }
             });
 
@@ -218,7 +218,7 @@ export class AptlyUtils {
                         "amd64",
                         "arm64"
                     ],
-                    Signing: AptlyUtils.Signing.SigningConfig
+                    Signing: AptlyAPIServer.SigningConfig
                 }
             });
 
@@ -336,9 +336,4 @@ export namespace AptlyUtils.Signing {
             path.join(AptlyAPIServer.dearmoredKeysDir, "private-key.dearmored.gpg")
         );
     }
-
-    export const SigningConfig = {
-        Keyring: path.join(AptlyAPIServer.dearmoredKeysDir, "public-key.dearmored.gpg"),
-        SecretKeyring: path.join(AptlyAPIServer.dearmoredKeysDir, "private-key.dearmored.gpg"),
-    } as const;
 }

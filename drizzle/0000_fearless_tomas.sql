@@ -9,11 +9,17 @@ CREATE TABLE `api_keys` (
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `api_keys_token_unique` ON `api_keys` (`token`);--> statement-breakpoint
+CREATE TABLE `os_releases` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`version` text NOT NULL,
+	`published_at` integer NOT NULL
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `os_releases_version_unique` ON `os_releases` (`version`);--> statement-breakpoint
 CREATE TABLE `package_releases` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`package_id` integer NOT NULL,
-	`version` text NOT NULL,
-	`leios_patch` integer,
+	`versionWithLeiosPatch` text NOT NULL,
 	`architecture` text NOT NULL,
 	FOREIGN KEY (`package_id`) REFERENCES `packages`(`id`) ON UPDATE no action ON DELETE no action
 );
@@ -24,6 +30,7 @@ CREATE TABLE `packages` (
 	`owner_user_id` integer NOT NULL,
 	`description` text NOT NULL,
 	`homepage_url` text NOT NULL,
+	`requires_patching` integer DEFAULT 0 NOT NULL,
 	`latest_stable_release_amd64` text,
 	`latest_stable_release_arm64` text,
 	`latest_testing_release_amd64` text,
@@ -39,6 +46,28 @@ CREATE TABLE `password_resets` (
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
+CREATE TABLE `scheduled_tasks` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`function` text NOT NULL,
+	`created_by_user_id` integer,
+	`args` text NOT NULL,
+	`autoDelete` integer DEFAULT 0 NOT NULL,
+	`storeLogs` integer DEFAULT 0 NOT NULL,
+	`status` text DEFAULT 'pending' NOT NULL,
+	`created_at` integer NOT NULL,
+	`finished_at` integer,
+	`result` text,
+	`message` text,
+	FOREIGN KEY (`created_by_user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action
+);
+--> statement-breakpoint
+CREATE TABLE `scheduled_tasks_paused_state` (
+	`task_id` integer PRIMARY KEY NOT NULL,
+	`next_step_to_execute` integer NOT NULL,
+	`data` text NOT NULL,
+	FOREIGN KEY (`task_id`) REFERENCES `scheduled_tasks`(`id`) ON UPDATE no action ON DELETE no action
+);
+--> statement-breakpoint
 CREATE TABLE `sessions` (
 	`token` text PRIMARY KEY NOT NULL,
 	`user_id` integer NOT NULL,
@@ -50,12 +79,19 @@ CREATE TABLE `sessions` (
 --> statement-breakpoint
 CREATE TABLE `stable_promotion_requests` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`package_id` integer NOT NULL,
 	`package_release_id` integer NOT NULL,
 	`status` text DEFAULT 'pending' NOT NULL,
-	`reviewed_by` integer,
 	`decision_reason` text,
-	FOREIGN KEY (`package_release_id`) REFERENCES `package_releases`(`id`) ON UPDATE no action ON DELETE no action,
-	FOREIGN KEY (`reviewed_by`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action
+	FOREIGN KEY (`package_id`) REFERENCES `packages`(`id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`package_release_id`) REFERENCES `package_releases`(`id`) ON UPDATE no action ON DELETE no action
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `stable_promotion_requests_package_release_id_unique` ON `stable_promotion_requests` (`package_release_id`);--> statement-breakpoint
+CREATE TABLE `tmp_data` (
+	`key` text PRIMARY KEY NOT NULL,
+	`data` text NOT NULL,
+	`expires_at` integer NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE `users` (

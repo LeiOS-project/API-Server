@@ -72,7 +72,7 @@ export class PkgReleasesService {
                 return APIResponse.serverError(c, "Failed to copy package release into testing repository");
             }
 
-            await TaskScheduler.enqueueTask("testing-repo:update", {}, {})
+            await TaskScheduler.enqueueTask("testing-repo:update", {}, { created_by_user_id: null });
 
             await DB.instance().insert(DB.Schema.packageReleases).values({
                 package_id: packageData.id,

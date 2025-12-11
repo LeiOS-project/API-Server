@@ -53,6 +53,13 @@ export class AptlyAPIServer {
         return `http://127.0.0.1:${this.settings.aptlyPort}`;
     }
 
+    static get SigningConfig() {
+        return {
+            Keyring: path.join(AptlyAPIServer.dearmoredKeysDir, "public-key.dearmored.gpg"),
+            SecretKeyring: path.join(AptlyAPIServer.dearmoredKeysDir, "private-key.dearmored.gpg"),
+        } as const;
+    }
+
     private static async ensureDirectories() {
         await AptlyUtils.ensureDirExists(this.settings.aptlyRoot);
         await AptlyUtils.ensureDirExists(this.aptlyDataDir);

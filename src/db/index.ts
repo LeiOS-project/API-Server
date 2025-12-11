@@ -4,6 +4,7 @@ import { randomBytes as crypto_randomBytes } from 'crypto';
 import { DrizzleDB } from './utils';
 import { Logger } from '../utils/logger';
 import {  } from 'drizzle-kit';
+import { eq } from 'drizzle-orm';
 
 export class DB {
 
@@ -37,6 +38,22 @@ export class DB {
         Logger.info(`Initial admin user created with username: ${username} and password: ${randomPassword} (also saved to ./data/initial_admin_credentials.txt)`);
     }
 
+    static async createInitialReleasesMetaIfNeeded() {
+
+        const initalReleaseExists = await this.db.select().from(DB.Schema.os_releases).where(
+            eq(DB.Schema.os_releases.version, "0000.00.00")
+        ).get();
+
+        if (!initalReleaseExists) {
+            await this.db.insert(DB.Schema.os_releases).values({
+                version: "0000.00.00",
+                published_at: new Date(0).getTime(),
+            });
+            Logger.info("Created initial OS release metadata entry (version 0000.00.00)");
+        }
+
+    }
+
     static instance() {
         if (!this.db) {
             throw new Error('Database not initialized. Call DB.init() first.');
@@ -62,6 +79,8 @@ export namespace DB.Schema {
 
     export const scheduled_tasks = TableSchema.scheduled_tasks;
     export const scheduled_tasks_paused_state = TableSchema.scheduled_tasks_paused_state;
+
+    export const metadata = TableSchema.metadata;
 }
 
 export namespace DB.Models {
@@ -79,4 +98,6 @@ export namespace DB.Models {
 
     export type ScheduledTask = typeof DB.Schema.scheduled_tasks.$inferSelect;
     export type ScheduledTaskPausedState = typeof DB.Schema.scheduled_tasks_paused_state.$inferSelect;
+
+    export type Metadata = typeof DB.Schema.metadata.$inferSelect;
 }

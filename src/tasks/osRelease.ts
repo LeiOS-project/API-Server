@@ -6,6 +6,7 @@ import { AptlyAPI } from "../aptly/api";
 interface Payload {
     pkgReleasesToIncludeByID: number[];
     version: string;
+    timestamp: number;
 }
 interface StepState {
     nextPackageIndexToMove: number;
@@ -81,6 +82,25 @@ OsReleaseTask.addStep("Move packages from archive to local stable repo", async (
 
 });
 
+OsReleaseTask.addStep("Record OS release data to database", async (payload, logger) => {
+
+    try {
+
+        await DB.instance().insert(DB.Schema.os_releases).values({
+            version: payload.version,
+            published_at: payload.timestamp,
+        });
+
+        logger.info("OS release data recorded in database:", payload.version);
+        return { success: true };
+
+    } catch (err) {
+        logger.error("Error recording OS release data:", err);
+        return { success: false, message: Error.isError(err) ? err.message : "Unknown error" };
+    }
+
+});
+
 OsReleaseTask.addStep("Create OS release snapshot", async (payload, logger) => {
 
     try {
@@ -102,7 +122,7 @@ OsReleaseTask.addStep("Create OS release snapshot", async (payload, logger) => {
 
 });
 
-OsReleaseTask.addStep("Publish OS release to S3", async (payload, logger) => {
+OsReleaseTask.addStep("Publish OS release snapshot to S3", async (payload, logger) => {
 
     try {
         const snapshotName = `leios-stable-${payload.version}`;
