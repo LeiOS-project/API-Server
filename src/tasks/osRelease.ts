@@ -55,6 +55,20 @@ OsReleaseTask.addStep("Move packages from archive to local stable repo", async (
 
             await AptlyAPI.Packages.copyIntoRepo("leios-stable", packageName, release.versionWithLeiosPatch, release.architecture);
 
+            if (release.architecture === "amd64") {
+                await DB.instance().update(DB.Schema.packages).set({
+                    latest_stable_release_amd64: release.versionWithLeiosPatch
+                }).where(
+                    eq(DB.Schema.packages.id, release.package_id)
+                );
+            } else if (release.architecture === "arm64") {
+                await DB.instance().update(DB.Schema.packages).set({
+                    latest_stable_release_arm64: release.versionWithLeiosPatch
+                }).where(
+                    eq(DB.Schema.packages.id, release.package_id)
+                );
+            }
+
         } catch (err) {
             logger.error("Error moving package release ID", payload.pkgReleasesToIncludeByID[state.nextPackageIndexToMove], ":", err);
         }
