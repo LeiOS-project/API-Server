@@ -15,7 +15,7 @@ router.get('/',
     APIRouteSpec.authenticated({
         summary: "Get all API keys",
         description: "Retrieve all API keys for the authenticated user's account.",
-        tags: [DOCS_TAGS.ACCOUNT],
+        tags: [DOCS_TAGS.ACCOUNT_API_KEYS],
         
         responses: APIResponseSpec.describeBasic(
             APIResponseSpec.success("API keys retrieved successfully", AccountAPIKeysModel.GetById.Response.array() ),
@@ -43,7 +43,7 @@ router.post('/',
     APIRouteSpec.authenticated({
         summary: "Create a new API key",
         description: "Create a new API key for the authenticated user's account.",
-        tags: [DOCS_TAGS.ACCOUNT],
+        tags: [DOCS_TAGS.ACCOUNT_API_KEYS],
 
         responses: APIResponseSpec.describeWithWrongInputs(
             APIResponseSpec.success("API key created successfully", AccountAPIKeysModel.Create.Response),
@@ -97,7 +97,7 @@ router.delete('/:apiKeyID',
     APIRouteSpec.authenticated({
         summary: "Delete an API key",
         description: "Delete an API key by its ID for the authenticated user's account.",
-        tags: [DOCS_TAGS.ACCOUNT],
+        tags: [DOCS_TAGS.ACCOUNT_API_KEYS],
 
         responses: APIResponseSpec.describeWithWrongInputs(
             APIResponseSpec.successNoData("API key deleted successfully"),
