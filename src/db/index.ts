@@ -3,10 +3,11 @@ import * as TableSchema from './schema';
 import { randomBytes as crypto_randomBytes } from 'crypto';
 import { DrizzleDB } from './utils';
 import { Logger } from '../utils/logger';
-import {  } from 'drizzle-kit';
 import { eq } from 'drizzle-orm';
 import { ConfigHandler } from '../utils/config';
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
+import { mkdir as fs_mkdir } from 'fs/promises';
+import { dirname as path_dirname } from 'path';
 
 export class DB {
 
@@ -17,6 +18,9 @@ export class DB {
         autoMigrate: boolean = false,
         configBaseDir: string
     ) {
+
+        await fs_mkdir(path_dirname(path), { recursive: true });
+
         this.db = drizzle(path);
         if (autoMigrate) {
             Logger.info("Running database migrations...");
