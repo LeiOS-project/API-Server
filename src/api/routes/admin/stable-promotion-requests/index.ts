@@ -7,6 +7,7 @@ import { AdminStablePromotionRequestModel } from "./model";
 import { DB } from "../../../../db";
 import { APIResponse } from "../../../utils/api-res";
 import { eq } from "drizzle-orm";
+import { RuntimeMetadata } from "../../../utils/metadata";
 
 export const router = new Hono().basePath('/stable-promotion-requests');
 
@@ -39,7 +40,7 @@ router.use('/:requestID/*',
 
     async (c, next) => {
         // @ts-ignore
-        const requestID = c.get("requestID") as number;
+        const { requestID } = c.req.valid("param") as { requestID: number };
 
         const request = DB.instance().select().from(DB.Schema.stablePromotionRequests).where(
             eq(DB.Schema.stablePromotionRequests.id, requestID)
@@ -109,6 +110,10 @@ router.post('/:requestID/decide',
         }).where(
             eq(DB.Schema.stablePromotionRequests.id, request.id)
         );
+
+        if (decision.status === 'approved') {
+            await RuntimeMetadata.addOSReleasePendingPackage(request.package_release_id);
+        }
 
         return APIResponse.successNoData(c, "Stable promotion request approved successfully");
     }
