@@ -37,3 +37,5 @@ data/
 config/
 testdata/
 tmp*
+
+build/

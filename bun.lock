@@ -16,6 +16,7 @@
         "zod": "^4.1.13",
       },
       "devDependencies": {
+        "@cleverjs/cli": "^1.1.8",
         "@hey-api/openapi-ts": "0.88.0",
         "@types/bun": "^1.3.4",
         "drizzle-kit": "^0.31.8",
@@ -26,6 +27,8 @@
     },
   },
   "packages": {
+    "@cleverjs/cli": ["@cleverjs/cli@1.1.8", "", {}, "sha512-WRCvIFFmKhTeT7IxpEBfDiZG0CJhqlt0+qutnoODWgUwDoPQDexDqwZQBwpZDpMwGfO137nDdMMnvyIrMLZTYw=="],
+
     "@cleverjs/utils": ["@cleverjs/utils@1.1.9", "", { "dependencies": { "low-level": "^1.2.5", "ptr.js": "^1.3.0" } }, "sha512-cj6Jt9qvLuL8zBiSTzIWM0UnkW9ua0t/R8PXmLo0LQySA8WPrq6plKZON0pRI9pGFwG4UATEguGjbrQQ2hku6A=="],
 
     "@drizzle-team/brocli": ["@drizzle-team/brocli@0.10.2", "", {}, "sha512-z33Il7l5dKjUgGULTqBsQBQwckHh5AbIuxhdsIxDDiZAzBOrZO6q9ogcWC65kU382AfynTfgNumVcNIjuIua6w=="],

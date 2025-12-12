@@ -43,11 +43,9 @@ beforeAll(async () => {
 
     TMP_ROOT = await createIsolatedDataDir();
 
-    const drizzleDb = drizzle(path.join(TMP_ROOT, "db.sqlite"));
-    migrate(drizzleDb, { migrationsFolder: "drizzle" });
-
     await DB.init(
         path.join(TMP_ROOT, "db.sqlite"),
+        true,
         TMP_ROOT
     );
 

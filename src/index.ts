@@ -22,6 +22,7 @@ export class Main {
 
         await DB.init(
             config.LRA_DB_PATH ?? "./data/db.sqlite",
+            config.LRA_DB_AUTO_MIGRATE,
             config.LRA_CONFIG_BASE_DIR ?? "./config"
         );
 

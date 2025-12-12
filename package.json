@@ -10,9 +10,11 @@
         "db:migrate": "bun scripts/db-utils && drizzle-kit migrate --config=drizzle.config.ts",
         "db:push": "bun scripts/db-utils && drizzle-kit push --config=drizzle.config.ts",
         "start": "bun run scripts/entrypoint.ts",
+        "compile": "bun run ./scripts/compile",
         "aptly-api-client:generate": "openapi-ts -f ./openapi-ts.aptly-api.config.ts"
     },
     "devDependencies": {
+        "@cleverjs/cli": "^1.1.8",
         "@hey-api/openapi-ts": "0.88.0",
         "@types/bun": "^1.3.4",
         "drizzle-kit": "^0.31.8"

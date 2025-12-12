@@ -6,6 +6,7 @@ import { Logger } from '../utils/logger';
 import {  } from 'drizzle-kit';
 import { eq } from 'drizzle-orm';
 import { ConfigHandler } from '../utils/config';
+import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
 
 export class DB {
 
@@ -13,9 +14,15 @@ export class DB {
 
     static async init(
         path: string,
+        autoMigrate: boolean = false,
         configBaseDir: string
     ) {
         this.db = drizzle(path);
+        if (autoMigrate) {
+            Logger.info("Running database migrations...");
+            await migrate(this.db, { migrationsFolder: "drizzle" });
+            Logger.info("Database migrations completed.");
+        }
 
         await this.createInitialAdminUserIfNeeded(configBaseDir);
 

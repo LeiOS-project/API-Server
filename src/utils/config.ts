@@ -115,6 +115,7 @@ export class ConfigHandler {
         .add("LRA_LOG_DIR", false)
 
         .add("LRA_DB_PATH", false)
+        .add("LRA_DB_AUTO_MIGRATE", false, [true, false])
 
         .add("LRA_APTLY_ROOT", false)
         .add("LRA_APTLY_PORT", false)
