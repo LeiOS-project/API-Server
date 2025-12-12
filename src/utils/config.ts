@@ -107,14 +107,20 @@ export class ConfigHandler {
     private static schema = new ConfigSchema()
         .add("LRA_LOG_LEVEL", false, ["debug", "info", "warn", "error", "critical"])
 
+        .add("LRA_HUB_URL", false)
+
         .add("LRA_API_HOST", false)
         .add("LRA_API_PORT", false)
 
+        .add("LRA_LOG_DIR", false)
+
         .add("LRA_DB_PATH", false)
+        .add("LRA_DB_AUTO_MIGRATE", false, [true, false])
 
         .add("LRA_APTLY_ROOT", false)
         .add("LRA_APTLY_PORT", false)
 
+        .add("LRA_CONFIG_BASE_DIR", false)
         .add("LRA_PRIVATE_KEY_PATH", true)
         .add("LRA_PUBLIC_KEY_PATH", true)
 

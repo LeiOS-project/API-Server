@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { APIResponse } from "../../utils/api-res";
 import { APIResponseSpec, APIRouteSpec } from "../../utils/specHelpers";
 import { AuthHandler, SessionHandler } from "../../utils/authHandler";
+import { DOCS_TAGS } from "../../docs";
 
 export const router = new Hono().basePath('/account');
 
@@ -26,7 +27,7 @@ router.get('/',
     APIRouteSpec.authenticated({
         summary: "Get account information",
         description: "Retrieve information about the authenticated user's account.",
-        tags: ['Account'],
+        tags: [DOCS_TAGS.ACCOUNT],
 
         responses: APIResponseSpec.describeBasic(
             APIResponseSpec.success("Account information retrieved successfully", AccountModel.GetInfo.Response),
@@ -57,7 +58,7 @@ router.put('/',
     APIRouteSpec.authenticated({
         summary: "Update account information",
         description: "Update information about the authenticated user's account.",
-        tags: ['Account'],
+        tags: [DOCS_TAGS.ACCOUNT],
 
         responses: APIResponseSpec.describeWithWrongInputs(
             APIResponseSpec.successNoData("Account information updated successfully"), 
@@ -86,7 +87,7 @@ router.put('/password',
     APIRouteSpec.authenticated({
         summary: "Change account password",
         description: "Change the password of the authenticated user's account.",
-        tags: ['Account'],
+        tags: [DOCS_TAGS.ACCOUNT],
 
         responses: APIResponseSpec.describeBasic(
             APIResponseSpec.successNoData("Password changed successfully"),
@@ -127,43 +128,19 @@ router.put('/password',
             eq(DB.Schema.users.id, authContext.user_id)
         ).run();
 
-        SessionHandler.inValidateAllSessionsForUser(authContext.user_id);
+        await SessionHandler.inValidateAllSessionsForUser(authContext.user_id);
 
         return APIResponse.successNoData(c, "Password changed successfully");
     },
 );
 
-router.post('/logout',
-
-    APIRouteSpec.authenticated({
-        summary: "Logout from current session",
-        description: "Logs out the authenticated user from the current session.",
-        tags: ['Account'],
-
-        responses: APIResponseSpec.describeBasic(
-            APIResponseSpec.successNoData("Logged out successfully"),
-            APIResponseSpec.unauthorized("Your Auth Context is not a session")
-        )
-    }),
-
-    async (c) => {
-        // @ts-ignore
-        const authContext = c.get("authContext") as AuthHandler.SessionAuthContext;
-
-        DB.instance().delete(DB.Schema.sessions).where(
-            eq(DB.Schema.sessions.token, authContext.token)
-        ).run();
-
-        return APIResponse.successNoData(c, "Logged out successfully");
-    },
-);
 
 router.delete('/',
 
     APIRouteSpec.authenticated({
         summary: "Delete account",
         description: "Permanently delete the authenticated user's account.",
-        tags: ['Account'],
+        tags: [DOCS_TAGS.ACCOUNT],
 
         responses: APIResponseSpec.describeBasic(
             APIResponseSpec.successNoData("Account deleted successfully"),

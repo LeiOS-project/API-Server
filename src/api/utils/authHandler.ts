@@ -1,8 +1,8 @@
 import { eq } from "drizzle-orm";
 import { DB } from "../../db";
-import { randomBytes as crypto_randomBytes } from 'crypto';
+import { randomBytes as crypto_randomBytes, createHash as crypto_createHash } from 'crypto';
 
-class AuthUtils {
+export class AuthUtils {
 
     static async getUserRole(userID: number) {
         const user = DB.instance().select().from(DB.Schema.users).where(eq(DB.Schema.users.id, userID)).get();
@@ -12,6 +12,48 @@ class AuthUtils {
         return user.role;
     }
 
+    static createRandomTokenID() {
+        return crypto_randomBytes(32).toString('hex');
+    }
+
+    static createBaseToken() {
+        return crypto_randomBytes(32).toString('hex');
+    }
+
+    static getFullToken(prefix: AuthHandler.TOKEN_PREFIX, tokenID: string, tokenBase: string) {
+        return `${prefix}${tokenID}:${tokenBase}`;
+    }
+
+    static getTokenParts(fullToken: string) {
+        const parts = fullToken.split(':');
+        if (parts.length !== 2) {
+            return null;
+        }
+        if (parts[0].startsWith(SessionHandler.SESSION_TOKEN_PREFIX)) {
+            return {
+                prefix: SessionHandler.SESSION_TOKEN_PREFIX,
+                id: parts[0].substring(SessionHandler.SESSION_TOKEN_PREFIX.length),
+                base: parts[1]
+            } satisfies AuthHandler.TokenParts;
+        } else if (parts[0].startsWith(APIKeyHandler.API_KEY_PREFIX)) {
+            return {
+                prefix: APIKeyHandler.API_KEY_PREFIX,
+                id: parts[0].substring(APIKeyHandler.API_KEY_PREFIX.length),
+                base: parts[1]
+            } satisfies AuthHandler.TokenParts;
+        } else {
+            return null;
+        }
+    }
+
+    static hashTokenBase(tokenBase: string) {
+        return Bun.password.hash(tokenBase);
+    }
+
+    static verifyHashedTokenBase(tokenBase: string, hashedToken: string) {
+        return Bun.password.verify(tokenBase, hashedToken);
+    }
+
 }
 
 export class SessionHandler {
@@ -19,24 +61,46 @@ export class SessionHandler {
     static readonly SESSION_TOKEN_PREFIX = "lra_sess_";
 
     static async createSession(userID: number) {
+
+        const tokenID = AuthUtils.createRandomTokenID();
+        const tokenBase = AuthUtils.createBaseToken();
+
+        const fullToken = AuthUtils.getFullToken(
+            this.SESSION_TOKEN_PREFIX,
+            tokenID,
+            tokenBase
+        );
+
         const result = await DB.instance().insert(DB.Schema.sessions).values({
-            token: this.SESSION_TOKEN_PREFIX + crypto_randomBytes(32).toString('hex'),
+            id: tokenID,
+            hashed_token: await AuthUtils.hashTokenBase(tokenBase),
             user_id: userID,
             user_role: await AuthUtils.getUserRole(userID) || 'user',
             expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).getTime() // 7 days from now
-        }).returning()
+        }).returning().get();
         
-        return result[0];
+        return {
+            token: fullToken,
+            user_id: result.user_id,
+            user_role: result.user_role,
+            expires_at: result.expires_at
+        } satisfies Omit<DB.Models.Session, 'id' | 'hashed_token'> & { token: string; };
     }
 
-    static async getSession(sessionToken: string) {
+    static async getSession(tokenParts: AuthHandler.TokenParts) {
 
-        if (!sessionToken.startsWith(this.SESSION_TOKEN_PREFIX)) {
+        if (!tokenParts.prefix.startsWith(this.SESSION_TOKEN_PREFIX)) {
             return null;
         }
 
-        const session = DB.instance().select().from(DB.Schema.sessions).where(eq(DB.Schema.sessions.token, sessionToken)).get();
+        const session = DB.instance().select().from(DB.Schema.sessions).where(
+            eq(DB.Schema.sessions.id, tokenParts.id)
+        ).get();
         if (!session) {
+            return null;
+        }
+
+        if (!(await AuthUtils.verifyHashedTokenBase(tokenParts.base, session.hashed_token))) {
             return null;
         }
 
@@ -50,7 +114,7 @@ export class SessionHandler {
 
         if (session.expires_at < Date.now()) {
             // Delete expired session
-            await DB.instance().delete(DB.Schema.sessions).where(eq(DB.Schema.sessions.token, session.token));
+            await DB.instance().delete(DB.Schema.sessions).where(eq(DB.Schema.sessions.id, session.id));
 
             return false;
         }
@@ -62,8 +126,8 @@ export class SessionHandler {
         await DB.instance().delete(DB.Schema.sessions).where(eq(DB.Schema.sessions.user_id, userID));
     }
 
-    static async inValidateSession(sessionToken: string) {
-        await DB.instance().delete(DB.Schema.sessions).where(eq(DB.Schema.sessions.token, sessionToken));
+    static async inValidateSession(tokenID: string) {
+        await DB.instance().delete(DB.Schema.sessions).where(eq(DB.Schema.sessions.id, tokenID));
     }
 
     static async changeUserRoleInSessions(userID: number, newRole: 'admin' | 'developer' | 'user') {
@@ -82,25 +146,47 @@ export class APIKeyHandler {
 
     static async createApiKey(userID: number, expiresInDays?: number) {
         const expiresAt = expiresInDays ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).getTime() : null;
-        
+
+        const tokenID = AuthUtils.createRandomTokenID();
+        const tokenBase = AuthUtils.createBaseToken();
+
+        const fullToken = AuthUtils.getFullToken(
+            this.API_KEY_PREFIX,
+            tokenID,
+            tokenBase
+        );
+
         const result = await DB.instance().insert(DB.Schema.apiKeys).values({
-            token: this.API_KEY_PREFIX + crypto_randomBytes(32).toString('hex'),
+            id: tokenID,
+            hashed_token: await AuthUtils.hashTokenBase(tokenBase),
             user_id: userID,
             user_role: await AuthUtils.getUserRole(userID) || 'user',
             expires_at: expiresAt
-        }).returning()
+        }).returning().get();
 
-        return result[0];
+        return {
+            token: fullToken,
+            user_id: result.user_id,
+            user_role: result.user_role,
+            expires_at: result.expires_at
+        } satisfies Omit<DB.Models.ApiKey, 'id' | 'hashed_token'> & { token: string; };
     }
 
-    static async getApiKey(apiKey: string) {
+    static async getApiKey(tokenParts: AuthHandler.TokenParts) {
 
-        if (!apiKey.startsWith(this.API_KEY_PREFIX)) {
+        if (!tokenParts.prefix.startsWith(this.API_KEY_PREFIX)) {
             return null;
         }
 
-        const key = DB.instance().select().from(DB.Schema.apiKeys).where(eq(DB.Schema.apiKeys.token, apiKey)).get();
+        const key = DB.instance().select().from(DB.Schema.apiKeys).where(
+            eq(DB.Schema.apiKeys.id, tokenParts.id)
+        ).get();
+
         if (!key) {
+            return null;
+        }
+        
+        if (!(await AuthUtils.verifyHashedTokenBase(tokenParts.base, key.hashed_token))) {
             return null;
         }
 
@@ -123,8 +209,8 @@ export class APIKeyHandler {
         await DB.instance().delete(DB.Schema.apiKeys).where(eq(DB.Schema.apiKeys.user_id, userID));
     }
 
-    static async deleteApiKey(apiKey: string) {
-        await DB.instance().delete(DB.Schema.apiKeys).where(eq(DB.Schema.apiKeys.token, apiKey));
+    static async deleteApiKey(apiKeyID: string) {
+        await DB.instance().delete(DB.Schema.apiKeys).where(eq(DB.Schema.apiKeys.id, apiKeyID));
     }
 
     static async changeUserRoleInApiKeys(userID: number, newRole: 'admin' | 'developer' | 'user') {
@@ -148,12 +234,17 @@ export class AuthHandler {
         }
     }
 
-    static async getAuthContext(token: string): Promise<AuthHandler.AuthContext | null> {
+    static async getAuthContext(fullToken: string): Promise<AuthHandler.AuthContext | null> {
 
-        switch (await this.getTokenType(token)) {
+        const tokenParts = AuthUtils.getTokenParts(fullToken);
+        if (!tokenParts) {
+            return null;
+        }
+
+        switch (await this.getTokenType(fullToken)) {
             case 'session':
 
-                const session = await SessionHandler.getSession(token);
+                const session = await SessionHandler.getSession(tokenParts);
                 if (!session) {
                     return null;
                 }
@@ -162,7 +253,7 @@ export class AuthHandler {
                     ...session
                 }
             case 'apiKey':
-                const apiKey = await APIKeyHandler.getApiKey(token);
+                const apiKey = await APIKeyHandler.getApiKey(tokenParts);
                 if (!apiKey) {
                     return null;
                 }
@@ -190,10 +281,10 @@ export class AuthHandler {
     static async invalidateAuthContext(authContext: AuthHandler.AuthContext): Promise<void> {
         switch (authContext.type) {
             case 'session':
-                await SessionHandler.inValidateSession(authContext.token);
+                await SessionHandler.inValidateSession(authContext.id);
                 break;
             case 'apiKey':
-                await APIKeyHandler.deleteApiKey(authContext.token);
+                await APIKeyHandler.deleteApiKey(authContext.id);
                 break;
         }
     }
@@ -216,6 +307,8 @@ export class AuthHandler {
 
 export namespace AuthHandler {
 
+    export type TOKEN_PREFIX = typeof SessionHandler.SESSION_TOKEN_PREFIX | typeof APIKeyHandler.API_KEY_PREFIX;
+
     export type AuthContext = SessionAuthContext | ApiKeyAuthContext;
 
     export interface SessionAuthContext extends DB.Models.Session {
@@ -224,6 +317,12 @@ export namespace AuthHandler {
 
     export interface ApiKeyAuthContext extends DB.Models.ApiKey {
         readonly type: 'apiKey';
+    }
+
+    export interface TokenParts {
+        readonly prefix: TOKEN_PREFIX;
+        readonly id: string;
+        readonly base: string;
     }
 
 }

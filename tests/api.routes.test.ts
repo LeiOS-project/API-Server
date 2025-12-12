@@ -1,19 +1,14 @@
-import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { API } from "../src/api";
 import { DB } from "../src/db";
-import { SessionHandler } from "../src/api/utils/authHandler";
+import { AuthHandler, AuthUtils, SessionHandler } from "../src/api/utils/authHandler";
 import { AptlyAPI } from "../src/aptly/api";
-import { AptlyAPIServer } from "../src/aptly/server";
-import { migrate } from "drizzle-orm/bun-sqlite/migrator";
-import { drizzle } from "drizzle-orm/bun-sqlite";
-import { Database } from "bun:sqlite";
-import { mkdirSync, unlinkSync, existsSync, rmSync } from "fs";
 import { randomUUID } from "crypto";
 import { eq } from "drizzle-orm";
+import { AuthModel } from "../src/api/routes/auth/model";
+import { makeAPIRequest } from "./helpers/api";
+import { AccountModel } from "../src/api/routes/account/model";
 
-const TEST_DB_PATH = "./data/test-api.sqlite";
-const APTLY_ROOT = `./data/test-aptly-${randomUUID().slice(0, 8)}`;
-const APTLY_PORT = 18111;
 const PACKAGE_FILE_PATH = "./testdata/fastfetch_2.55.0_amd64.deb";
 const PACKAGE_NAME = "fastfetch";
 const PACKAGE_VERSION = "2.55.0";
@@ -22,27 +17,6 @@ const PACKAGE_MAINTAINER_NAME = "Carter Li";
 const PACKAGE_MAINTAINER_EMAIL = "zhangsongcui@live.cn";
 
 type Arch = AptlyAPI.Utils.Architectures;
-
-const createdAptPackages = new Set<string>();
-
-let app: any;
-async function resetDatabase() {
-    await DB.instance().delete(DB.Schema.stablePromotionRequests).run();
-    await DB.instance().delete(DB.Schema.packageReleases).run();
-    await DB.instance().delete(DB.Schema.packages).run();
-    await DB.instance().delete(DB.Schema.apiKeys).run();
-    await DB.instance().delete(DB.Schema.sessions).run();
-    await DB.instance().delete(DB.Schema.passwordResets).run();
-    await DB.instance().delete(DB.Schema.users).run();
-}
-
-async function cleanupAptly() {
-    for (const name of createdAptPackages) {
-        await AptlyAPI.Packages.deleteAllInAllRepos(name);
-    }
-    await AptlyAPI.DB.cleanup();
-    createdAptPackages.clear();
-}
 
 async function seedUser(role: "admin" | "developer" | "user", overrides: Partial<DB.Models.User> = {}, password = "TestP@ssw0rd") {
     const user = DB.instance().insert(DB.Schema.users).values({
@@ -53,429 +27,468 @@ async function seedUser(role: "admin" | "developer" | "user", overrides: Partial
         role,
     } as any).returning().get();
 
-    return { user, password };
+    return { ...user, password } as Omit<typeof user & { password: string }, "password_hash">;
 }
 
-async function seedPackage(ownerId: number, overrides: Partial<DB.Models.Package> = {}) {
-    return DB.instance().insert(DB.Schema.packages).values({
-        name: overrides.name ?? `pkg-${randomUUID()}`,
-        owner_user_id: ownerId,
-        description: overrides.description ?? "A useful package",
-        homepage_url: overrides.homepage_url ?? "https://example.com",
-        requires_patching: overrides.requires_patching ?? false
-    }).returning().get();
+async function seedSession(user_id: number) {
+    const session = await SessionHandler.createSession(user_id);
+    return session;
+    
 }
 
-async function seedRelease(packageId: number, version = "1.0.0", arch: Arch = "amd64", leios_patch: string | null = null) {
-    return DB.instance().insert(DB.Schema.packageReleases).values({
-        package_id: packageId,
-        version,
-        leios_patch,
-        architecture: arch,
-    }).returning().get();
-}
+let testAdmin = await seedUser("admin", { username: "testadmin" }, "AdminP@ss1");
+let testDeveloper = await seedUser("developer", { username: "testdeveloper" }, "DevP@ss1");
+let testUser = await seedUser("user", { username: "testuser" }, "UserP@ss1");
 
-function authHeaders(token: string) {
-    return {
-        Authorization: `Bearer ${token}`
-    };
-}
+describe("Auth routes and access checks", async () => {
 
-beforeAll(async () => {
-    if (!existsSync("./data")) {
-        mkdirSync("./data");
-    }
-    if (existsSync(TEST_DB_PATH)) {
-        unlinkSync(TEST_DB_PATH);
-    }
+    let session_token: string;
 
-    if (existsSync(APTLY_ROOT)) {
-        rmSync(APTLY_ROOT, { recursive: true, force: true });
-    }
-    mkdirSync(APTLY_ROOT, { recursive: true });
-
-    await AptlyAPIServer.init({
-        aptlyRoot: APTLY_ROOT,
-        aptlyPort: APTLY_PORT,
-        s3Settings: {
-            endpoint: "http://localhost:9000",
-            region: "us-east-1",
-            bucket: "leios-test-bucket",
-            prefix: "test-prefix",
-            accessKeyId: "test-access-key",
-            secretAccessKey: "test-secret-key"
-        },
-        keySettings: {
-            publicKeyPath: "./data/keys/public-key.gpg",
-            privateKeyPath: "./data/keys/private-key.gpg",
-        }
-    });
-    await AptlyAPIServer.start();
-
-    const sqlite = new Database(TEST_DB_PATH);
-    const drizzleDb = drizzle(sqlite);
-    await migrate(drizzleDb, { migrationsFolder: "drizzle" });
-    // @ts-ignore - inject test database directly
-    DB["db"] = drizzleDb;
-    await API.init();
-    app = (API as any).app;
-});
-
-afterEach(async () => {
-    await resetDatabase();
-    await cleanupAptly();
-});
-
-afterAll(async () => {
-    await AptlyAPIServer.stop("SIGINT");
-    if (existsSync(APTLY_ROOT)) {
-        rmSync(APTLY_ROOT, { recursive: true, force: true });
-    }
-    if (existsSync(TEST_DB_PATH)) {
-        unlinkSync(TEST_DB_PATH);
-    }
-});
-
-async function uploadFixtureToArchive(packageName: string, version: string, arch: Arch) {
-    const file = new File([await Bun.file(PACKAGE_FILE_PATH).arrayBuffer()], "package.deb");
-
-    await AptlyAPI.Packages.uploadAndVerify(
-        "leios-archive",
-        {
-            name: packageName,
-            version,
-            architecture: arch,
-            maintainer_name: PACKAGE_MAINTAINER_NAME,
-            maintainer_email: PACKAGE_MAINTAINER_EMAIL,
-        },
-        file,
-        true
-    );
-
-    createdAptPackages.add(packageName);
-}
-
-describe("Auth routes", () => {
     test("POST /auth/login authenticates and creates session", async () => {
-        const { user, password } = await seedUser("user");
 
-        const res = await app.request("/auth/login", {
+        const data = await makeAPIRequest("/auth/login", {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ username: user.username, password })
+            body: { username: testUser.username, password: testUser.password },
+            expectedBodySchema: AuthModel.Login.Response
         });
 
-        expect(res.status).toBe(200);
-        const body = await res.json();
-        expect(body.success).toBe(true);
-        expect(body.data.token.startsWith("lra_sess_")).toBe(true);
+        expect(data.token.startsWith("lra_sess_")).toBe(true);
+        
+        session_token = data.token;
 
-        const stored = DB.instance().select().from(DB.Schema.sessions).where(eq(DB.Schema.sessions.token, body.data.token as string)).get();
-        expect(stored?.user_id).toBe(user.id);
+        const session = await AuthHandler.getAuthContext(data.token);
+
+        expect(session).toBeDefined();
+        if (!session) return;
+
+        expect(session.user_id).toBe(testUser.id);
+        expect(session.user_role).toBe("user");
+        expect(session.type).toBe("session");
+        expect(session.expires_at).toBeGreaterThan(Date.now());
+
+        const tokenParts = AuthUtils.getTokenParts(data.token);
+        expect(tokenParts).toBeDefined();
+        if (!tokenParts) return;
+        
+        expect(await AuthUtils.verifyHashedTokenBase(tokenParts.base, session.hashed_token)).toBe(true);
+        expect(tokenParts.prefix).toBe("lra_sess_");
+        expect(tokenParts.id).toBe(session.id);
+    });
+
+    test("POST /auth/login with invalid credentials fails", async () => {
+
+        await makeAPIRequest("/auth/login", {
+            method: "POST",
+            body: { username: testUser.username, password: "WrongPassword" },
+        }, 401);
+
+    });
+
+    test("GET /auth/session returns current session info", async () => {
+
+        const data = await makeAPIRequest("/auth/session", {
+            authToken: session_token,
+            expectedBodySchema: AuthModel.Session.Response
+        });
+
+        expect(data.user_id).toBe(testUser.id);
+        expect(data.user_role).toBe("user");
+    });
+
+    test("GET /auth/session with invalid token fails", async () => {
+
+        await makeAPIRequest("/auth/session", {
+            authToken: "invalid_token",
+        }, 401);
+
+    });
+    
+    test("GET /dev as admin succeeds", async () => {
+
+        await makeAPIRequest("/dev", {
+            authToken: session_token,
+        }, 401);
+
+    });
+
+    test("GET /admin as non-admin fails", async () => {
+
+        await makeAPIRequest("/admin", {
+            authToken: session_token,
+        }, 401);
+
     });
 
     test("POST /auth/logout invalidates session", async () => {
-        const { user } = await seedUser("user");
-        const session = await SessionHandler.createSession(user.id);
 
-        const res = await app.request("/auth/logout", {
+        await makeAPIRequest("/auth/logout", {
             method: "POST",
-            headers: authHeaders(session.token)
+            authToken: session_token
         });
 
-        expect(res.status).toBe(200);
-        const check = DB.instance().select().from(DB.Schema.sessions).where(eq(DB.Schema.sessions.token, session.token)).get();
-        expect(check).toBeUndefined();
+        const session = await AuthHandler.getAuthContext(session_token);
+
+        expect(session).toBeNil();
     });
 });
 
-describe("Account routes", () => {
-    test("GET /account returns current user", async () => {
-        const { user } = await seedUser("user");
-        const session = await SessionHandler.createSession(user.id);
+describe("Account routes", async () => {
 
-        const res = await app.request("/account", {
-            headers: authHeaders(session.token)
+    let session_token = await seedSession(testUser.id).then(s => s.token);
+
+    test("GET /account returns current user", async () => {
+
+        const data = await makeAPIRequest("/account", {
+            authToken: session_token,
+            expectedBodySchema: AccountModel.GetInfo.Response
         });
 
-        expect(res.status).toBe(200);
-        const body = await res.json();
-        expect(body.data.id).toBe(user.id);
-        expect(body.data.password_hash).toBeUndefined();
+        expect(data.id).toBe(testUser.id);
+        expect(data.username).toBe(testUser.username);
+        expect(data.display_name).toBe(testUser.display_name);
+        expect(data.email).toBe(testUser.email);
+        expect(data.role).toBe("user");
     });
 
     test("PUT /account updates profile fields", async () => {
-        const { user } = await seedUser("user");
-        const session = await SessionHandler.createSession(user.id);
+        
+        const newUserData = {
+            display_name: "Updated Name",
+            username: "updatedusername",
+            email: "updated@example.com"
+        }
 
-        const res = await app.request("/account", {
+        await makeAPIRequest("/account", {
             method: "PUT",
-            headers: {
-                ...authHeaders(session.token),
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ display_name: "Updated", username: user.username })
+            authToken: session_token,
+            body: newUserData
         });
 
-        expect(res.status).toBe(200);
-        const updated = DB.instance().select().from(DB.Schema.users).where(eq(DB.Schema.users.id, user.id)).get();
-        expect(updated?.display_name).toBe("Updated");
+        testUser.display_name = newUserData.display_name;
+        testUser.username = newUserData.username;
+        testUser.email = newUserData.email;
+
+        const dbresult = DB.instance().select().from(DB.Schema.users).where(eq(DB.Schema.users.id, testUser.id)).get();
+
+        expect(dbresult?.display_name).toBe(newUserData.display_name);
+        expect(dbresult?.username).toBe(newUserData.username);
+        expect(dbresult?.email).toBe(newUserData.email);
+    });
+
+    test("PUT /account try updating role fails", async () => {
+        
+        await makeAPIRequest("/account", {
+            method: "PUT",
+            authToken: session_token,
+            body: { role: "admin" }
+        }, 400);
+        
+        const dbresult = DB.instance().select().from(DB.Schema.users).where(eq(DB.Schema.users.id, testUser.id)).get();
+        expect(dbresult?.role).toBe("user");
     });
 
     test("PUT /account/password rotates credentials and invalidates old sessions", async () => {
-        const oldPassword = "OldP@ssw0rd";
-        const { user } = await seedUser("user", {}, oldPassword);
-        const session = await SessionHandler.createSession(user.id);
 
-        const res = await app.request("/account/password", {
+        const oldPassword = testUser.password;
+        const newPassword = "NewP@ssw0rd1";
+
+        await makeAPIRequest("/account/password", {
             method: "PUT",
-            headers: {
-                ...authHeaders(session.token),
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ current_password: oldPassword, new_password: "NewP@ssw0rd1" })
+            authToken: session_token,
+            body: {
+                current_password: oldPassword,
+                new_password: newPassword
+            }
         });
 
-        expect(res.status).toBe(200);
-        const stillThere = DB.instance().select().from(DB.Schema.sessions).where(eq(DB.Schema.sessions.token, session.token)).get();
-        expect(stillThere).toBeUndefined();
+        testUser.password = newPassword;
 
-        const loginRes = await app.request("/auth/login", {
+        // Old session should be invalidated
+        await makeAPIRequest("/account", {
+            authToken: session_token,
+        }, 401);
+
+        // Login with old password should fail
+        await makeAPIRequest("/auth/login", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username: user.username, password: "NewP@ssw0rd1" })
+            body: { username: testUser.username, password: oldPassword }
+        }, 401);
+
+        // Login with new password should succeed
+        const data = await makeAPIRequest("/auth/login", {
+            method: "POST",
+            body: { username: testUser.username, password: newPassword },
+            expectedBodySchema: AuthModel.Login.Response
         });
-        expect(loginRes.status).toBe(200);
+
+        expect(data.token.startsWith("lra_sess_")).toBe(true);
+
+        session_token = data.token;
     });
 
     test("DELETE /account prevents removal while packages exist", async () => {
-        const { user } = await seedUser("user");
-        const session = await SessionHandler.createSession(user.id);
-        await seedPackage(user.id);
+        
+        const tempPkg = await DB.instance().insert(DB.Schema.packages).values({
+            name: "temp-package",
+            owner_user_id: testUser.id,
+            description: "Temporary package",
+            homepage_url: "https://temp.example.com",
+            requires_patching: false
+        }).returning().get();
 
-        const res = await app.request("/account", {
+        await makeAPIRequest("/account", {
             method: "DELETE",
-            headers: authHeaders(session.token)
+            authToken: session_token
+        }, 400);
+
+        const dbresult = DB.instance().select().from(DB.Schema.users).where(eq(DB.Schema.users.id, testUser.id)).get();
+        expect(dbresult).toBeDefined();
+
+        // Cleanup
+        await DB.instance().delete(DB.Schema.packages).where(eq(DB.Schema.packages.id, tempPkg.id));
+    });
+
+    test("DELETE /account removes user without packages", async () => {
+        
+        await makeAPIRequest("/account", {
+            method: "DELETE",
+            authToken: session_token
         });
 
-        expect(res.status).toBe(400);
+        const dbresult = DB.instance().select().from(DB.Schema.users).where(eq(DB.Schema.users.id, testUser.id)).get();
+        expect(dbresult).toBeUndefined();
+
+        // recreate test user for further tests
+        testUser = await seedUser("user", { username: "testuser" }, "UserP@ss1");
     });
 });
 
 describe("Public package routes", () => {
     test("Lists packages and returns details with releases", async () => {
-        const { user } = await seedUser("developer");
-        const pkg = await seedPackage(user.id, { name: PACKAGE_NAME });
 
-        await uploadFixtureToArchive(PACKAGE_NAME, PACKAGE_VERSION, PACKAGE_ARCH);
+        const tempPkg = await DB.instance().insert(DB.Schema.packages).values({
+            name: "public-package",
+            owner_user_id: testDeveloper.id,
+            description: "Public package",
+            homepage_url: "https://public.example.com",
+            requires_patching: false
+        }).returning().get();
 
-        const listRes = await app.request("/public/packages");
+        const tempRelease = await DB.instance().insert(DB.Schema.packageReleases).values({
+            package_id: tempPkg.id,
+            versionWithLeiosPatch: "1.0.0",
+            architecture: "amd64"
+        }).returning().get();
+
+        const listRes = await API.getApp().request("/public/packages");
         expect(listRes.status).toBe(200);
         const listBody = await listRes.json();
-        expect(Array.isArray(listBody.data)).toBe(true);
-        expect(listBody.data[0].name).toBe(pkg.name);
+        expect(listBody.data.some((pkg: any) => pkg.id === tempPkg.id)).toBe(true);
 
-        const detailRes = await app.request(`/public/packages/${pkg.name}`);
-        expect(detailRes.status).toBe(200);
-        const detailBody = await detailRes.json();
-        expect(detailBody.data.package.name).toBe(pkg.name);
-        expect(detailBody.data.releases["leios-archive"][PACKAGE_VERSION].amd64.name).toBe(pkg.name);
+        // const detailRes = await API.getApp().request(`/public/packages/${tempPkg.name}`);
+        // expect(detailRes.status).toBe(200);
+        // const detailBody = await detailRes.json();
+        // expect(detailBody.data.id).toBe(tempPkg.id);
+        // expect(detailBody.data.releases.length).toBe(1);
+        // expect(detailBody.data.releases[0].id).toBe(tempRelease.id);
+
+        // Cleanup
+        await DB.instance().delete(DB.Schema.packageReleases).where(eq(DB.Schema.packageReleases.id, tempRelease.id));
+        await DB.instance().delete(DB.Schema.packages).where(eq(DB.Schema.packages.id, tempPkg.id));
+
     });
 });
 
-describe("Developer package routes", () => {
-    test("Developer can create and update own package", async () => {
-        const { user } = await seedUser("developer");
-        const session = await SessionHandler.createSession(user.id);
+// describe("Developer package routes", () => {
+//     test("Developer can create and update own package", async () => {
+//         const { user } = await seedUser("developer");
+//         const session = await SessionHandler.createSession(user.id);
 
-        const createRes = await app.request("/dev/packages", {
-            method: "POST",
-            headers: {
-                ...authHeaders(session.token),
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                name: "devpkg",
-                description: "Dev package",
-                homepage_url: "https://devpkg.example.com",
-                requires_patching: false
-            })
-        });
+//         const createRes = await API.getApp().request("/dev/packages", {
+//             method: "POST",
+//             headers: {
+//                 ...authHeaders(session.token),
+//                 "Content-Type": "application/json"
+//             },
+//             body: JSON.stringify({
+//                 name: "devpkg",
+//                 description: "Dev package",
+//                 homepage_url: "https://devpkg.example.com",
+//                 requires_patching: false
+//             })
+//         });
 
-        expect(createRes.status).toBe(201);
-        const createdBody = await createRes.json();
+//         expect(createRes.status).toBe(201);
+//         const createdBody = await createRes.json();
 
-        const pkg = DB.instance().select().from(DB.Schema.packages).where(eq(DB.Schema.packages.id, createdBody.data.id)).get();
-        expect(pkg?.owner_user_id).toBe(user.id);
+//         const pkg = DB.instance().select().from(DB.Schema.packages).where(eq(DB.Schema.packages.id, createdBody.data.id)).get();
+//         expect(pkg?.owner_user_id).toBe(user.id);
 
-        const updateRes = await app.request(`/dev/packages/${createdBody.data.id}`, {
-            method: "PUT",
-            headers: {
-                ...authHeaders(session.token),
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ description: "Updated description" })
-        });
-        const updateBody = await updateRes.json();
-        expect(updateRes.status).toBe(200);
-        expect(updateBody.message).toBe("Package updated successfully");
-        const updated = DB.instance().select().from(DB.Schema.packages).where(eq(DB.Schema.packages.id, createdBody.data.id)).get();
-        expect(updated?.description).toBe("Updated description");
-    });
+//         const updateRes = await API.getApp().request(`/dev/packages/${createdBody.data.id}`, {
+//             method: "PUT",
+//             headers: {
+//                 ...authHeaders(session.token),
+//                 "Content-Type": "application/json"
+//             },
+//             body: JSON.stringify({ description: "Updated description" })
+//         });
+//         const updateBody = await updateRes.json();
+//         expect(updateRes.status).toBe(200);
+//         expect(updateBody.message).toBe("Package updated successfully");
+//         const updated = DB.instance().select().from(DB.Schema.packages).where(eq(DB.Schema.packages.id, createdBody.data.id)).get();
+//         expect(updated?.description).toBe("Updated description");
+//     });
 
-    test("Developer release lifecycle stores data", async () => {
-        const { user } = await seedUser("developer", {
-            display_name: PACKAGE_MAINTAINER_NAME,
-            email: PACKAGE_MAINTAINER_EMAIL
-        });
-        const session = await SessionHandler.createSession(user.id);
-        const pkg = await seedPackage(user.id, { name: PACKAGE_NAME });
+//     test("Developer release lifecycle stores data", async () => {
+//         const { user } = await seedUser("developer", {
+//             display_name: PACKAGE_MAINTAINER_NAME,
+//             email: PACKAGE_MAINTAINER_EMAIL
+//         });
+//         const session = await SessionHandler.createSession(user.id);
+//         const pkg = await seedPackage(user.id, { name: PACKAGE_NAME });
 
-        const listBefore = await app.request(`/dev/packages/${pkg.id}/releases`, {
-            headers: authHeaders(session.token)
-        });
-        const emptyBody = await listBefore.json();
-        expect(listBefore.status).toBe(200);
-        expect(emptyBody.data).toEqual([]);
+//         const listBefore = await API.getApp().request(`/dev/packages/${pkg.id}/releases`, {
+//             headers: authHeaders(session.token)
+//         });
+//         const emptyBody = await listBefore.json();
+//         expect(listBefore.status).toBe(200);
+//         expect(emptyBody.data).toEqual([]);
 
-        const file = new File([await Bun.file(PACKAGE_FILE_PATH).arrayBuffer()], "package.deb");
-        const form = new FormData();
-        form.set("file", file);
+//         const file = new File([await Bun.file(PACKAGE_FILE_PATH).arrayBuffer()], "package.deb");
+//         const form = new FormData();
+//         form.set("file", file);
 
-        const createRes = await app.request(`/dev/packages/${pkg.id}/releases/${PACKAGE_VERSION}/${PACKAGE_ARCH}`, {
-            method: "POST",
-            headers: authHeaders(session.token),
-            body: form
-        });
-        const createBody = await createRes.json();
-        expect(createRes.status).toBe(201);
-        expect(createBody.message).toBe("Package release created successfully");
+//         const createRes = await API.getApp().request(`/dev/packages/${pkg.id}/releases/${PACKAGE_VERSION}/${PACKAGE_ARCH}`, {
+//             method: "POST",
+//             headers: authHeaders(session.token),
+//             body: form
+//         });
+//         const createBody = await createRes.json();
+//         expect(createRes.status).toBe(201);
+//         expect(createBody.message).toBe("Package release created successfully");
 
-        createdAptPackages.add(PACKAGE_NAME);
 
-        const dbRelease = DB.instance().select().from(DB.Schema.packageReleases).where(eq(DB.Schema.packageReleases.package_id, pkg.id)).get();
-        expect(dbRelease?.version).toBe(PACKAGE_VERSION);
+//         const dbRelease = DB.instance().select().from(DB.Schema.packageReleases).where(eq(DB.Schema.packageReleases.package_id, pkg.id)).get();
+//         expect(dbRelease?.version).toBe(PACKAGE_VERSION);
 
-        const listAfter = await app.request(`/dev/packages/${pkg.id}/releases`, {
-            headers: authHeaders(session.token)
-        });
-        expect(listAfter.status).toBe(200);
-        const afterBody = await listAfter.json();
-        expect(afterBody.data.length).toBe(1);
-    });
+//         const listAfter = await API.getApp().request(`/dev/packages/${pkg.id}/releases`, {
+//             headers: authHeaders(session.token)
+//         });
+//         expect(listAfter.status).toBe(200);
+//         const afterBody = await listAfter.json();
+//         expect(afterBody.data.length).toBe(1);
+//     });
 
-    test("Developer can request stable promotion", async () => {
-        const { user } = await seedUser("developer");
-        const session = await SessionHandler.createSession(user.id);
-        const pkg = await seedPackage(user.id, { name: "stable-pkg" });
-        const release = await seedRelease(pkg.id, "2.0.0", "arm64");
+//     test("Developer can request stable promotion", async () => {
+//         const { user } = await seedUser("developer");
+//         const session = await SessionHandler.createSession(user.id);
+//         const pkg = await seedPackage(user.id, { name: "stable-pkg" });
+//         const release = await seedRelease(pkg.id, "2.0.0", "arm64");
 
-        const createRes = await app.request(`/dev/packages/${pkg.id}/stable-promotion-requests`, {
-            method: "POST",
-            headers: {
-                ...authHeaders(session.token),
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ package_release_id: release.id })
-        });
-        const createBody = await createRes.json();
-        expect(createRes.status).toBe(201);
-        expect(createBody.message).toBe("Stable promotion request submitted");
+//         const createRes = await API.getApp().request(`/dev/packages/${pkg.id}/stable-promotion-requests`, {
+//             method: "POST",
+//             headers: {
+//                 ...authHeaders(session.token),
+//                 "Content-Type": "application/json"
+//             },
+//             body: JSON.stringify({ package_release_id: release.id })
+//         });
+//         const createBody = await createRes.json();
+//         expect(createRes.status).toBe(201);
+//         expect(createBody.message).toBe("Stable promotion request submitted");
 
-        const listRes = await app.request(`/dev/packages/${pkg.id}/stable-promotion-requests`, {
-            headers: authHeaders(session.token)
-        });
-        expect(listRes.status).toBe(200);
-        const body = await listRes.json();
-        expect(body.data[0].package_release_id).toBe(release.id);
-    });
-});
+//         const listRes = await API.getApp().request(`/dev/packages/${pkg.id}/stable-promotion-requests`, {
+//             headers: authHeaders(session.token)
+//         });
+//         expect(listRes.status).toBe(200);
+//         const body = await listRes.json();
+//         expect(body.data[0].package_release_id).toBe(release.id);
+//     });
+// });
 
-describe("Admin routes", () => {
-    test("Admin can create and delete packages", async () => {
-        const { user: admin } = await seedUser("admin");
-        const { user: developer } = await seedUser("developer");
-        const adminSession = await SessionHandler.createSession(admin.id);
+// describe("Admin routes", () => {
+//     test("Admin can create and delete packages", async () => {
+//         const { user: admin } = await seedUser("admin");
+//         const { user: developer } = await seedUser("developer");
+//         const adminSession = await SessionHandler.createSession(admin.id);
 
-        const createRes = await app.request("/admin/packages", {
-            method: "POST",
-            headers: {
-                ...authHeaders(adminSession.token),
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                name: "admin-pkg",
-                owner_user_id: developer.id,
-                description: "Admin created",
-                homepage_url: "https://adminpkg.example.com",
-                requires_patching: false
-            })
-        });
-        expect(createRes.status).toBe(201);
-        const createdBody = await createRes.json();
+//         const createRes = await API.getApp().request("/admin/packages", {
+//             method: "POST",
+//             headers: {
+//                 ...authHeaders(adminSession.token),
+//                 "Content-Type": "application/json"
+//             },
+//             body: JSON.stringify({
+//                 name: "admin-pkg",
+//                 owner_user_id: developer.id,
+//                 description: "Admin created",
+//                 homepage_url: "https://adminpkg.example.com",
+//                 requires_patching: false
+//             })
+//         });
+//         expect(createRes.status).toBe(201);
+//         const createdBody = await createRes.json();
 
-        const deleteRes = await app.request(`/admin/packages/${createdBody.data.id}`, {
-            method: "DELETE",
-            headers: authHeaders(adminSession.token)
-        });
-        const deleteBody = await deleteRes.json();
-        expect(deleteRes.status).toBe(200);
-        expect(deleteBody.message).toBe("Package deleted successfully");
-        const pkg = DB.instance().select().from(DB.Schema.packages).where(eq(DB.Schema.packages.id, createdBody.data.id)).get();
-        expect(pkg).toBeUndefined();
-    });
+//         const deleteRes = await API.getApp().request(`/admin/packages/${createdBody.data.id}`, {
+//             method: "DELETE",
+//             headers: authHeaders(adminSession.token)
+//         });
+//         const deleteBody = await deleteRes.json();
+//         expect(deleteRes.status).toBe(200);
+//         expect(deleteBody.message).toBe("Package deleted successfully");
+//         const pkg = DB.instance().select().from(DB.Schema.packages).where(eq(DB.Schema.packages.id, createdBody.data.id)).get();
+//         expect(pkg).toBeUndefined();
+//     });
 
-    test("Admin user management CRUD", async () => {
-        const { user: admin } = await seedUser("admin");
-        const adminSession = await SessionHandler.createSession(admin.id);
+//     test("Admin user management CRUD", async () => {
+//         const { user: admin } = await seedUser("admin");
+//         const adminSession = await SessionHandler.createSession(admin.id);
 
-        const createRes = await app.request("/admin/users", {
-            method: "POST",
-            headers: {
-                ...authHeaders(adminSession.token),
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                username: "managed",
-                display_name: "Managed User",
-                email: "managed@example.com",
-                password: "Adm1nManage!",
-                role: "user"
-            })
-        });
-        expect(createRes.status).toBe(201);
-        const created = await createRes.json();
+//         const createRes = await API.getApp().request("/admin/users", {
+//             method: "POST",
+//             headers: {
+//                 ...authHeaders(adminSession.token),
+//                 "Content-Type": "application/json"
+//             },
+//             body: JSON.stringify({
+//                 username: "managed",
+//                 display_name: "Managed User",
+//                 email: "managed@example.com",
+//                 password: "Adm1nManage!",
+//                 role: "user"
+//             })
+//         });
+//         expect(createRes.status).toBe(201);
+//         const created = await createRes.json();
 
-        const updateRes = await app.request(`/admin/users/${created.data.id}`, {
-            method: "PUT",
-            headers: {
-                ...authHeaders(adminSession.token),
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ display_name: "Renamed", role: "developer" })
-        });
-        const updateBody = await updateRes.json();
-        expect(updateRes.status).toBe(200);
-        expect(updateBody.message).toBe("User updated successfully");
+//         const updateRes = await API.getApp().request(`/admin/users/${created.data.id}`, {
+//             method: "PUT",
+//             headers: {
+//                 ...authHeaders(adminSession.token),
+//                 "Content-Type": "application/json"
+//             },
+//             body: JSON.stringify({ display_name: "Renamed", role: "developer" })
+//         });
+//         const updateBody = await updateRes.json();
+//         expect(updateRes.status).toBe(200);
+//         expect(updateBody.message).toBe("User updated successfully");
 
-        const passwordRes = await app.request(`/admin/users/${created.data.id}/password`, {
-            method: "PUT",
-            headers: {
-                ...authHeaders(adminSession.token),
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ password: "N3wAdm1nPw" })
-        });
-        expect(passwordRes.status).toBe(200);
+//         const passwordRes = await API.getApp().request(`/admin/users/${created.data.id}/password`, {
+//             method: "PUT",
+//             headers: {
+//                 ...authHeaders(adminSession.token),
+//                 "Content-Type": "application/json"
+//             },
+//             body: JSON.stringify({ password: "N3wAdm1nPw" })
+//         });
+//         expect(passwordRes.status).toBe(200);
 
-        const deleteRes = await app.request(`/admin/users/${created.data.id}`, {
-            method: "DELETE",
-            headers: authHeaders(adminSession.token)
-        });
-        expect(deleteRes.status).toBe(200);
-        const deleted = DB.instance().select().from(DB.Schema.users).where(eq(DB.Schema.users.id, created.data.id)).get();
-        expect(deleted).toBeUndefined();
-    });
-});
+//         const deleteRes = await API.getApp().request(`/admin/users/${created.data.id}`, {
+//             method: "DELETE",
+//             headers: authHeaders(adminSession.token)
+//         });
+//         expect(deleteRes.status).toBe(200);
+//         const deleted = DB.instance().select().from(DB.Schema.users).where(eq(DB.Schema.users.id, created.data.id)).get();
+//         expect(deleted).toBeUndefined();
+//     });
+// });

@@ -1,3 +1,4 @@
+import type { TaskHandler } from '@cleverjs/utils';
 import { sql } from 'drizzle-orm';
 import {
     sqliteTable,
@@ -33,7 +34,8 @@ export const passwordResets = sqliteTable('password_resets', {
  * @deprecated Use DB.Schema.sessions instead
  */
 export const sessions = sqliteTable('sessions', {
-    token: text().primaryKey(),
+    id: text().primaryKey(),
+    hashed_token: text().notNull(),
     user_id: int().notNull().references(() => users.id),
     user_role: text({
         enum: ['admin', 'developer', 'user']
@@ -45,8 +47,8 @@ export const sessions = sqliteTable('sessions', {
  * @deprecated Use DB.Schema.apiKeys instead
  */
 export const apiKeys = sqliteTable('api_keys', {
-    id: int().primaryKey({ autoIncrement: true }),
-    token: text().notNull().unique(),
+    id: text().primaryKey(),
+    hashed_token: text().notNull(),
     user_id: int().notNull().references(() => users.id),
     user_role: text({
         enum: ['admin', 'developer', 'user']
@@ -78,8 +80,7 @@ export const packages = sqliteTable('packages', {
 export const packageReleases = sqliteTable('package_releases', {
     id: int().primaryKey({ autoIncrement: true }),
     package_id: int().notNull().references(() => packages.id),
-    version: text().notNull(),
-    leios_patch: text(),
+    versionWithLeiosPatch: text().notNull(),
     architecture: text({ enum: ['amd64', 'arm64'] }).notNull(),
 });
 
@@ -91,5 +92,50 @@ export const stablePromotionRequests = sqliteTable('stable_promotion_requests', 
     package_id: int().notNull().references(() => packages.id),
     package_release_id: int().unique().notNull().references(() => packageReleases.id),
     status: text({ enum: ['pending', 'approved', 'denied'] }).default('pending').notNull(),
-    decision_reason: text(),
+    admin_note: text(),
+});
+
+/**
+ * @deprecated Use DB.Schema.scheduled_tasks instead
+ */
+export const scheduled_tasks = sqliteTable('scheduled_tasks', {
+    id: int().primaryKey({ autoIncrement: true }),
+    function: text().notNull(),
+    created_by_user_id: int().references(() => users.id),
+    args: text({ mode: 'json' }).$type<Record<string, any>>().notNull(),
+    autoDelete: int({ mode: 'boolean' }).notNull().default(sql`0`),
+    storeLogs: int({ mode: 'boolean' }).notNull().default(sql`0`),
+    status: text({ enum: ["pending", "running", "paused", "failed", "completed"] }).notNull().default('pending'),
+    created_at: int().notNull(),
+    finished_at: int(),
+    result: text({ mode: 'json' }).$type<Record<string, any>>(),
+    message: text(),
+});
+
+/**
+ * @deprecated Use DB.Models.scheduled_tasks_paused_state instead
+ */
+export const scheduled_tasks_paused_state = sqliteTable('scheduled_tasks_paused_state', {
+    task_id: int().primaryKey().references(() => scheduled_tasks.id),
+    next_step_to_execute: int().notNull(),
+    data: text({ mode: 'json' }).$type<TaskHandler.TempPausedTaskState["data"]>().notNull(),
+});
+
+/**
+ * @deprecated Use DB.Schema.tmp_data instead
+ */
+export const metadata = sqliteTable('metadata', {
+    key: text().primaryKey(),
+    data: text({ mode: 'json' }).$type<Record<string, any> | Array<any>>().notNull()
+});
+
+
+/**
+ * @deprecated Use DB.Models.os_releases instead
+ */
+export const os_releases = sqliteTable('os_releases', {
+    id: int().primaryKey({ autoIncrement: true }),
+    // YYYY.MM.(release_this_month) format
+    version: text().notNull().unique(),
+    published_at: int().notNull(),
 });

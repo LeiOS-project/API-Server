@@ -54,6 +54,7 @@ export class API {
 				}, err.status)
 			}
 
+			Logger.error("API Error:", err);
 			return c.json({ success: false, message: 'Internal Server Error' }, 500);
 		})
 
@@ -66,7 +67,7 @@ export class API {
 		}
 
 		this.app.get("/health", (c) => {
-			return c.json({ status: "LeiOS Repo API is running" });
+			return c.json({ status: "LeiOS API is running" });
 		});
 
         this.app.get("/", (c) => {
@@ -93,6 +94,13 @@ export class API {
 			this.server.stop();
 			Logger.log("API server stopped.");
 		}
+	}
+
+	static getApp(): typeof API.app {
+		if (!this.app) {
+			throw new Error("API not initialized. Call API.init() first.");
+		}
+		return this.app;
 	}
 
 }

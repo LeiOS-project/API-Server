@@ -62,42 +62,6 @@ export class AptlyUtils {
         }
     }
 
-    static async ensureBinaryGpgKeyring(sourcePath: string, outputPath: string) {
-        const fileExists = await fs.access(sourcePath).then(() => true).catch(() => false);
-        if (!fileExists) {
-            throw new Error(`GPG key file not found at ${sourcePath}`);
-        }
-
-        await this.ensureDirExists(path.dirname(outputPath));
-
-        const buffer = await fs.readFile(sourcePath);
-        const header = buffer.slice(0, 64).toString("utf8");
-        const isArmored = header.includes("BEGIN PGP");
-
-        if (!isArmored) {
-            if (sourcePath !== outputPath) {
-                await fs.copyFile(sourcePath, outputPath);
-            }
-            return outputPath;
-        }
-
-        const dearmorProcess = Bun.spawn({
-            cmd: ["gpg", "--dearmor", "--yes", "--output", outputPath, sourcePath],
-            stdin: "ignore",
-            stdout: "pipe",
-            stderr: "pipe",
-        });
-
-        const exitCode = await dearmorProcess.exited;
-        if (exitCode !== 0) {
-            const stderrText = dearmorProcess.stderr ? await new Response(dearmorProcess.stderr).text() : "";
-            throw new Error(`Failed to dearmor GPG key at ${sourcePath}: ${stderrText}`);
-        }
-
-        Logger.info(`GPG key at ${sourcePath} dearmored to ${outputPath}`);
-        return outputPath;
-    }
-
     static forwardAptlyOutput(stream: ReadableStream<Uint8Array> | null, logFn: (message: string) => void) {
         if (!stream) return;
 
@@ -181,21 +145,6 @@ export class AptlyUtils {
     }
 
     static async initialRepoPublishIfNeeded() {
-        await this.ensureDirExists(AptlyAPIServer.dearmoredKeysDir);
-
-        const publicKeyringPath = await this.ensureBinaryGpgKeyring(
-            AptlyAPIServer.settings.keySettings.publicKeyPath,
-            path.join(AptlyAPIServer.dearmoredKeysDir, "public-key.dearmored.gpg")
-        );
-        const secretKeyringPath = await this.ensureBinaryGpgKeyring(
-            AptlyAPIServer.settings.keySettings.privateKeyPath,
-            path.join(AptlyAPIServer.dearmoredKeysDir, "private-key.dearmored.gpg")
-        );
-
-        const signingConfig = {
-            Keyring: publicKeyringPath,
-            SecretKeyring: secretKeyringPath,
-        } as const;
 
         const publishPrefix = "s3:leios-live-repo:";
 
@@ -223,7 +172,7 @@ export class AptlyUtils {
                         "amd64",
                         "arm64"
                     ],
-                    Signing: signingConfig,
+                    Signing: AptlyAPIServer.SigningConfig
                 }
             });
 
@@ -269,7 +218,7 @@ export class AptlyUtils {
                         "amd64",
                         "arm64"
                     ],
-                    Signing: signingConfig,
+                    Signing: AptlyAPIServer.SigningConfig
                 }
             });
 
@@ -282,11 +231,12 @@ export class AptlyUtils {
     }
 
     static extractVersionAndPatchSuffix(fullVersion: string) {
-        const leiosSuffixMatch = fullVersion.match(/(.*)leios(\d+)$/);
+        // Allow up to four numeric segments in the leios suffix (e.g. leios1, leios1.2.3.4)
+        const leiosSuffixMatch = fullVersion.match(/(.*)leios(\d+(?:\.\d+){0,2})$/);
         if (leiosSuffixMatch) {
             return {
                 version: leiosSuffixMatch[1],
-                leios_patch: parseInt(leiosSuffixMatch[2])
+                leios_patch: leiosSuffixMatch[2]
             };
         }
         return {
@@ -332,5 +282,64 @@ export class AptlyUtils {
         }
 
         throw new Error(`Aptly API not reachable after ${timeoutMs}ms: ${lastError}`);
+    }
+
+}
+
+export namespace AptlyUtils.Signing {
+
+    async function ensureBinaryGpgKeyring(sourcePath: string, outputPath: string) {
+
+        if (await fs.exists(outputPath)) {
+            Logger.info(`GPG keyring already exists at ${outputPath}, skipping dearmoring.`);
+            return outputPath;
+        }
+
+        const fileExists = await fs.access(sourcePath).then(() => true).catch(() => false);
+        if (!fileExists) {
+            throw new Error(`GPG key file not found at ${sourcePath}`);
+        }
+
+        await AptlyUtils.ensureDirExists(path.dirname(outputPath));
+
+        const buffer = await fs.readFile(sourcePath);
+        const header = buffer.subarray(0, 64).toString("utf8");
+        const isArmored = header.includes("BEGIN PGP");
+
+        if (!isArmored) {
+            if (sourcePath !== outputPath) {
+                await fs.copyFile(sourcePath, outputPath);
+            }
+            return outputPath;
+        }
+
+        const dearmorProcess = Bun.spawn({
+            cmd: ["gpg", "--dearmor", "--yes", "--output", outputPath, sourcePath],
+            stdin: "ignore",
+            stdout: "pipe",
+            stderr: "pipe",
+        });
+
+        const exitCode = await dearmorProcess.exited;
+        if (exitCode !== 0) {
+            const stderrText = dearmorProcess.stderr ? await new Response(dearmorProcess.stderr).text() : "";
+            throw new Error(`Failed to dearmor GPG key at ${sourcePath}: ${stderrText}`);
+        }
+
+        Logger.info(`GPG key at ${sourcePath} dearmored to ${outputPath}`);
+        return outputPath;
+    }
+
+    export async function ensureSigningConfigExists() {
+        await AptlyUtils.ensureDirExists(AptlyAPIServer.dearmoredKeysDir);
+
+        await ensureBinaryGpgKeyring(
+            AptlyAPIServer.settings.keySettings.publicKeyPath,
+            path.join(AptlyAPIServer.dearmoredKeysDir, "public-key.dearmored.gpg")
+        );
+        await ensureBinaryGpgKeyring(
+            AptlyAPIServer.settings.keySettings.privateKeyPath,
+            path.join(AptlyAPIServer.dearmoredKeysDir, "private-key.dearmored.gpg")
+        );
     }
 }

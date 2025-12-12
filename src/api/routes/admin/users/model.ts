@@ -1,6 +1,7 @@
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "drizzle-zod";
 import { DB } from "../../../../db";
 import z from "zod";
+import { UserDataPolicys } from "../../../utils/shared-models/accountData";
 
 export namespace AdminUsersModel {
 
@@ -24,7 +25,7 @@ export namespace AdminUsersModel {
 
     export namespace Create {
         const InsertSchema = createInsertSchema(DB.Schema.users, {
-            username: z.string().min(3).max(32),
+            username: UserDataPolicys.Username,
             display_name: z.string().min(1).max(64),
             email: z.email(),
         }).omit({
@@ -42,16 +43,19 @@ export namespace AdminUsersModel {
     }
 
     export namespace Update {
-        export const Body = createUpdateSchema(DB.Schema.users).partial().omit({
+        export const Body = createUpdateSchema(DB.Schema.users).omit({
             id: true,
             password_hash: true,
-        });
+        }).partial().refine(
+            (data) => Object.values(data).some((value) => value !== undefined),
+            { message: "At least one field must be provided" }
+        );
         export type Body = z.infer<typeof Body>;
     }
 
     export namespace UpdatePassword {
         export const Body = z.object({
-            password: z.string().min(8).max(128),
+            password: UserDataPolicys.Password
         });
         export type Body = z.infer<typeof Body>;
     }

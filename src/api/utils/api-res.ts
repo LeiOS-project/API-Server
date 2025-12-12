@@ -15,6 +15,15 @@ export class APIResponse {
         return c.json({ success: true, code: 201, message, data }, 201);
     }
 
+    static createdNoData(c: Context, message: string) {
+        return c.json({ success: true, code: 201, message, data: null }, 201);
+    }
+
+    static accepted<Data extends APIResponse.Types.RequiredReturnData>(c: Context, message: string, data: Data) {
+        return c.json({ success: true, code: 202, message, data }, 202);
+    }
+
+
     static serverError(c: Context, message: string) {
         return c.json({ success: false, code: 500, message }, 500);
     }
@@ -33,6 +42,10 @@ export class APIResponse {
 
     static conflict(c: Context, message: string) {
         return c.json({ success: false, code: 409, message }, 409);
+    }
+
+    static tooManyRequests(c: Context, message: string) {
+        return c.json({ success: false, code: 429, message }, 429);
     }
 
 }
@@ -66,7 +79,16 @@ export namespace APIResponse.Schema {
         });
     }
 
-    export function created<Message extends string, Data extends z.ZodType<APIResponse.Types.RequiredReturnData>>(message: Message, data: Data) {
+    export function accepted<Message extends string, Data extends z.ZodType<APIResponse.Types.RequiredReturnData>>(message: Message, data: Data) {
+        return z.object({
+            success: z.literal(true),
+            code: z.literal(202),
+            message: z.literal(message),
+            data
+        });
+    }
+
+    export function created<Message extends string, Data extends z.ZodType<APIResponse.Types.NonRequiredReturnData>>(message: Message, data: Data) {
         return z.object({
             success: z.literal(true),
             code: z.literal(201),
@@ -80,6 +102,7 @@ export namespace APIResponse.Schema {
     export const badRequest = APIResponse.Utils.createErrorSchemaFactory(400);
     export const notFound = APIResponse.Utils.createErrorSchemaFactory(404);
     export const conflict = APIResponse.Utils.createErrorSchemaFactory(409);
+    export const tooManyRequests = APIResponse.Utils.createErrorSchemaFactory(429);
 }
 
 export namespace APIResponse.Types {
@@ -91,11 +114,13 @@ export namespace APIResponse.Types {
 
     export type BasicResponseSchema =
         | z.infer<ReturnType<typeof APIResponse.Schema.success<any, z.ZodType<NonRequiredReturnData>>>>
+        | z.infer<ReturnType<typeof APIResponse.Schema.accepted<any, z.ZodType<RequiredReturnData>>>>
         | z.infer<ReturnType<typeof APIResponse.Schema.created<any, z.ZodType<RequiredReturnData>>>>
         | z.infer<ReturnType<typeof APIResponse.Schema.serverError<any>>>
         | z.infer<ReturnType<typeof APIResponse.Schema.unauthorized<any>>>
         | z.infer<ReturnType<typeof APIResponse.Schema.badRequest<any>>>
         | z.infer<ReturnType<typeof APIResponse.Schema.notFound<any>>>
-        | z.infer<ReturnType<typeof APIResponse.Schema.conflict<any>>>;
+        | z.infer<ReturnType<typeof APIResponse.Schema.conflict<any>>>
+        | z.infer<ReturnType<typeof APIResponse.Schema.tooManyRequests<any>>>;
 
 }

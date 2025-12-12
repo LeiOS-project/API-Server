@@ -35,7 +35,7 @@ router.post('/',
         tags: [DOCS_TAGS.ADMIN_API.PACKAGES],
 
         responses: APIResponseSpec.describeWithWrongInputs(
-            APIResponseSpec.created("Package created successfully", PackageModel.CreatePackageAsAdmin.Response),
+            APIResponseSpec.createdNoData("Package created successfully"),
             APIResponseSpec.badRequest("Owner user ID does not correspond to a developer account"),
             APIResponseSpec.conflict("Package with this name already exists")
         )
@@ -50,21 +50,21 @@ router.post('/',
     }
 );
 
-router.use('/:packageID/*',
+router.use('/:packageName/*',
 
     zValidator("param", z.object({
-        packageID: z.coerce.number().int().positive()
+        packageName: z.string()
     })),
 
     async (c, next) => {
         // @ts-ignore
-        const { packageID } = c.req.valid("param") as { packageID: number };
+        const { packageName } = c.req.valid("param") as { packageName: string };
 
-        return await PackagesService.packageMiddleware(c, next, packageID, true);
+        return await PackagesService.packageMiddleware(c, next, packageName, true);
     }
 );
 
-router.get('/:packageID',
+router.get('/:packageName',
 
     APIRouteSpec.authenticated({
         summary: "Get package details",
@@ -72,7 +72,7 @@ router.get('/:packageID',
         tags: [DOCS_TAGS.ADMIN_API.PACKAGES],
 
         responses: APIResponseSpec.describeBasic(
-            APIResponseSpec.success("Package retrieved successfully", PackageModel.GetPackageById.Response),
+            APIResponseSpec.success("Package retrieved successfully", PackageModel.GetPackageByName.Response),
             APIResponseSpec.notFound("Package with specified ID not found")
         )
     }),
@@ -82,7 +82,7 @@ router.get('/:packageID',
     }
 );
 
-router.put('/:packageID',
+router.put('/:packageName',
 
     APIRouteSpec.authenticated({
         summary: "Update package details",
@@ -104,7 +104,7 @@ router.put('/:packageID',
     }
 );
 
-router.delete('/:packageID',
+router.delete('/:packageName',
 
     APIRouteSpec.authenticated({
         summary: "Delete a package",
@@ -122,5 +122,5 @@ router.delete('/:packageID',
     }
 );
 
-router.route('/:packageID', releasesRouter);
-router.route('/:packageID', stableRequestsRouter);
+router.route('/:packageName', releasesRouter);
+router.route('/:packageName', stableRequestsRouter);

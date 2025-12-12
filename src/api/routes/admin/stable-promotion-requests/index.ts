@@ -77,21 +77,39 @@ router.get('/:requestID',
     }
 );
 
-router.post('/:requestID/approve',
+router.post('/:requestID/decide',
 
     APIRouteSpec.authenticated({
-        summary: "Approve stable promotion request",
-        description: "Approve a specific stable promotion request, promoting the package release to stable.",
+        summary: "Decide on a stable promotion request",
+        description: "Approve or reject a stable promotion request for a package.",
         tags: [DOCS_TAGS.ADMIN_API.STABLE_PROMOTION_REQUESTS],
 
-        responses: APIResponseSpec.describeBasic(
-            APIResponseSpec.successNoData("Stable promotion request approved successfully"),
+        responses: APIResponseSpec.describeWithWrongInputs(
+            APIResponseSpec.successNoData("Decided on stable promotion request successfully"),
+            APIResponseSpec.badRequest("Stable promotion request has already been approved or denied / Invalid input data"),
             APIResponseSpec.notFound("Stable promotion request not found")
         )
     }),
 
+    zValidator("json", AdminStablePromotionRequestModel.Decide.Body),
+
     async (c) => {
         // @ts-ignore
         const request = c.get("stablePromotionRequest") as DB.Models.StablePromotionRequest;
+
+        const decision = c.req.valid("json");
+
+        if (request.status !== 'pending') {
+            return APIResponse.badRequest(c, "Stable promotion request has already been approved or denied");
+        }
+
+        await DB.instance().update(DB.Schema.stablePromotionRequests).set({
+            status: decision.status,
+            admin_note: decision.admin_note
+        }).where(
+            eq(DB.Schema.stablePromotionRequests.id, request.id)
+        );
+
+        return APIResponse.successNoData(c, "Stable promotion request approved successfully");
     }
 );

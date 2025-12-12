@@ -67,7 +67,7 @@ export class PackagesService {
         }
     }
 
-    static async packageMiddleware(c: Context, next: () => Promise<void>, packageID: number, asAdmin = false) {
+    static async packageMiddleware(c: Context, next: () => Promise<void>, packageName: string, asAdmin = false) {
 
         let packageData: DB.Models.Package | undefined;
 
@@ -76,13 +76,13 @@ export class PackagesService {
             const authContext = c.get("authContext") as AuthHandler.AuthContext;
 
             packageData = DB.instance().select().from(DB.Schema.packages).where(and(
-                eq(DB.Schema.packages.id, packageID),
+                eq(DB.Schema.packages.name, packageName),
                 eq(DB.Schema.packages.owner_user_id, authContext.user_id)
             )).get();
 
         } else {
             packageData = DB.instance().select().from(DB.Schema.packages).where(
-                eq(DB.Schema.packages.id, packageID)
+                eq(DB.Schema.packages.name, packageName)
             ).get();
         }
 

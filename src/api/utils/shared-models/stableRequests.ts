@@ -12,7 +12,7 @@ export namespace StablePromotionRequestsModel {
 
     export const Pending = Entity.extend({
         status: z.literal("pending"),
-        decision_reason: z.null()
+        admin_note: z.null()
     });
     export type Pending = z.infer<typeof Pending>;
 
@@ -23,7 +23,7 @@ export namespace StablePromotionRequestsModel {
 
     export const Denied = Entity.extend({
         status: z.literal("denied"),
-        decision_reason: z.string()
+        admin_note: z.string()
     });
     export type Denied = z.infer<typeof Denied>;
 
@@ -49,7 +49,7 @@ export namespace StablePromotionRequestsModel.Create {
         package_id: true,
         // package_release_id: true,
         status: true,
-        decision_reason: true
+        admin_note: true
     });
 
     export const Response = z.object({
@@ -59,31 +59,3 @@ export namespace StablePromotionRequestsModel.Create {
     export type Response = z.infer<typeof Response>;
 }
 
-export namespace StablePromotionRequestsModel.Decision {
-    export const Body = z.object({
-        decision: z.enum(["approve", "deny"]),
-        reason: z.string().min(1).max(500).optional(),
-    });
-
-    export type Body = z.infer<typeof Body>;
-}
-
-export namespace StablePromotionRequestsModel.CopyToStable {
-
-    export const Body = z.object({
-        version: z.string().min(1),
-        arch: z.enum(["amd64", "arm64"]),
-        leios_patch: z.number().int().nonnegative().optional(),
-    });
-
-    export type Body = z.infer<typeof Body>;
-
-    export const Response = z.object({
-        version: z.string(),
-        arch: z.enum(["amd64", "arm64"]),
-        leios_patch: z.number().int().nonnegative().optional(),
-        copied: z.literal(true)
-    });
-
-    export type Response = z.infer<typeof Response>;
-}

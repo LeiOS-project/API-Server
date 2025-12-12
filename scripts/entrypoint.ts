@@ -1,11 +1,5 @@
 
-console.log("Running database migrations...");
-
-await Bun.$`bun run db:migrate`;
-
-console.log("Database migrations completed.");
-
-console.log("Starting API server...");
+process.env["LRA_DB_AUTO_MIGRATE"] = "true";
 
 await import("../src/index");
 

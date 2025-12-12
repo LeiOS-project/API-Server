@@ -3,6 +3,8 @@ import { AptlyAPIServer } from "./aptly/server";
 import { DB } from "./db";
 import { ConfigHandler } from "./utils/config";
 import { Logger } from "./utils/logger";
+import { TaskScheduler } from "./tasks";
+import { LiveRepoUtils } from "./utils/live-repo";
 
 export class Main {
 
@@ -19,8 +21,13 @@ export class Main {
         Logger.setLogLevel(config.LRA_LOG_LEVEL ?? "info");
 
         await DB.init(
-            config.LRA_DB_PATH ?? "./data/db.sqlite"
+            config.LRA_DB_PATH ?? "./data/db.sqlite",
+            config.LRA_DB_AUTO_MIGRATE,
+            config.LRA_CONFIG_BASE_DIR ?? "./config"
         );
+
+        // start task scheduler
+        await TaskScheduler.processQueue();
 
         await AptlyAPIServer.init({
             aptlyRoot: config.LRA_APTLY_ROOT ?? "./data/aptly",
@@ -29,17 +36,25 @@ export class Main {
                 endpoint: config.LRA_S3_ENDPOINT,
                 region: config.LRA_S3_REGION,
                 bucket: config.LRA_S3_BUCKET,
-                prefix: config.LRA_S3_PREFIX,
+                prefix: config.LRA_S3_PREFIX || "leios/",
                 accessKeyId: config.LRA_S3_ACCESS_KEY_ID,
                 secretAccessKey: config.LRA_S3_SECRET_ACCESS_KEY
             },
             keySettings: {
-                publicKeyPath: config.LRA_PUBLIC_KEY_PATH ?? "./data/keys/public-key.gpg",
-                privateKeyPath: config.LRA_PRIVATE_KEY_PATH ?? "./data/keys/private-key.gpg",
+                publicKeyPath: config.LRA_PUBLIC_KEY_PATH ?? "./config/keys/public-key.gpg",
+                privateKeyPath: config.LRA_PRIVATE_KEY_PATH ?? "./config/keys/private-key.gpg",
             }
         });
 
-        await API.init();
+        await LiveRepoUtils.uploadAdditionalFilesIfNeeded({
+            endpoint: config.LRA_S3_ENDPOINT,
+            region: config.LRA_S3_REGION,
+            bucket: config.LRA_S3_BUCKET,
+            accessKeyId: config.LRA_S3_ACCESS_KEY_ID,
+            secretAccessKey: config.LRA_S3_SECRET_ACCESS_KEY
+        }, config.LRA_PUBLIC_KEY_PATH ?? "./config/keys/public-key.gpg");
+
+        await API.init([config.LRA_HUB_URL || "https://hub.leios.dev"]);
 
         await AptlyAPIServer.start();
 
@@ -50,11 +65,13 @@ export class Main {
 
     }
 
-    private static gracefulShutdown(type: NodeJS.Signals, code: number) {
+    private static async gracefulShutdown(type: NodeJS.Signals, code: number) {
         try {
             Logger.log(`Received ${type}, shutting down...`);
-            API.stop();
-            AptlyAPIServer.stop(type);
+            await API.stop();
+            await AptlyAPIServer.stop(type);
+            await TaskScheduler.stopProcessing();
+            Logger.log("Shutdown complete, exiting.");
             process.exit(code);
         } catch {
             Logger.critical("Error during shutdown, forcing exit");

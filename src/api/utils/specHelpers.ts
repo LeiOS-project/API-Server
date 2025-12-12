@@ -66,13 +66,30 @@ export class APIResponseSpec {
         return this.success(description, z.null());
     }
 
-    static created<Data extends z.ZodType<APIResponse.Types.RequiredReturnData>>(description: string, dataSchema: Data) {
+    static created<Data extends z.ZodType<APIResponse.Types.NonRequiredReturnData>>(description: string, dataSchema: Data) {
         return {
             201: {
                 description,
                 content: {
                     "application/json": {
                         schema: resolver(APIResponse.Schema.created(description, dataSchema))
+                    },
+                },
+            }
+        }
+    }
+
+    static createdNoData(description: string) {
+        return this.created(description, z.null());
+    }
+
+    static accepted<Data extends z.ZodType<APIResponse.Types.RequiredReturnData>>(description: string, dataSchema: Data) {
+        return {
+            202: {
+                description,
+                content: {
+                    "application/json": {
+                        schema: resolver(APIResponse.Schema.accepted(description, dataSchema))
                     },
                 },
             }
@@ -120,6 +137,10 @@ export class APIResponseSpec {
         return this.genericError(409, message);
     }
 
+    static tooManyRequests(message = "Too Many Requests: You have sent too many requests in a given amount of time") {
+        return this.genericError(429, message);
+    }
+
 }
 
 export namespace APIResponseSpec.Types {
@@ -139,6 +160,6 @@ export namespace APIResponseSpec.Types {
         responses: DescribeRouteOptions['responses'];
     }
 
-    export type HTTP_ERROR_CODES = 400 | 401 | 404 | 409 | 500;
+    export type HTTP_ERROR_CODES = 400 | 401 | 404 | 409 | 429 | 500;
 
 }

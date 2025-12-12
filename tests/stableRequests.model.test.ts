@@ -1,35 +1,25 @@
-// import { describe, expect, test } from "bun:test";
-// import { StableRequestModel } from "../src/api/utils/shared-models/stableRequests";
+import { describe, expect, test } from "bun:test";
+import { StablePromotionRequestsModel } from "../src/api/utils/shared-models/stableRequests";
+import { AdminStablePromotionRequestModel } from "../src/api/routes/admin/stable-promotion-requests/model";
 
-// describe("StableRequestModel schemas", () => {
+describe("StableRequestModel schemas", () => {
+	test("accepts valid create payload", () => {
+		const parsed = StablePromotionRequestsModel.Create.Body.parse({
+			package_release_id: 42,
+		});
 
-//     test("accepts valid create payload", () => {
-//         const parsed = StableRequestModel.Create.Body.parse({
-//             version: "1.2.3",
-//             arch: "amd64"
-//         });
+		expect(parsed.package_release_id).toBe(42);
+	});
 
-//         expect(parsed.version).toBe("1.2.3");
-//         expect(parsed.arch).toBe("amd64");
-//     });
+	test("rejects missing package_release_id", () => {
+		expect(() => StablePromotionRequestsModel.Create.Body.parse({} as any)).toThrow();
+	});
 
-//     test("rejects invalid architecture", () => {
-//         expect(() => StableRequestModel.Create.Body.parse({
-//             version: "1.2.3",
-//             // @ts-expect-error - invalid arch is rejected
-//             arch: "x86"
-//         })).toThrow();
-//     });
+	test("rejects invalid architecture for copy body", () => {
+		expect(() => AdminStablePromotionRequestModel.Decide.Body.parse({
+			version: "1.2.3",
+			arch: "x86" as any
+		})).toThrow();
+	});
 
-//     test("accepts copy response shape", () => {
-//         const parsed = StableRequestModel.CopyToStable.Response.parse({
-//             version: "2.0.0",
-//             arch: "arm64",
-//             copied: true
-//         });
-
-//         expect(parsed.copied).toBe(true);
-//         expect(parsed.arch).toBe("arm64");
-//     });
-
-// });
+});

@@ -6,6 +6,7 @@ import { eq, and, or, sql } from "drizzle-orm";
 import { AuthHandler } from "../authHandler";
 import { AptlyAPI } from "../../../aptly/api";
 import { AptlyUtils } from "../../../aptly/utils";
+import { TaskScheduler } from "../../../tasks";
 
 export class PkgReleasesService {
 
@@ -20,7 +21,7 @@ export class PkgReleasesService {
         return APIResponse.success(c, "Package releases retrieved successfully", releases);
     }
 
-    static async createRelease(c: Context, file: File, version: string, arch: "amd64" | "arm64", leios_patch: string | null, isAdmin = false) {
+    static async createRelease(c: Context, file: File, versionWithLeiosPatch: string, arch: "amd64" | "arm64", isAdmin = false) {
         // @ts-ignore
         const packageData = c.get("package") as DB.Models.Package;
 
@@ -34,9 +35,8 @@ export class PkgReleasesService {
         const existingRelease = DB.instance().select().from(DB.Schema.packageReleases).where(
             and(
                 eq(DB.Schema.packageReleases.package_id, packageData.id),
-                eq(DB.Schema.packageReleases.version, version),
+                eq(DB.Schema.packageReleases.versionWithLeiosPatch, versionWithLeiosPatch),
                 eq(DB.Schema.packageReleases.architecture, arch),
-                leios_patch ? eq(DB.Schema.packageReleases.leios_patch, leios_patch) : sql`1=1`
             )
         ).get();
 
@@ -45,15 +45,13 @@ export class PkgReleasesService {
         }
 
         try {
-            const result = await AptlyAPI.Packages.uploadAndVerify(
-                "leios-archive",
+            const result = await AptlyAPI.Packages.uploadAndVerifyIntoArchiveRepo(
                 {
                     name: packageData.name,
-                    version,
+                    versionWithLeiosPatch: versionWithLeiosPatch,
                     architecture: arch,
                     maintainer_name: owner.display_name,
-                    maintainer_email: owner.email,
-                    leios_patch: leios_patch || undefined
+                    maintainer_email: owner.email
                 },
                 file,
                 isAdmin
@@ -63,33 +61,34 @@ export class PkgReleasesService {
                 return APIResponse.serverError(c, "Failed to upload and verify package release");
             }
 
-            // cleanup everything in testing repo first
-            const cleanupResult = await AptlyAPI.Packages.deleteInRepo("leios-testing", packageData.name);
+            // cleanup everything in testing repo first but ensure we only cleanup for this architecture
+            const cleanupResult = await AptlyAPI.Packages.deleteInRepo("leios-testing", packageData.name, undefined, arch);
             if (!cleanupResult) {
                 return APIResponse.serverError(c, "Failed to clean up existing package releases in testing repository");
             }
 
-            const copyResult = await AptlyAPI.Packages.copyIntoRepo("leios-testing", packageData.name, version, undefined, arch);
+            const copyResult = await AptlyAPI.Packages.copyIntoRepo("leios-testing", packageData.name, versionWithLeiosPatch, arch);
             if (!copyResult) {
                 return APIResponse.serverError(c, "Failed to copy package release into testing repository");
             }
 
+            await TaskScheduler.enqueueTask("testing-repo:update", {}, { created_by_user_id: null });
+
             await DB.instance().insert(DB.Schema.packageReleases).values({
                 package_id: packageData.id,
-                version,
-                leios_patch: leios_patch ?? null,
+                versionWithLeiosPatch,
                 architecture: arch
             });
 
             if (arch === "amd64") {
                 await DB.instance().update(DB.Schema.packages).set({
-                    latest_stable_release_amd64: AptlyUtils.buildVersionWithLeiOSSuffix(version, leios_patch)
+                    latest_testing_release_amd64: versionWithLeiosPatch
                 }).where(
                     eq(DB.Schema.packages.id, packageData.id)
                 );
             } else if (arch === "arm64") {
                 await DB.instance().update(DB.Schema.packages).set({
-                    latest_stable_release_arm64: AptlyUtils.buildVersionWithLeiOSSuffix(version, leios_patch)
+                    latest_testing_release_arm64: versionWithLeiosPatch
                 }).where(
                     eq(DB.Schema.packages.id, packageData.id)
                 );
@@ -99,17 +98,18 @@ export class PkgReleasesService {
             return APIResponse.serverError(c, "Failed to upload and verify package release: " + error);
         }
 
-        return APIResponse.created(c, "Package release created successfully", { version, arch });
+        return APIResponse.createdNoData(c, "Package release created successfully");
 
     }
 
-    static async pkgReleaseMiddleware(c: Context, next: () => Promise<void>, releaseID: number) {
+    static async pkgReleaseMiddleware(c: Context, next: () => Promise<void>, versionWithLeiosPatch: string, arch: "amd64" | "arm64") {
         // @ts-ignore
         const packageData = c.get("package") as DB.Models.Package;
         
         const releaseData = DB.instance().select().from(DB.Schema.packageReleases).where(and(
-            eq(DB.Schema.packageReleases.id, releaseID),
-            eq(DB.Schema.packageReleases.package_id, packageData.id)
+            eq(DB.Schema.packageReleases.package_id, packageData.id),
+            eq(DB.Schema.packageReleases.versionWithLeiosPatch, versionWithLeiosPatch),
+            eq(DB.Schema.packageReleases.architecture, arch),
         )).get();
 
         // @ts-ignore
@@ -135,7 +135,7 @@ export class PkgReleasesService {
         await DB.instance().delete(DB.Schema.packageReleases).where(
             eq(DB.Schema.packageReleases.id, releaseData.id)
         );
-        await AptlyAPI.Packages.deleteAllInAllRepos(packageData.name, releaseData.version, releaseData.leios_patch || undefined, releaseData.architecture);
+        await AptlyAPI.Packages.deleteAllInAllRepos(packageData.name, releaseData.versionWithLeiosPatch, releaseData.architecture);
         
         return APIResponse.successNoData(c, "Package release deleted successfully");
     }
