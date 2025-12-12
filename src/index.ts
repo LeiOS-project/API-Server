@@ -29,14 +29,6 @@ export class Main {
         // start task scheduler
         await TaskScheduler.processQueue();
 
-        await LiveRepoUtils.uploadAdditionalFilesIfNeeded({
-            endpoint: config.LRA_S3_ENDPOINT,
-            region: config.LRA_S3_REGION,
-            bucket: config.LRA_S3_BUCKET,
-            accessKeyId: config.LRA_S3_ACCESS_KEY_ID,
-            secretAccessKey: config.LRA_S3_SECRET_ACCESS_KEY
-        }, config.LRA_PUBLIC_KEY_PATH ?? "./config/keys/public-key.gpg");
-
         await AptlyAPIServer.init({
             aptlyRoot: config.LRA_APTLY_ROOT ?? "./data/aptly",
             aptlyPort: parseInt(config.LRA_APTLY_PORT ?? "12150"),
@@ -53,6 +45,14 @@ export class Main {
                 privateKeyPath: config.LRA_PRIVATE_KEY_PATH ?? "./config/keys/private-key.gpg",
             }
         });
+
+        await LiveRepoUtils.uploadAdditionalFilesIfNeeded({
+            endpoint: config.LRA_S3_ENDPOINT,
+            region: config.LRA_S3_REGION,
+            bucket: config.LRA_S3_BUCKET,
+            accessKeyId: config.LRA_S3_ACCESS_KEY_ID,
+            secretAccessKey: config.LRA_S3_SECRET_ACCESS_KEY
+        }, config.LRA_PUBLIC_KEY_PATH ?? "./config/keys/public-key.gpg");
 
         await API.init([config.LRA_HUB_URL || "https://hub.leios.dev"]);
 
