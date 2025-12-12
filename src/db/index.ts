@@ -5,6 +5,7 @@ import { DrizzleDB } from './utils';
 import { Logger } from '../utils/logger';
 import {  } from 'drizzle-kit';
 import { eq } from 'drizzle-orm';
+import { ConfigHandler } from '../utils/config';
 
 export class DB {
 
@@ -42,14 +43,16 @@ export class DB {
             expires_at: Date.now() + 7 * 24 * 60 * 60 * 1000 // 7 Days
         });
 
-        Bun.write(`${configBaseDir}/initial_admin_password_reset_token.txt`, `https://{DASHBOARD_URL}/auth/reset-password?token=${passwordResetToken}`, {
+        const DASHBOARD_URL = ConfigHandler.getConfig()?.LRA_HUB_URL || "https://{DASHBOARD_URL}";
+
+        Bun.write(`${configBaseDir}/initial_admin_password_reset_token.txt`, `${DASHBOARD_URL}/auth/reset-password?token=${passwordResetToken}`, {
             mode: 0o600,
             createPath: true
         });
 
         Logger.info(
             `Initial admin user created with username: ${username}.\n` +
-            `You can set the password under https://{DASHBOARD_URL}/auth/reset-password?token=${passwordResetToken}\n` +
+            `You can set the password under ${DASHBOARD_URL}/auth/reset-password?token=${passwordResetToken}\n` +
             `The url is also safed at ${configBaseDir}/initial_admin_password_reset_token.txt\n`
         );
     }
