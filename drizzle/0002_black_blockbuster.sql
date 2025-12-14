@@ -1,0 +1,1 @@
+ALTER TABLE `scheduled_tasks` ADD `tag` text DEFAULT 'none' NOT NULL;

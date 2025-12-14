@@ -15,6 +15,20 @@
       "when": 1765557167861,
       "tag": "0001_shocking_carlie_cooper",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1765726373749,
+      "tag": "0002_black_blockbuster",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1765726384017,
+      "tag": "0003_marvelous_gideon",
+      "breakpoints": true
     }
   ]
 }
