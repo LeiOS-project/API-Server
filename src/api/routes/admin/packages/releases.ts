@@ -25,7 +25,7 @@ router.get('/',
     }
 );
 
-router.post('/:versionWithLeiosPatch/:arch',
+router.post('/:versionWithLeiosPatch',
 
     APIRouteSpec.authenticated({
         summary: "Create a new package release",
@@ -34,41 +34,34 @@ router.post('/:versionWithLeiosPatch/:arch',
 
         responses: APIResponseSpec.describeWithWrongInputs(
             APIResponseSpec.createdNoData("Package release created successfully"),
-            APIResponseSpec.conflict("Conflict: Package release with this version already exists")
+            APIResponseSpec.conflict("Package release with this version already exists")
         )
     }),
-
-    zValidator("form", z.object({
-        file: z.file()
-    })),
 
     zValidator("param", PackageReleaseModel.Param),
 
     async (c) => {
-        const { file } = c.req.valid("form");
+        const { versionWithLeiosPatch } = c.req.valid("param");
 
-        const { versionWithLeiosPatch, arch } = c.req.valid("param");
-
-        return await PkgReleasesService.createRelease(c, file, versionWithLeiosPatch, arch, false);
+        return await PkgReleasesService.createRelease(c, versionWithLeiosPatch);
     }
-);
+)
 
 
-
-router.use('/:versionWithLeiosPatch/:arch/*',
+router.use('/:versionWithLeiosPatch/*',
 
     zValidator("param", PackageReleaseModel.Param),
 
     async (c, next) => {
         // @ts-ignore
-        const { versionWithLeiosPatch, arch } = c.req.valid("param") as { versionWithLeiosPatch: string, arch: "amd64" | "arm64" };
+        const { versionWithLeiosPatch } = c.req.valid("param") as { versionWithLeiosPatch: string};
 
-        return await PkgReleasesService.pkgReleaseMiddleware(c, next, versionWithLeiosPatch, arch);
+        return await PkgReleasesService.pkgReleaseMiddleware(c, next, versionWithLeiosPatch);
     }
 );
 
 
-router.get('/:versionWithLeiosPatch/:arch',
+router.get('/:versionWithLeiosPatch',
 
     APIRouteSpec.authenticated({
         summary: "Get package release details",
@@ -76,7 +69,7 @@ router.get('/:versionWithLeiosPatch/:arch',
         tags: [DOCS_TAGS.ADMIN_API.PACKAGES_RELEASES],
 
         responses: APIResponseSpec.describeBasic(
-            APIResponseSpec.success("Package release retrieved successfully", PackageReleaseModel.GetReleaseByVersionAndArch.Response),
+            APIResponseSpec.success("Package release retrieved successfully", PackageReleaseModel.GetReleaseByVersion.Response),
             APIResponseSpec.notFound("Package release with specified version not found")
         )
     }),
@@ -86,7 +79,34 @@ router.get('/:versionWithLeiosPatch/:arch',
     }
 );
 
-router.delete('/:versionWithLeiosPatch/:arch',
+router.post('/:versionWithLeiosPatch/:arch',
+
+    APIRouteSpec.authenticated({
+        summary: "Upload package release file for architecture",
+        description: "Upload a release file for the specified package and architecture.",
+        tags: [DOCS_TAGS.ADMIN_API.PACKAGES_RELEASES],
+
+        responses: APIResponseSpec.describeWithWrongInputs(
+            APIResponseSpec.createdNoData("Package release file uploaded successfully"),
+            APIResponseSpec.conflict("Package release already contains a release for this architecture"),
+            APIResponseSpec.serverError("Failed to upload and verify package release asset")
+        )
+    }),
+
+    zValidator("form", PackageReleaseModel.UploadReleaseAssetForArch.FileInput),
+
+    zValidator("param", PackageReleaseModel.ParamWithArch),
+
+    async (c) => {
+        const { file } = c.req.valid("form");
+
+        const { arch } = c.req.valid("param");
+
+        return await PkgReleasesService.uploadReleaseAssetAfterMiddleware(c, file, arch, true);
+    }
+);
+
+router.delete('/:versionWithLeiosPatch',
 
     APIRouteSpec.authenticated({
         summary: "Delete a package release",
