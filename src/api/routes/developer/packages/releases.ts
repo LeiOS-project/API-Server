@@ -25,6 +25,60 @@ router.get('/',
     }
 );
 
+router.post('/:versionWithLeiosPatch',
+
+    APIRouteSpec.authenticated({
+        summary: "Create a new package release",
+        description: "Create a new release for the specified package.",
+        tags: [DOCS_TAGS.DEV_API.PACKAGES_RELEASES],
+
+        responses: APIResponseSpec.describeWithWrongInputs(
+            APIResponseSpec.createdNoData("Package release created successfully"),
+            APIResponseSpec.conflict("Conflict: Package release with this version already exists")
+        )
+    }),
+
+    zValidator("param", PackageReleaseModel.Param),
+
+    async (c) => {
+        const { versionWithLeiosPatch } = c.req.valid("param");
+
+        return await PkgReleasesService.createRelease(c, file, versionWithLeiosPatch, false);
+    }
+)
+
+
+router.use('/:versionWithLeiosPatch/*',
+
+    zValidator("param", PackageReleaseModel.Param),
+
+    async (c, next) => {
+        // @ts-ignore
+        const { versionWithLeiosPatch } = c.req.valid("param") as { versionWithLeiosPatch: string};
+
+        return await PkgReleasesService.pkgReleaseMiddleware(c, next, versionWithLeiosPatch, arch);
+    }
+);
+
+
+router.get('/:versionWithLeiosPatch',
+
+    APIRouteSpec.authenticated({
+        summary: "Get package release details",
+        description: "Retrieve details of a specific package release.",
+        tags: [DOCS_TAGS.DEV_API.PACKAGES_RELEASES],
+
+        responses: APIResponseSpec.describeBasic(
+            APIResponseSpec.success("Package release retrieved successfully", PackageReleaseModel.GetReleaseByVersionAndArch.Response),
+            APIResponseSpec.notFound("Package release with specified version not found")
+        )
+    }),
+
+    async (c) => {
+        return await PkgReleasesService.getPkgReleaseAfterMiddleware(c);
+    }
+);
+
 router.post('/:versionWithLeiosPatch/:arch',
 
     APIRouteSpec.authenticated({
@@ -42,47 +96,14 @@ router.post('/:versionWithLeiosPatch/:arch',
         file: z.file()
     })),
 
-    zValidator("param", PackageReleaseModel.Param),
+    zValidator("param", PackageReleaseModel.ParamWithArch),
 
     async (c) => {
         const { file } = c.req.valid("form");
 
-        const { versionWithLeiosPatch, arch } = c.req.valid("param");
+        const { arch } = c.req.valid("param");
 
-        return await PkgReleasesService.createRelease(c, file, versionWithLeiosPatch, arch, false);
-    }
-);
-
-
-
-router.use('/:versionWithLeiosPatch/:arch/*',
-
-    zValidator("param", PackageReleaseModel.Param),
-
-    async (c, next) => {
-        // @ts-ignore
-        const { versionWithLeiosPatch, arch } = c.req.valid("param") as { versionWithLeiosPatch: string, arch: "amd64" | "arm64" };
-
-        return await PkgReleasesService.pkgReleaseMiddleware(c, next, versionWithLeiosPatch, arch);
-    }
-);
-
-
-router.get('/:versionWithLeiosPatch/:arch',
-
-    APIRouteSpec.authenticated({
-        summary: "Get package release details",
-        description: "Retrieve details of a specific package release.",
-        tags: [DOCS_TAGS.DEV_API.PACKAGES_RELEASES],
-
-        responses: APIResponseSpec.describeBasic(
-            APIResponseSpec.success("Package release retrieved successfully", PackageReleaseModel.GetReleaseByVersionAndArch.Response),
-            APIResponseSpec.notFound("Package release with specified version not found")
-        )
-    }),
-
-    async (c) => {
-        return await PkgReleasesService.getPkgReleaseAfterMiddleware(c);
+        return await PkgReleasesService.uploadReleaseAssetAfterMiddleware(c, file, arch, false);
     }
 );
 

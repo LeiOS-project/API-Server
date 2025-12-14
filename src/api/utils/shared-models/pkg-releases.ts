@@ -10,7 +10,11 @@ export namespace PackageReleaseModel {
     export const versionWithLeiosPatchRegex = /^(?:[0-9][0-9A-Za-z.+~\-]*leios\d+(?:\.\d+){0,2}|(?!.*leios)[0-9][0-9A-Za-z.+~\-]*)$/;
 
     export const Param = z.object({
-        versionWithLeiosPatch: z.string().regex(versionWithLeiosPatchRegex),
+        versionWithLeiosPatch: z.string().regex(versionWithLeiosPatchRegex)
+    });
+
+    export const ParamWithArch = z.object({
+        // versionWithLeiosPatch: z.string().regex(versionWithLeiosPatchRegex),
         arch: z.enum(["amd64", "arm64"])
     });
 

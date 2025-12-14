@@ -82,7 +82,8 @@ export const packageReleases = sqliteTable('package_releases', {
     id: int().primaryKey({ autoIncrement: true }),
     package_id: int().notNull().references(() => packages.id),
     versionWithLeiosPatch: text().notNull(),
-    architecture: text({ enum: ['amd64', 'arm64'] }).notNull(),
+    // architecture: text({ enum: ['amd64', 'arm64'] }).notNull(),
+    architecture: text({ mode: "json" }).$type<("amd64" | "arm64")[]>().default(sql`'[]'`).notNull(),
 });
 
 /**
