@@ -50,6 +50,15 @@ export class RuntimeMetadata {
         }
     }
 
+    static async removeOSReleasePendingPackageIfExists(packageReleaseId: number) {
+        const pendingPackages = await this.getOSReleasePendingPackages();
+        const index = pendingPackages.indexOf(packageReleaseId);
+        if (index !== -1) {
+            pendingPackages.splice(index, 1);
+            await this.setMetadata("os-release-pending-packages", pendingPackages);
+        }
+    }
+
     static async clearOSReleasePendingPackages() {
         await this.setMetadata("os-release-pending-packages", []);
     }

@@ -7,6 +7,7 @@ import { AuthHandler } from "../authHandler";
 import { AptlyAPI } from "../../../aptly/api";
 import { AptlyUtils } from "../../../aptly/utils";
 import { TaskScheduler } from "../../../tasks";
+import { RuntimeMetadata } from "../metadata";
 
 export class PkgReleasesService {
 
@@ -159,6 +160,8 @@ export class PkgReleasesService {
 
         // @ts-ignore
         const packageData = c.get("package") as DB.Models.Package;
+
+        await RuntimeMetadata.removeOSReleasePendingPackageIfExists(releaseData.id);
 
         await DB.instance().delete(DB.Schema.packageReleases).where(
             eq(DB.Schema.packageReleases.id, releaseData.id)

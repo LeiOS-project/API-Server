@@ -6,6 +6,7 @@ import { eq, and, or } from "drizzle-orm";
 import { AuthHandler } from "../authHandler";
 import { AptlyAPI } from "../../../aptly/api";
 import { TaskScheduler } from "../../../tasks";
+import { RuntimeMetadata } from "../metadata";
 
 export class PackagesService {
 
@@ -118,12 +119,22 @@ export class PackagesService {
         // @ts-ignore
         const packageData = c.get("package") as DB.Models.Package;
 
-        await DB.instance().delete(DB.Schema.packages).where(
-            eq(DB.Schema.packages.id, packageData.id)
+        const packageReleaseIDs = await DB.instance().select({
+            id: DB.Schema.packageReleases.id
+        }).from(DB.Schema.packageReleases).where(
+            eq(DB.Schema.packageReleases.package_id, packageData.id)
         );
+
+        for (const pkgRelease of packageReleaseIDs) {
+            await RuntimeMetadata.removeOSReleasePendingPackageIfExists(pkgRelease.id);
+        }
 
         await DB.instance().delete(DB.Schema.packageReleases).where(
             eq(DB.Schema.packageReleases.package_id, packageData.id)
+        );
+
+        await DB.instance().delete(DB.Schema.packages).where(
+            eq(DB.Schema.packages.id, packageData.id)
         );
 
         await AptlyAPI.Packages.deleteAllInAllRepos(packageData.name);
