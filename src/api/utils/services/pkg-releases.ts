@@ -166,6 +166,11 @@ export class PkgReleasesService {
         await DB.instance().delete(DB.Schema.packageReleases).where(
             eq(DB.Schema.packageReleases.id, releaseData.id)
         );
+
+        await DB.instance().delete(DB.Schema.stablePromotionRequests).where(
+            eq(DB.Schema.stablePromotionRequests.package_release_id, releaseData.id)
+        );
+
         await AptlyAPI.Packages.deleteAllInAllRepos(packageData.name, releaseData.versionWithLeiosPatch, undefined);
 
         await TaskScheduler.enqueueTask("testing-repo:update", {}, { created_by_user_id: null, tag: "update-testing-repo-after-package-release-deletion" });
