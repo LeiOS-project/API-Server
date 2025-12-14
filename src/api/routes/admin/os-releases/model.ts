@@ -31,6 +31,7 @@ export namespace OSReleasesModel.CreateRelease {
     export const Response = z.object({
         version: z.string(),
         taskID: z.number(),
+        taskTag: z.string()
     });
 
     export type Response = z.infer<typeof Response>;

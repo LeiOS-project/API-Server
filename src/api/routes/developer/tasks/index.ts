@@ -25,21 +25,19 @@ router.get('/',
     }
 );
 
-router.use('/:taskID/*',
+router.use('/:taskIDorTag/*',
 
-    zValidator("param", z.object({
-        taskID: z.coerce.number()
-    })),
+    zValidator("param", TaskStatusModel.Param),
 
     async (c, next) => {
         // @ts-ignore
-        const { taskID } = c.req.valid("param") as { taskID: number };
+        const { taskIDorTag } = c.req.valid("param") as { taskIDorTag: number | string };
 
-        TaskInfoService.taskMiddleware(c, next, taskID, false);
+        TaskInfoService.taskMiddleware(c, next, taskIDorTag, false);
     }
 );
 
-router.get('/:taskID',
+router.get('/:taskIDorTag',
 
     APIRouteSpec.authenticated({
         summary: "Get scheduled task",
@@ -47,7 +45,8 @@ router.get('/:taskID',
         tags: [DOCS_TAGS.DEV_API.TASKS],
 
         responses: APIResponseSpec.describeBasic(
-            APIResponseSpec.success("Task retrieved successfully", TaskStatusModel.GetByID.Response)
+            APIResponseSpec.success("Task retrieved successfully", TaskStatusModel.GetByIDorTag.Response),
+            APIResponseSpec.notFound("Task with specified ID or Tag not found")
         )
     }),
 
@@ -56,7 +55,7 @@ router.get('/:taskID',
     }
 );
 
-router.get('/:taskID/logs',
+router.get('/:taskIDorTag/logs',
 
     APIRouteSpec.authenticated({
         summary: "Get scheduled task logs",
@@ -64,9 +63,9 @@ router.get('/:taskID/logs',
         tags: [DOCS_TAGS.DEV_API.TASKS],
 
         responses: APIResponseSpec.describeBasic(
-            APIResponseSpec.success("Task logs retrieved successfully", TaskStatusModel.GetLogsByID.Response),
+            APIResponseSpec.success("Task logs retrieved successfully", TaskStatusModel.GetLogsByIDorTag.Response),
             APIResponseSpec.badRequest("Logs are not stored for this task"),
-            APIResponseSpec.notFound("Log file not found for this task")
+            APIResponseSpec.notFound("Task with specified ID or Tag not found / Log file not found for this task")
         )
     }),
 

@@ -54,16 +54,19 @@ router.post('/',
 
 		const version = OSReleaseUtils.getVersionString(now, lastRelease.version);
 
+		const taskTag = `create-os-release:${version}`;
+
 		const taskID = await TaskScheduler.enqueueTask("os-release:create", {
 			pkgReleasesToIncludeByID: await RuntimeMetadata.getOSReleasePendingPackages(),
 			version,
 			timestamp: now.getTime()
-		}, { created_by_user_id: null, tag: `create-os-release:${version}` });
+		}, { created_by_user_id: null, tag: taskTag });
 
 		return APIResponse.accepted(c, "OS release creation task enqueued", {
 			taskID,
-			version
-		});
+			version,
+			taskTag
+		} satisfies OSReleasesModel.CreateRelease.Response);
 	}
 );
 

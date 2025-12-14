@@ -26,7 +26,7 @@ export class TaskInfoService {
         }
     }
 
-    static async taskMiddleware(c: Context, next: () => Promise<void>, taskID: number, asAdmin = false) {
+    static async taskMiddleware(c: Context, next: () => Promise<void>, taskIDorTag: number | string, asAdmin = false) {
 
         let taskData: DB.Models.ScheduledTask | undefined;
 
@@ -34,18 +34,32 @@ export class TaskInfoService {
             // @ts-ignore
             const authContext = c.get("authContext") as AuthHandler.AuthContext;
 
-            taskData = DB.instance().select().from(DB.Schema.scheduled_tasks).where(and(
-                eq(DB.Schema.scheduled_tasks.id, taskID),
-                eq(DB.Schema.scheduled_tasks.created_by_user_id, authContext.user_id)
-            )).get();
+            if (typeof taskIDorTag === "number") {
+                taskData = DB.instance().select().from(DB.Schema.scheduled_tasks).where(and(
+                    eq(DB.Schema.scheduled_tasks.id, taskIDorTag),
+                    eq(DB.Schema.scheduled_tasks.created_by_user_id, authContext.user_id)
+                )).get();
+            } else {
+                taskData = DB.instance().select().from(DB.Schema.scheduled_tasks).where(and(
+                    eq(DB.Schema.scheduled_tasks.tag, taskIDorTag),
+                    eq(DB.Schema.scheduled_tasks.created_by_user_id, authContext.user_id)
+                )).get();
+            }
         } else {
-            taskData = DB.instance().select().from(DB.Schema.scheduled_tasks).where(
-                eq(DB.Schema.scheduled_tasks.id, taskID)
-            ).get();
+            
+            if (typeof taskIDorTag === "number") {
+                taskData = DB.instance().select().from(DB.Schema.scheduled_tasks).where(
+                    eq(DB.Schema.scheduled_tasks.id, taskIDorTag)
+                ).get();
+            } else {
+                taskData = DB.instance().select().from(DB.Schema.scheduled_tasks).where(
+                    eq(DB.Schema.scheduled_tasks.tag, taskIDorTag)
+                ).get();
+            }
         }
 
         if (!taskData) {
-            return APIResponse.notFound(c, "Task with specified ID not found");
+            return APIResponse.notFound(c, "Task with specified ID or Tag not found");
         }
         // @ts-ignore
         c.set("task", taskData);
