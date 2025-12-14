@@ -4,7 +4,10 @@ import z from "zod";
 
 export namespace AdminStablePromotionRequestModel.GetById {
 
-    export const Response = createSelectSchema(DB.Schema.stablePromotionRequests)
+    export const Response = createSelectSchema(DB.Schema.stablePromotionRequests).extend({
+        package_name: z.string(),
+        package_release_version: z.string()
+    });
 
     export type Response = z.infer<typeof Response>;
 

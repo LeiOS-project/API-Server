@@ -17,18 +17,46 @@ router.get('/',
         summary: "List stable promotion requests",
         description: "Retrieve a list of all stable promotion requests for packages.",
         tags: [DOCS_TAGS.ADMIN_API.STABLE_PROMOTION_REQUESTS],
-        
+
         responses: APIResponseSpec.describeBasic(
             APIResponseSpec.success("Stable promotion requests retrieved successfully", AdminStablePromotionRequestModel.GetAll.Response)
         )
     }),
 
     async (c) => {
-        
-        const result = await DB.instance().select().from(DB.Schema.stablePromotionRequests);
 
-        return APIResponse.success(c, "Stable promotion requests retrieved successfully", result);
+        const stablePromotionRequests = await DB.instance().select().from(DB.Schema.stablePromotionRequests);
 
+        const results: AdminStablePromotionRequestModel.GetAll.Response = [];
+
+        stablePromotionRequests.forEach(r => {
+            const pkg = DB.instance().select({
+                name: DB.Schema.packages.name
+            }).from(DB.Schema.packages).where(
+                eq(DB.Schema.packages.id, r.package_id)
+            ).get();
+
+            if (!pkg) {
+                throw new Error(`Package with ID ${r.package_id} not found for stable promotion request ID ${r.id}`);
+            }
+            const pkgRelease = DB.instance().select({
+                versionWithLeiosPatch: DB.Schema.packageReleases.versionWithLeiosPatch
+            }).from(DB.Schema.packageReleases).where(
+                eq(DB.Schema.packageReleases.id, r.package_release_id)
+            ).get();
+
+            if (!pkgRelease) {
+                throw new Error(`Package release with ID ${r.package_release_id} not found for stable promotion request ID ${r.id}`);
+            }
+
+            results.push({
+                ...r,
+                package_name: pkg.name,
+                package_release_version: pkgRelease.versionWithLeiosPatch
+            });
+        });
+
+        return APIResponse.success(c, "Stable promotion requests retrieved successfully", results satisfies AdminStablePromotionRequestModel.GetAll.Response);
     }
 );
 
@@ -74,7 +102,32 @@ router.get('/:requestID',
         // @ts-ignore
         const request = c.get("stablePromotionRequest") as DB.Models.StablePromotionRequest;
 
-        return APIResponse.success(c, "Stable promotion request retrieved successfully", request);
+        const pkg = DB.instance().select({
+            name: DB.Schema.packages.name
+        }).from(DB.Schema.packages).where(
+            eq(DB.Schema.packages.id, request.package_id)
+        ).get();
+
+        if (!pkg) {
+            throw new Error(`Package with ID ${request.package_id} not found for stable promotion request ID ${request.id}`);
+        }
+        const pkgRelease = DB.instance().select({
+            versionWithLeiosPatch: DB.Schema.packageReleases.versionWithLeiosPatch
+        }).from(DB.Schema.packageReleases).where(
+            eq(DB.Schema.packageReleases.id, request.package_release_id)
+        ).get();
+
+        if (!pkgRelease) {
+            throw new Error(`Package release with ID ${request.package_release_id} not found for stable promotion request ID ${request.id}`);
+        }
+
+        const result = {
+            ...request,
+            package_name: pkg.name,
+            package_release_version: pkgRelease.versionWithLeiosPatch
+        };
+
+        return APIResponse.success(c, "Stable promotion request retrieved successfully", result satisfies AdminStablePromotionRequestModel.GetById.Response);
     }
 );
 
