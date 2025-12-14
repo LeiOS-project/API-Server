@@ -122,6 +122,10 @@ export class PackagesService {
             eq(DB.Schema.packages.id, packageData.id)
         );
 
+        await DB.instance().delete(DB.Schema.packageReleases).where(
+            eq(DB.Schema.packageReleases.package_id, packageData.id)
+        );
+
         await AptlyAPI.Packages.deleteAllInAllRepos(packageData.name);
 
         await TaskScheduler.enqueueTask("testing-repo:update", {}, { created_by_user_id: null });
