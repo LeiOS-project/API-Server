@@ -8,6 +8,7 @@ import { DB } from "../../../../db";
 import { APIResponse } from "../../../utils/api-res";
 import { asc, desc, eq } from "drizzle-orm";
 import { RuntimeMetadata } from "../../../utils/metadata";
+import { ApiHelperModels } from "../../../utils/shared-models/api-helper-models";
 
 export const router = new Hono().basePath('/stable-promotion-requests');
 
@@ -23,11 +24,7 @@ router.get('/',
         )
     }),
 
-    zValidator("query", z.object({
-        limit: z.coerce.number().int().positive().min(1).max(100).default(10),
-        offset: z.coerce.number().int().min(0).default(0),
-        order: z.enum(["newest", "oldest"]).default("newest")
-    })),
+    zValidator("query", ApiHelperModels.ListAll.Query),
 
     async (c) => {
 
