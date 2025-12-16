@@ -6,13 +6,14 @@ import {
     text,
     
 } from 'drizzle-orm/sqlite-core';
+import { SQLUtils } from './utils';
 
 /**
  * @deprecated Use DB.Schema.users instead
  */
 export const users = sqliteTable('users', {
     id: int().primaryKey({ autoIncrement: true }),
-    created_at: int().notNull(),
+    created_at: SQLUtils.getCreatedAtColumn(),
     username: text().notNull().unique(),
     display_name: text().notNull(),
     email: text().notNull().unique(),
@@ -28,7 +29,7 @@ export const users = sqliteTable('users', {
 export const passwordResets = sqliteTable('password_resets', {
     token: text().primaryKey(),
     user_id: int().notNull().references(() => users.id),
-    created_at: int().notNull(),
+    created_at: SQLUtils.getCreatedAtColumn(),
     expires_at: int().notNull()
 });
 
@@ -42,7 +43,7 @@ export const sessions = sqliteTable('sessions', {
     user_role: text({
         enum: ['admin', 'developer', 'user']
     }).notNull().references(() => users.role),
-    created_at: int().notNull(),
+    created_at: SQLUtils.getCreatedAtColumn(),
     expires_at: int().notNull()
 });
 
@@ -57,7 +58,7 @@ export const apiKeys = sqliteTable('api_keys', {
         enum: ['admin', 'developer', 'user']
     }).notNull().references(() => users.role),
     description: text().notNull(),
-    created_at: int().notNull(),
+    created_at: SQLUtils.getCreatedAtColumn(),
     expires_at: int(),
 });
 
@@ -72,7 +73,7 @@ export const packages = sqliteTable('packages', {
     description: text().notNull(),
     homepage_url: text().notNull(),
     requires_patching: int({ mode: 'boolean' }).notNull().default(sql`0`),
-    created_at: int().notNull(),
+    created_at: SQLUtils.getCreatedAtColumn(),
     // version strings of version + leios patch if exists
     latest_stable_release_amd64: text(),
     latest_stable_release_arm64: text(),
@@ -89,7 +90,7 @@ export const packageReleases = sqliteTable('package_releases', {
     versionWithLeiosPatch: text().notNull(),
     // architecture: text({ enum: ['amd64', 'arm64'] }).notNull(),
     architecture: text({ mode: "json" }).$type<("amd64" | "arm64")[]>().notNull(),
-    created_at: int().notNull(),
+    created_at: SQLUtils.getCreatedAtColumn(),
 });
 
 /**
@@ -100,7 +101,7 @@ export const stablePromotionRequests = sqliteTable('stable_promotion_requests', 
     package_id: int().notNull().references(() => packages.id),
     package_release_id: int().unique().notNull().references(() => packageReleases.id),
     status: text({ enum: ['pending', 'approved', 'denied'] }).default('pending').notNull(),
-    created_at: int().notNull(),
+    created_at: SQLUtils.getCreatedAtColumn(),
     admin_note: text(),
 });
 
@@ -116,7 +117,7 @@ export const scheduled_tasks = sqliteTable('scheduled_tasks', {
     autoDelete: int({ mode: 'boolean' }).notNull().default(sql`0`),
     storeLogs: int({ mode: 'boolean' }).notNull().default(sql`0`),
     status: text({ enum: ["pending", "running", "paused", "failed", "completed"] }).notNull().default('pending'),
-    created_at: int().notNull(),
+    created_at: SQLUtils.getCreatedAtColumn(),
     finished_at: int(),
     result: text({ mode: 'json' }).$type<Record<string, any>>(),
     message: text(),
@@ -147,6 +148,6 @@ export const os_releases = sqliteTable('os_releases', {
     id: int().primaryKey({ autoIncrement: true }),
     // YYYY.MM.(release_this_month) format
     version: text().notNull().unique(),
-    created_at: int().notNull(),
+    created_at: SQLUtils.getCreatedAtColumn(),
     published_at: int().notNull(),
 });
