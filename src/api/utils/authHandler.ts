@@ -83,6 +83,7 @@ export class SessionHandler {
             token: fullToken,
             user_id: result.user_id,
             user_role: result.user_role,
+            created_at: result.created_at,
             expires_at: result.expires_at
         } satisfies Omit<DB.Models.Session, 'id' | 'hashed_token'> & { token: string; };
     }
@@ -169,6 +170,7 @@ export class APIKeyHandler {
             token: fullToken,
             user_id: result.user_id,
             user_role: result.user_role,
+            created_at: result.created_at,
             expires_at: result.expires_at,
             description: result.description,
         } satisfies Omit<DB.Models.ApiKey, 'id' | 'hashed_token'> & { token: string; };
