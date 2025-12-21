@@ -17,12 +17,7 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
                     scheme: "bearer",
                     bearerFormat: "JWT",
                     description: "Enter your bearer token in the format **Bearer &lt;token&gt;**",
-                },
-                ddnsv2BasicAuth: {
-                    type: "http",
-                    scheme: "basic",
-                    description: "Enter your DDNSv2 Basic Auth credentials",
-                },
+                }
             },
             responses: {
                 undefined: {
