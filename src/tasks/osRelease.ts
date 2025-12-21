@@ -94,7 +94,7 @@ OsReleaseTask.addStep("Record OS release data to database", async (payload, logg
 
         await DB.instance().insert(DB.Schema.os_releases).values({
             version: payload.version,
-            published_at: payload.timestamp,
+            // @TODO: link task ID properly
         });
 
         logger.info("OS release data recorded in database:", payload.version);

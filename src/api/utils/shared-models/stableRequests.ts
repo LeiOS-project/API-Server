@@ -46,6 +46,7 @@ export namespace StablePromotionRequestsModel.GetAll {
 export namespace StablePromotionRequestsModel.Create {
     export const Body = createInsertSchema(DB.Schema.stablePromotionRequests).omit({
         id: true,
+        created_at: true,
         package_id: true,
         // package_release_id: true,
         status: true,

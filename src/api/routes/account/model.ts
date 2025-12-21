@@ -16,11 +16,12 @@ export namespace AccountModel.UpdateInfo {
 
     export const Body = createUpdateSchema(DB.Schema.users, {
         username: UserDataPolicys.Username,
-        email: z.email('Invalid email'),
+        email: z.email('Invalid email')
     }).omit({
         id: true,
         password_hash: true,
-        role: true
+        role: true,
+        created_at: true
     }).partial().refine(
         (data) => Object.values(data).some((value) => value !== undefined),
         { message: "At least one field must be provided" }

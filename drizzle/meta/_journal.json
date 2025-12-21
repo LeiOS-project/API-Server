@@ -29,6 +29,27 @@
       "when": 1765726384017,
       "tag": "0003_marvelous_gideon",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1765904964633,
+      "tag": "0004_massive_shadow_king",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1765905021373,
+      "tag": "0005_tough_deathstrike",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1765913713404,
+      "tag": "0006_far_mac_gargan",
+      "breakpoints": true
     }
   ]
 }

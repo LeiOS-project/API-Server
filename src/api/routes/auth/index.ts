@@ -110,6 +110,7 @@ router.get('/session',
         return APIResponse.success(c, "Session info retrieved successfully", {
             user_id: authContext.user_id,
             user_role: authContext.user_role,
+            created_at: authContext.created_at,
             expires_at: authContext.expires_at
         } satisfies AuthModel.Session.Response);
     }

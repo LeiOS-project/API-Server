@@ -73,7 +73,7 @@ router.get('/:packageName',
 
         responses: APIResponseSpec.describeBasic(
             APIResponseSpec.success("Package retrieved successfully", PackageModel.GetPackageByName.Response),
-            APIResponseSpec.notFound("Package with specified ID not found")
+            APIResponseSpec.notFound("Package with specified Name not found")
         )
     }),
 
@@ -91,7 +91,7 @@ router.put('/:packageName',
 
         responses: APIResponseSpec.describeWithWrongInputs(
             APIResponseSpec.successNoData("Package updated successfully"),
-            APIResponseSpec.notFound("Package with specified ID not found")
+            APIResponseSpec.notFound("Package with specified Name not found")
         )
     }),
 
@@ -113,7 +113,7 @@ router.delete('/:packageName',
 
         responses: APIResponseSpec.describeBasic(
             APIResponseSpec.successNoData("Package deleted successfully"),
-            APIResponseSpec.notFound("Package with specified ID not found")
+            APIResponseSpec.notFound("Package with specified Name not found")
         )
     }),
 

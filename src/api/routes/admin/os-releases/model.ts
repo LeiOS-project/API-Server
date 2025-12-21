@@ -1,6 +1,7 @@
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "drizzle-zod";
 import { DB } from "../../../../db";
 import { z } from "zod";
+import { TuplifyUnion, TaskHandler } from "@cleverjs/utils";
 
 export namespace OSReleasesModel {
 
@@ -12,7 +13,12 @@ export namespace OSReleasesModel {
 
 export namespace OSReleasesModel.GetByVersion {
 
-    export const Response = createSelectSchema(DB.Schema.os_releases)
+    export const Response = createSelectSchema(DB.Schema.os_releases).extend({
+        published_at: z.number().nullable(),
+        publishing_status: z.enum(["pending", "running", "paused", "failed", "completed"] satisfies TuplifyUnion<TaskHandler.BaseTaskData<{}>["status"]>)
+    }).omit({
+        taskID: true,
+    });
 
     export type Response = z.infer<typeof Response>;
 
@@ -28,11 +34,17 @@ export namespace OSReleasesModel.GetAll {
 
 export namespace OSReleasesModel.CreateRelease {
 
+    export const Response = OSReleasesModel.GetByVersion.Response;
+
+    export type Response = z.infer<typeof Response>;
+}
+
+export namespace OSReleasesModel.GetPublishingLogs {
+
     export const Response = z.object({
-        version: z.string(),
-        taskID: z.number(),
-        taskTag: z.string()
+        logs: z.string()
     });
 
     export type Response = z.infer<typeof Response>;
+
 }

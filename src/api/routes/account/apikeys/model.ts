@@ -36,6 +36,7 @@ export namespace AccountAPIKeysModel.Create {
         user_id: true,
         user_role: true,
         hashed_token: true,
+        created_at: true
     });
     
     export type Body = z.infer<typeof Body>;

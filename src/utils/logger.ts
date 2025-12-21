@@ -25,37 +25,37 @@ export class Logger {
 
     static debug(...args: any[]) {
         if (this.logLevel <= this.logLevelMap.debug) {
-            console.debug("[DEBUG]", ...args);
+            console.debug(`[${new Date(Date.now()).toISOString()}]`, "[DEBUG]", ...args);
         }
     }
 
     static log(...args: any[]) {
         if (this.logLevel <= this.logLevelMap.info) {
-            console.log("[INFO]", ...args);
+            console.log(`[${new Date(Date.now()).toISOString()}]`, "[INFO]", ...args);
         }
     }
 
     static info(...args: any[]) {
         if (this.logLevel <= this.logLevelMap.info) {
-            console.info("[INFO]", ...args);
+            console.info(`[${new Date(Date.now()).toISOString()}]`, "[INFO]", ...args);
         }
     }
 
     static warn(...args: any[]) {
         if (this.logLevel <= this.logLevelMap.warn) {
-            console.warn("[WARN]", ...args);
+            console.warn(`[${new Date(Date.now()).toISOString()}]`, "[WARN]", ...args);
         }
     }
 
     static error(...args: any[]) {
         if (this.logLevel <= this.logLevelMap.error) {
-            console.error("[ERROR]", ...args);
+            console.error(`[${new Date(Date.now()).toISOString()}]`, "[ERROR]", ...args);
         }
     }
 
     static critical(...args: any[]) {
         if (this.logLevel <= this.logLevelMap.critical) {
-            console.error("[CRITICAL]", ...args);
+            console.error(`[${new Date(Date.now()).toISOString()}]`, "[CRITICAL]", ...args);
         }
     }
 

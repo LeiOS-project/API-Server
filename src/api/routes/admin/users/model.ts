@@ -31,6 +31,7 @@ export namespace AdminUsersModel {
         }).omit({
             id: true,
             password_hash: true,
+            created_at: true
         });
 
         export const Body = InsertSchema.extend({
@@ -46,6 +47,7 @@ export namespace AdminUsersModel {
         export const Body = createUpdateSchema(DB.Schema.users).omit({
             id: true,
             password_hash: true,
+            created_at: true
         }).partial().refine(
             (data) => Object.values(data).some((value) => value !== undefined),
             { message: "At least one field must be provided" }

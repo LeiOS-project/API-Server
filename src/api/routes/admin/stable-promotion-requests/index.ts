@@ -6,8 +6,9 @@ import { DOCS_TAGS } from "../../../docs";
 import { AdminStablePromotionRequestModel } from "./model";
 import { DB } from "../../../../db";
 import { APIResponse } from "../../../utils/api-res";
-import { eq } from "drizzle-orm";
+import { asc, desc, eq } from "drizzle-orm";
 import { RuntimeMetadata } from "../../../utils/metadata";
+import { ApiHelperModels } from "../../../utils/shared-models/api-helper-models";
 
 export const router = new Hono().basePath('/stable-promotion-requests');
 
@@ -23,38 +24,39 @@ router.get('/',
         )
     }),
 
+    zValidator("query", ApiHelperModels.ListAll.Query),
+
     async (c) => {
 
-        const stablePromotionRequests = await DB.instance().select().from(DB.Schema.stablePromotionRequests);
+        const { limit, offset, order } = c.req.valid("query");
+        
+        const results = await DB.instance().select({
+            id: DB.Schema.stablePromotionRequests.id,
+            package_id: DB.Schema.stablePromotionRequests.package_id,
+            package_release_id: DB.Schema.stablePromotionRequests.package_release_id,
+            created_at: DB.Schema.stablePromotionRequests.created_at,
+            status: DB.Schema.stablePromotionRequests.status,
+            admin_note: DB.Schema.stablePromotionRequests.admin_note,
 
-        const results: AdminStablePromotionRequestModel.GetAll.Response = [];
-
-        stablePromotionRequests.forEach(r => {
-            const pkg = DB.instance().select({
-                name: DB.Schema.packages.name
-            }).from(DB.Schema.packages).where(
-                eq(DB.Schema.packages.id, r.package_id)
-            ).get();
-
-            if (!pkg) {
-                throw new Error(`Package with ID ${r.package_id} not found for stable promotion request ID ${r.id}`);
-            }
-            const pkgRelease = DB.instance().select({
-                versionWithLeiosPatch: DB.Schema.packageReleases.versionWithLeiosPatch
-            }).from(DB.Schema.packageReleases).where(
-                eq(DB.Schema.packageReleases.id, r.package_release_id)
-            ).get();
-
-            if (!pkgRelease) {
-                throw new Error(`Package release with ID ${r.package_release_id} not found for stable promotion request ID ${r.id}`);
-            }
-
-            results.push({
-                ...r,
-                package_name: pkg.name,
-                package_release_version: pkgRelease.versionWithLeiosPatch
-            });
-        });
+            package_name: DB.Schema.packages.name,
+            package_release_version: DB.Schema.packageReleases.versionWithLeiosPatch,
+        })
+        .from(DB.Schema.stablePromotionRequests)
+        .innerJoin(
+            DB.Schema.packages,
+            eq(DB.Schema.packages.id, DB.Schema.stablePromotionRequests.package_id),
+        )
+        .innerJoin(
+            DB.Schema.packageReleases,
+            eq(DB.Schema.packageReleases.id, DB.Schema.stablePromotionRequests.package_release_id),
+        )
+        .orderBy(
+            order === "newest" ?
+                desc(DB.Schema.stablePromotionRequests.created_at) :
+                asc(DB.Schema.stablePromotionRequests.created_at)
+        )
+        .limit(limit)
+        .offset(offset);
 
         return APIResponse.success(c, "Stable promotion requests retrieved successfully", results satisfies AdminStablePromotionRequestModel.GetAll.Response);
     }

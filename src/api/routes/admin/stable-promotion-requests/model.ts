@@ -29,7 +29,8 @@ export namespace AdminStablePromotionRequestModel.Decide {
     }).omit({
         id: true,
         package_id: true,
-        package_release_id: true
+        package_release_id: true,
+        created_at: true
     });
 
     export type Body = z.infer<typeof Body>;

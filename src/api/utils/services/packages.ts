@@ -89,7 +89,7 @@ export class PackagesService {
         }
 
         if (!packageData) {
-            return APIResponse.notFound(c, "Package with specified ID not found");
+            return APIResponse.notFound(c, "Package with specified Name not found");
         }
         // @ts-ignore
         c.set("package", packageData);
@@ -143,7 +143,7 @@ export class PackagesService {
 
         await AptlyAPI.Packages.deleteAllInAllRepos(packageData.name);
 
-        await TaskScheduler.enqueueTask("testing-repo:update", {}, { created_by_user_id: null, tag: "update-testing-repo-after-package-deletion" });
+        await TaskScheduler.enqueueTask("testing-repo:update", {}, { created_by_user_id: null });
         // @TODO: Enqueue a task to update the stable reo as well
 
         return APIResponse.successNoData(c, "Package deleted successfully");

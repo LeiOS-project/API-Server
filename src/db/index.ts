@@ -75,9 +75,17 @@ export class DB {
         ).get();
 
         if (!initalReleaseExists) {
+            const taskID = await this.db.insert(DB.Schema.scheduled_tasks).values({
+                function: "os-release:create",
+                status: "completed",
+                created_at: new Date(0).getTime(),
+                args: {}
+            }).returning().get().id;
+
             await this.db.insert(DB.Schema.os_releases).values({
                 version: "0000.00.00",
-                published_at: new Date(0).getTime(),
+                taskID,
+                created_at: new Date(0).getTime(),
             });
             Logger.info("Created initial OS release metadata entry (version 0000.00.00)");
         }

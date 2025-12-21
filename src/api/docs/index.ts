@@ -38,7 +38,7 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
 
         servers: [
             {
-                url: "http://localhost:4000",
+                url: "http://localhost:12151",
                 description: "Local development server",
             },
             {
