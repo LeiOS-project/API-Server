@@ -88,7 +88,7 @@ export const packageReleases = sqliteTable('package_releases', {
     package_id: int().notNull().references(() => packages.id),
     versionWithLeiosPatch: text().notNull(),
     // architecture: text({ enum: ['amd64', 'arm64'] }).notNull(),
-    architecture: text({ mode: "json" }).$type<("amd64" | "arm64")[]>().notNull(),
+    architectures: text({ mode: "json" }).$type<("amd64" | "arm64")[]>().notNull(),
     created_at: SQLUtils.getCreatedAtColumn(),
 });
 

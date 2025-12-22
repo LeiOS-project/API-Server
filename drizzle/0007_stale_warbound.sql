@@ -1,0 +1,1 @@
+ALTER TABLE `package_releases` RENAME COLUMN "architecture" TO "architectures";

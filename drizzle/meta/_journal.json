@@ -50,6 +50,13 @@
       "when": 1765913713404,
       "tag": "0006_far_mac_gargan",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1766411352481,
+      "tag": "0007_stale_warbound",
+      "breakpoints": true
     }
   ]
 }

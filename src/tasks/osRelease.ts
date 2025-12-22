@@ -52,7 +52,7 @@ OsReleaseTask.addStep("Move packages from archive to local stable repo", async (
 
             
 
-            if (release.architecture.includes("amd64")) {
+            if (release.architectures.includes("amd64")) {
 
                 // delete in stable for this package first but ensure we only delete for this architecture
                 await AptlyAPI.Packages.deleteInRepo("leios-stable", packageName, undefined, "amd64");
@@ -65,7 +65,7 @@ OsReleaseTask.addStep("Move packages from archive to local stable repo", async (
                     eq(DB.Schema.packages.id, release.package_id)
                 );
             }
-            if (release.architecture.includes("arm64")) {
+            if (release.architectures.includes("arm64")) {
 
                 // delete in stable for this package first but ensure we only delete for this architecture
                 await AptlyAPI.Packages.deleteInRepo("leios-stable", packageName, undefined, "arm64");
