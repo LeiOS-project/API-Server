@@ -148,3 +148,11 @@ OsReleaseTask.addStep("Publish OS release snapshot to S3", async (payload, logge
     }
 
 });
+
+OsReleaseTask.addStep("Finalize OS release", async (payload, logger) => {
+
+    logger.info("OS release process completed successfully for version", payload.version);
+
+    return { success: true };
+
+});
