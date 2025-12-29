@@ -90,8 +90,12 @@ router.post('/',
 		const taskID = await TaskScheduler.enqueueTask("os-release:create", {
 			pkgReleasesToIncludeByID: await RuntimeMetadata.getOSReleasePendingPackages(),
 			version,
-			timestamp: now.getTime()
-		}, { created_by_user_id: null });
+			timestamp: now.getTime(),
+		}, {
+			created_by_user_id: null
+		}, {
+			storeLogs: true
+		});
 
 		const result = {
 			...await DB.instance().insert(DB.Schema.os_releases).values({

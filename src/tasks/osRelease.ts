@@ -88,24 +88,24 @@ OsReleaseTask.addStep("Move packages from archive to local stable repo", async (
 
 });
 
-OsReleaseTask.addStep("Record OS release data to database", async (payload, logger) => {
+// OsReleaseTask.addStep("Record OS release data to database", async (payload, logger) => {
 
-    try {
+//     try {
 
-        await DB.instance().insert(DB.Schema.os_releases).values({
-            version: payload.version,
-            // @TODO: link task ID properly
-        });
+//         await DB.instance().insert(DB.Schema.os_releases).values({
+//             version: payload.version,
+//             // @TODO: link task ID properly
+//         });
 
-        logger.info("OS release data recorded in database:", payload.version);
-        return { success: true };
+//         logger.info("OS release data recorded in database:", payload.version);
+//         return { success: true };
 
-    } catch (err) {
-        logger.error("Error recording OS release data:", err);
-        return { success: false, message: Error.isError(err) ? err.message : "Unknown error" };
-    }
+//     } catch (err) {
+//         logger.error("Error recording OS release data:", err);
+//         return { success: false, message: Error.isError(err) ? err.message : "Unknown error" };
+//     }
 
-});
+// });
 
 OsReleaseTask.addStep("Create OS release snapshot", async (payload, logger) => {
 

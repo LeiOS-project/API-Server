@@ -71,26 +71,34 @@ export class DB {
 
     static async createInitialOSReleasesMetaIfNeeded() {
 
-        const initalReleaseExists = await this.db.select().from(DB.Schema.os_releases).where(
+        // const initalReleaseExists = await this.db.select().from(DB.Schema.os_releases).where(
+        //     eq(DB.Schema.os_releases.version, "0000.00.0")
+        // ).get();
+
+        // if (!initalReleaseExists) {
+        //     const taskID = await this.db.insert(DB.Schema.scheduled_tasks).values({
+        //         function: "os-release:create",
+        //         status: "completed",
+        //         created_at: new Date(0).getTime(),
+        //         args: {}
+        //     }).returning().get().id;
+
+        //     await this.db.insert(DB.Schema.os_releases).values({
+        //         version: "0000.00.0",
+        //         changelog: "Initial placeholder release",
+        //         taskID,
+        //         created_at: new Date(0).getTime(),
+        //     });
+        //     Logger.info("Created initial OS release metadata entry (version 0000.00.0)");
+        // }
+
+        // no longr used, remove any existing placeholder entries
+        await this.db.delete(DB.Schema.os_releases).where(
+            eq(DB.Schema.os_releases.version, "0000.00.0")
+        );
+        await this.db.delete(DB.Schema.os_releases).where(
             eq(DB.Schema.os_releases.version, "0000.00.00")
-        ).get();
-
-        if (!initalReleaseExists) {
-            const taskID = await this.db.insert(DB.Schema.scheduled_tasks).values({
-                function: "os-release:create",
-                status: "completed",
-                created_at: new Date(0).getTime(),
-                args: {}
-            }).returning().get().id;
-
-            await this.db.insert(DB.Schema.os_releases).values({
-                version: "0000.00.00",
-                changelog: "Initial placeholder release",
-                taskID,
-                created_at: new Date(0).getTime(),
-            });
-            Logger.info("Created initial OS release metadata entry (version 0000.00.00)");
-        }
+        );
 
     }
 
