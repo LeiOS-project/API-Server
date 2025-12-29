@@ -78,14 +78,18 @@ router.post('/',
 
 		const newReleaseData = c.req.valid('json');
 		
-		const lastRelease = DB.instance().select().from(DB.Schema.os_releases).orderBy(desc(DB.Schema.os_releases.created_at)).limit(1).get();
-		if (!lastRelease) {
-			throw new Error("No previous OS release found to base delta on");
+		let lastReleaseVersion = DB.instance().select().from(DB.Schema.os_releases).orderBy(desc(DB.Schema.os_releases.created_at)).limit(1).get()?.version;
+		if (!lastReleaseVersion) {
+			// check if any releases exist at all
+			const anyRelease = DB.instance().select().from(DB.Schema.os_releases).limit(1).get();
+			if (!anyRelease) {
+				lastReleaseVersion = "0000.00.0";
+			}
 		}
 
 		const now = new Date(Date.now());
 
-		const version = OSReleaseUtils.getVersionString(now, lastRelease.version);
+		const version = OSReleaseUtils.getVersionString(now, lastReleaseVersion as string);
 
 		const taskID = await TaskScheduler.enqueueTask("os-release:create", {
 			pkgReleasesToIncludeByID: await RuntimeMetadata.getOSReleasePendingPackages(),

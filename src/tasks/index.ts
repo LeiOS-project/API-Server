@@ -171,7 +171,7 @@ class PersistentLogger implements TaskHandler.PersistentTaskLoggerLike {
 	}
 
 	async close() {
-		throw new Error("Method not implemented.");
+		this.writeStream.end();
 	}
 
 }
