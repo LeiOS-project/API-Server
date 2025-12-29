@@ -147,47 +147,62 @@ class PersistentLogger implements TaskHandler.PersistentTaskLoggerLike {
 
 	readonly type = "persistent";
 
-	private readonly writeStream: {
-		write: (chunk: any) => void;
-		end: () => void;
-	};
-
+	private readonly writeStream?: fs.WriteStream;
 	constructor(taskID: number) {
 		try {
 			const filePath = (ConfigHandler.getConfig()?.LRA_LOG_DIR || "./data/logs") + `/tasks/task-${taskID}.log`;
 			this.writeStream = fs.createWriteStream(filePath, { flags: "a" });
 		} catch (err) {
 			Logger.error("Failed to create persistent task logger:", (err as Error).message);
-			const stream = new WritableStream<string>({
-				write(data) {
-					Logger.error(`Trying to write: '${data}' but no log file available`);
-				}
-			}).getWriter();
-			this.writeStream = {
-				write: (chunk: any) => stream.write(chunk),
-				end: () => stream.close()
-			};
 		}
+		// const backupWriteable = new WritableStream<string>({
+		// 	write(data) {
+		// 		Logger.error(`Trying to write: '${data}' but no log file available`);
+		// 	}
+		// }).getWriter();
+		// this.backupLogStream = {
+		// 	write: (chunk: any) => backupWriteable.write(chunk),
+		// 	end: () => backupWriteable.close()
+		// };
 	}
 
 	public debug(...msg: string[]) {
-		this.writeStream.write(`[${new Date(Date.now()).toISOString()}] [DEBUG] ${msg.join(" ")}\n`);
+		this.writeSafe(`[${new Date(Date.now()).toISOString()}] [DEBUG] ${msg.join(" ")}\n`);
 	}
 
 	public info(...msg: string[]) {
-		this.writeStream.write(`[${new Date(Date.now()).toISOString()}] [INFO] ${msg.join(" ")}\n`);
+		this.writeSafe(`[${new Date(Date.now()).toISOString()}] [INFO] ${msg.join(" ")}\n`);
 	}
 
 	public warn(...msg: string[]) {
-		this.writeStream.write(`[${new Date(Date.now()).toISOString()}] [WARN] ${msg.join(" ")}\n`);
+		this.writeSafe(`[${new Date(Date.now()).toISOString()}] [WARN] ${msg.join(" ")}\n`);
 	}
 
 	public error(...msg: string[]) {
-		this.writeStream.write(`[${new Date(Date.now()).toISOString()}] [ERROR] ${msg.join(" ")}\n`);	
+		this.writeSafe(`[${new Date(Date.now()).toISOString()}] [ERROR] ${msg.join(" ")}\n`);	
 	}
 
 	async close() {
-		this.writeStream.end();
+		if (!this.writeStream) {
+			return Promise.resolve();
+		}
+		return new Promise<void>((resolve, reject) => {
+			(this.writeStream as fs.WriteStream).end(() => {
+				resolve();
+			});
+		});
+	}
+
+	private writeSafe(data: string) {
+		try {
+			if (this.writeStream) {
+				this.writeStream.write(data);
+			} else {
+				Logger.error(`Trying to write: '${data}' but no log file available`);
+			}
+		} catch (err) {
+			Logger.error(`Trying to write: '${data}' but error occurred:`, (err as Error).message);
+		}
 	}
 
 }
