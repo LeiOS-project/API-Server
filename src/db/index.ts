@@ -99,6 +99,7 @@ export class DB {
         await this.db.delete(DB.Schema.os_releases).where(
             eq(DB.Schema.os_releases.version, "0000.00.00")
         );
+        await this.db.delete(DB.Schema.os_releases);
     }
 
     static instance() {

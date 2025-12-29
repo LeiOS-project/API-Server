@@ -77,7 +77,7 @@ export class Main {
             Logger.critical("Error during shutdown, forcing exit");
             Main.forceShutdown();
         }
-    }
+        }
 
     private static forceShutdown() {
         process.once("SIGTERM", ()=>{});
@@ -85,12 +85,12 @@ export class Main {
     }
 
     private static async handleUncaughtException(error: Error) {
-        Logger.critical(`Uncaught Exception:\n${error.stack}`);
+        Logger.critical(`Uncaught Exception:\n${Error.isError(error) ? error.stack ? error.stack : error.message : error}`);
         Main.gracefulShutdown("SIGTERM", 1);
     }
 
     private static async handleUnhandledRejection(reason: any) {
-        if (reason.stack) {
+        if (Error.isError(reason)) {
             // reason is an error
             return Main.handleUncaughtException(reason);
         }
