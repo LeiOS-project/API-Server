@@ -29,6 +29,7 @@ export class DB {
         }
 
         await this.createInitialAdminUserIfNeeded(configBaseDir);
+        await this.createInitialOSReleasesMetaIfNeeded();
 
         Logger.info(`Database initialized at ${path}`);
     }
@@ -68,7 +69,7 @@ export class DB {
         );
     }
 
-    static async createInitialReleasesMetaIfNeeded() {
+    static async createInitialOSReleasesMetaIfNeeded() {
 
         const initalReleaseExists = await this.db.select().from(DB.Schema.os_releases).where(
             eq(DB.Schema.os_releases.version, "0000.00.00")
