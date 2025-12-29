@@ -92,5 +92,34 @@ describe("User Account Policy Schema Testing", () => {
         }
 
     });
+
+    test("Password validation", async () => {
+        
+        const invalidPasswords = [
+            "short", // Too short
+            "alllowercase1!", // No uppercase letter
+            "ALLUPPERCASE1!", // No lowercase letter
+            "NoNumbers!", // No number
+            "NoSpecialChar1", // No special character
+            "ThisPasswordIsWayTooLongToBeConsideredValidBecauseItExceedsTheMaximumAllowedLength123!@#", // Too long
+        ];
+
+        for (const password of invalidPasswords) {
+            expect(UserDataPolicys.Password.safeParse(password)).toEqual({ success: false, error: expect.anything() });
+        }
+
+        const validPasswords = [
+            "ValidPass1!",
+            "Another$Good2",
+            "Str0ng&P@ssword",
+            "Complex#1234",
+            "A1b2C3d4!",
+        ];
+
+        for (const password of validPasswords) {
+            expect(UserDataPolicys.Password.safeParse(password)).toEqual({ success: true, data: expect.anything() });
+        }
+
+    });
     
 });

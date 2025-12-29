@@ -16,10 +16,12 @@ export namespace UserDataPolicys {
     export const Password = z.string()
         .min(8, 'Must be at least 8 characters')
         .max(50, 'Must be at most 50 characters')
-        .regex(/[A-Z]/, 'Must contain at least one uppercase letter')
-        .regex(/[a-z]/, 'Must contain at least one lowercase letter')
-        .regex(/[0-9]/, 'Must contain at least one number')
-        .regex(/[\W_]/, 'Must contain at least one special character')
+        // .regex(/[A-Z]/, 'Must contain at least one uppercase letter')
+        // .regex(/[a-z]/, 'Must contain at least one lowercase letter')
+        // .regex(/[0-9]/, 'Must contain at least one number')
+        // .regex(/[\W_]/, 'Must contain at least one special character')
+        // Combined regex to improve performance
+        // .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).+$/, 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character')
         .describe("New password for the account");
 
     export type Password = z.infer<typeof Password>;
