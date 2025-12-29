@@ -1,4 +1,4 @@
-import { Logger } from "@hey-api/openapi-ts";
+import { Logger } from "../utils/logger";
 import { ConfigHandler } from "../utils/config";
 
 export class TaskUtils {
