@@ -5,6 +5,7 @@ import { ConfigHandler } from "./utils/config";
 import { Logger } from "./utils/logger";
 import { TaskScheduler } from "./tasks";
 import { LiveRepoUtils } from "./utils/live-repo";
+import { Utils } from "./utils";
 
 export class Main {
 
@@ -25,6 +26,9 @@ export class Main {
             config.LRA_DB_AUTO_MIGRATE,
             config.LRA_CONFIG_BASE_DIR ?? "./config"
         );
+
+
+        await Utils.ensureDirectoryExists(config.LRA_LOG_DIR ?? "./data/logs");
 
         // start task scheduler
         await TaskScheduler.processQueue();

@@ -1,4 +1,5 @@
 import { randomBytes as crypto_randomBytes } from 'crypto';
+import { mkdir, mkdirSync } from 'fs';
 
 export class Utils {
 
@@ -32,6 +33,15 @@ export class Utils {
 
     static sleep(ms: number) {
         return new Promise<void>(resolve => setTimeout(() => resolve(), ms));
+    }
+
+
+    static ensureDirectoryExists(path: string) {
+        try {
+            mkdirSync(path, { recursive: true });
+        } catch (err) {
+            // ignore
+        }
     }
 
 }

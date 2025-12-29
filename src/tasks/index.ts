@@ -6,6 +6,8 @@ import { OsReleaseTask } from "./osRelease";
 import { ConfigHandler } from "../utils/config";
 import fs from "fs";
 import { UpdateTestingRepoTask } from "./updateTestingRepo";
+import { Utils } from "../utils";
+import { dirname } from "path";
 
 type AdditionalTaskMeta = {
 	created_by_user_id: number | null;
@@ -151,6 +153,9 @@ class PersistentLogger implements TaskHandler.PersistentTaskLoggerLike {
 	constructor(taskID: number) {
 		try {
 			const filePath = (ConfigHandler.getConfig()?.LRA_LOG_DIR || "./data/logs") + `/tasks/task-${taskID}.log`;
+			Utils.ensureDirectoryExists(dirname(filePath));
+
+			// this.writeStream = fs.createWriteStream(filePath, { flags: "a" });
 			this.writeStream = fs.createWriteStream(filePath, { flags: "a" });
 		} catch (err) {
 			Logger.error("Failed to create persistent task logger:", (err as Error).message);
@@ -186,17 +191,26 @@ class PersistentLogger implements TaskHandler.PersistentTaskLoggerLike {
 		if (!this.writeStream) {
 			return Promise.resolve();
 		}
-		return new Promise<void>((resolve, reject) => {
-			(this.writeStream as fs.WriteStream).end(() => {
-				resolve();
+		try {
+			return new Promise<void>((resolve, reject) => {
+				(this.writeStream as fs.WriteStream).end(() => {
+					resolve();
+				});
 			});
-		});
+		} catch (err) {
+			Logger.error("Error closing persistent task logger:", (err as Error).message);
+		}
+		return Promise.resolve();
 	}
 
 	private writeSafe(data: string) {
 		try {
-			if (this.writeStream) {
-				this.writeStream.write(data);
+			if (this.writeStream && this.writeStream.writable) {
+				this.writeStream.write(data, err => {
+					if (err) {
+						Logger.error(`Trying to write: '${data}' but error occurred:`, err.message);
+					}
+				});
 			} else {
 				Logger.error(`Trying to write: '${data}' but no log file available`);
 			}
