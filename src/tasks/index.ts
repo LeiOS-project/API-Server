@@ -147,11 +147,27 @@ class PersistentLogger implements TaskHandler.PersistentTaskLoggerLike {
 
 	readonly type = "persistent";
 
-	private readonly writeStream: fs.WriteStream;
+	private readonly writeStream: {
+		write: (chunk: any) => void;
+		end: () => void;
+	};
 
 	constructor(taskID: number) {
-		const filePath = (ConfigHandler.getConfig()?.LRA_LOG_DIR || "./data/logs") + `/tasks/task-${taskID}.log`;
-		this.writeStream = fs.createWriteStream(filePath, { flags: "a" });
+		try {
+			const filePath = (ConfigHandler.getConfig()?.LRA_LOG_DIR || "./data/logs") + `/tasks/task-${taskID}.log`;
+			this.writeStream = fs.createWriteStream(filePath, { flags: "a" });
+		} catch (err) {
+			Logger.error("Failed to create persistent task logger:", (err as Error).message);
+			const stream = new WritableStream<string>({
+				write(data) {
+					Logger.error(`Trying to write: '${data}' but no log file available`);
+				}
+			}).getWriter();
+			this.writeStream = {
+				write: (chunk: any) => stream.write(chunk),
+				end: () => stream.close()
+			};
+		}
 	}
 
 	public debug(...msg: string[]) {
