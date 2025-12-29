@@ -348,7 +348,7 @@ export namespace AptlyAPI.Publishing {
         });
 
         if (!result.data) {
-            throw new Error("Failed to publish snapshot to S3: " + result.error);
+            throw new Error("Failed to publish snapshot to S3: " + result.error.error);
         }
 
         return true;
