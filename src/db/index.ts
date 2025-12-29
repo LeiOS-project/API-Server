@@ -84,6 +84,7 @@ export class DB {
 
             await this.db.insert(DB.Schema.os_releases).values({
                 version: "0000.00.00",
+                changelog: "Initial placeholder release",
                 taskID,
                 created_at: new Date(0).getTime(),
             });

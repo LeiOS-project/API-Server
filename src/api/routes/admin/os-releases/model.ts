@@ -34,6 +34,15 @@ export namespace OSReleasesModel.GetAll {
 
 export namespace OSReleasesModel.CreateRelease {
 
+    export const Body = createInsertSchema(DB.Schema.os_releases).omit({
+        id: true,
+        created_at: true,
+        taskID: true,
+        version: true,
+    });
+
+    export type Body = z.infer<typeof Body>;
+
     export const Response = OSReleasesModel.GetByVersion.Response;
 
     export type Response = z.infer<typeof Response>;

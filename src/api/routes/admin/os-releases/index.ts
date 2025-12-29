@@ -37,6 +37,7 @@ router.get('/',
 		const releases = await DB.instance().select({
 			id: DB.Schema.os_releases.id,
 			version: DB.Schema.os_releases.version,
+			changelog: DB.Schema.os_releases.changelog,
 			created_at: DB.Schema.os_releases.created_at,
 
 			published_at: DB.Schema.scheduled_tasks.finished_at,
@@ -71,8 +72,12 @@ router.post('/',
 		)
 	}),
 
+	zValidator('json', OSReleasesModel.CreateRelease.Body),
+
 	async (c) => {
 
+		const newReleaseData = c.req.valid('json');
+		
 		const lastRelease = DB.instance().select().from(DB.Schema.os_releases).orderBy(desc(DB.Schema.os_releases.created_at)).limit(1).get();
 		if (!lastRelease) {
 			throw new Error("No previous OS release found to base delta on");
@@ -91,6 +96,7 @@ router.post('/',
 		const result = {
 			...await DB.instance().insert(DB.Schema.os_releases).values({
 				version,
+				changelog: newReleaseData.changelog,
 				taskID,
 			}).returning().get(),
 			published_at: null,

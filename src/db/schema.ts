@@ -146,6 +146,7 @@ export const os_releases = sqliteTable('os_releases', {
     id: int().primaryKey({ autoIncrement: true }),
     // YYYY.MM.(release_this_month) format
     version: text().notNull().unique(),
+    changelog: text().notNull(),
     created_at: SQLUtils.getCreatedAtColumn(),
     taskID: int().notNull().references(() => scheduled_tasks.id),
     // published_at: int().references(() => scheduled_tasks.finished_at),

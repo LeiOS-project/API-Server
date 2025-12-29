@@ -1,0 +1,1 @@
+ALTER TABLE `os_releases` ADD `changelog` text DEFAULT '' NOT NULL;
