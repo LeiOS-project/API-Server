@@ -344,6 +344,7 @@ export namespace AptlyAPI.Publishing {
                     Name: `leios-stable-${version}`,
                     Component: "main"
                 }],
+                Signing: AptlyAPIServer.SigningConfig
             }
         });
 
