@@ -21,7 +21,7 @@ export namespace UserDataPolicys {
         // .regex(/[0-9]/, 'Must contain at least one number')
         // .regex(/[\W_]/, 'Must contain at least one special character')
         // Combined regex to improve performance
-        // .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).+$/, 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character')
+        .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).+$/, 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character')
         .describe("New password for the account");
 
     export type Password = z.infer<typeof Password>;

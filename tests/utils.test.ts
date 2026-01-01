@@ -84,22 +84,22 @@ describe("Testing OS Release Utilities", () => {
     test("Generate Version String", () => {
 
         const date1 = new Date(Date.UTC(2024, 6 - 1, 15)); // June 15, 2024
-        expect(OSReleaseUtils.getVersionString(date1, "2024.05.02")).toBe("2024.06.01");
+        expect(OSReleaseUtils.getVersionString(date1, "2024.05.2")).toBe("2024.06.1");
 
         const date2 = new Date(Date.UTC(2024, 6 - 1, 20)); // June 20, 2024
-        expect(OSReleaseUtils.getVersionString(date2, "2024.06.01")).toBe("2024.06.02");
+        expect(OSReleaseUtils.getVersionString(date2, "2024.06.1")).toBe("2024.06.2");
 
         const date3 = new Date(Date.UTC(2023, 12 - 1, 31)); // December 31, 2023
-        expect(OSReleaseUtils.getVersionString(date3, "2023.11.03")).toBe("2023.12.01");
+        expect(OSReleaseUtils.getVersionString(date3, "2023.11.3")).toBe("2023.12.1");
 
         const date4 = new Date(Date.UTC(2024, 1 - 1, 15)); // January 15, 2024
-        expect(OSReleaseUtils.getVersionString(date4, "2023.12.05")).toBe("2024.01.01");
+        expect(OSReleaseUtils.getVersionString(date4, "2023.12.5")).toBe("2024.01.1");
 
         const date5 = new Date(Date.UTC(2024, 6 - 1, 1)); // June 1, 2024
-        expect(OSReleaseUtils.getVersionString(date5)).toBe("2024.06.01");
+        expect(OSReleaseUtils.getVersionString(date5)).toBe("2024.06.1");
 
         const date6 = new Date(Date.UTC(2024, 11 - 1, 10)); // November 10, 2024
-        expect(OSReleaseUtils.getVersionString(date6, "2024.11.09")).toBe("2024.11.10");
+        expect(OSReleaseUtils.getVersionString(date6, "2024.11.9")).toBe("2024.11.10");
 
     });
 
