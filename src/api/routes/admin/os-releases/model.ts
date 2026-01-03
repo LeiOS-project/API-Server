@@ -6,7 +6,7 @@ import { TuplifyUnion, TaskHandler } from "@cleverjs/utils";
 export namespace OSReleasesModel {
 
     export const Param = z.object({
-        version: z.string().regex(/^\d{4}\.\d{2}\.\d{2}$/),
+        version: z.string().regex(/^\d{4}\.\d{2}\.\d{1,3}$/),
     });
 
 }
