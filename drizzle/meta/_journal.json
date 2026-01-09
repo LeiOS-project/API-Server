@@ -71,6 +71,20 @@
       "when": 1767018789543,
       "tag": "0009_eager_wallow",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1767980125037,
+      "tag": "0010_mixed_jocasta",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1767980141334,
+      "tag": "0011_narrow_paibok",
+      "breakpoints": true
     }
   ]
 }

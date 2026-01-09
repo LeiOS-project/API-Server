@@ -25,7 +25,7 @@ router.get('/',
     }
 );
 
-router.post('/:versionWithLeiosPatch',
+router.post('/',
 
     APIRouteSpec.authenticated({
         summary: "Create a new package release",
@@ -39,12 +39,12 @@ router.post('/:versionWithLeiosPatch',
         )
     }),
 
-    zValidator("param", PackageReleaseModel.Param),
+    zValidator("json", PackageReleaseModel.CreateRelease.Body),
 
     async (c) => {
-        const { versionWithLeiosPatch } = c.req.valid("param");
+        const body = c.req.valid("json");
 
-        return await PkgReleasesService.createRelease(c, versionWithLeiosPatch);
+        return await PkgReleasesService.createRelease(c, body);
     }
 )
 
@@ -77,6 +77,29 @@ router.get('/:versionWithLeiosPatch',
 
     async (c) => {
         return await PkgReleasesService.getPkgReleaseAfterMiddleware(c);
+    }
+);
+
+router.put('/:versionWithLeiosPatch',
+
+    APIRouteSpec.authenticated({
+        summary: "Update a package release",
+        description: "Update details of a specific package release.",
+        tags: [DOCS_TAGS.ADMIN_API.PACKAGES_RELEASES],
+
+        responses: APIResponseSpec.describeWithWrongInputs(
+            APIResponseSpec.successNoData("Package release updated successfully"),
+            APIResponseSpec.notFound("Package release with specified version not found"),
+            APIResponseSpec.badRequest("Syntax or validation error in request")
+        )
+    }),
+
+    zValidator("json", PackageReleaseModel.UpdateRelease.Body),
+
+    async (c) => {
+        const body = c.req.valid("json");
+
+        return await PkgReleasesService.updatePkgReleaseAfterMiddleware(c, body);
     }
 );
 

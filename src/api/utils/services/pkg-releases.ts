@@ -23,12 +23,12 @@ export class PkgReleasesService {
         return APIResponse.success(c, "Package releases retrieved successfully", releases satisfies PackageReleaseModel.GetAll.Response);
     }
 
-    static async createRelease(c: Context, versionWithLeiosPatch: string) {
+    static async createRelease(c: Context, releaseData: PackageReleaseModel.CreateRelease.Body) {
         // @ts-ignore
         const packageData = c.get("package") as DB.Models.Package;
 
         if (packageData.requires_patching) {
-            const matches = versionWithLeiosPatch.match(PackageReleaseModel.versionWithRequiredLeiOSPatchRegex);
+            const matches = releaseData.versionWithLeiosPatch.match(PackageReleaseModel.versionWithRequiredLeiOSPatchRegex);
             if (!matches) {
                 return APIResponse.badRequest(c, "Package requires leios patch suffix in version but is missing in version argument");
             }
@@ -44,7 +44,7 @@ export class PkgReleasesService {
         const existingRelease = DB.instance().select().from(DB.Schema.packageReleases).where(
             and(
                 eq(DB.Schema.packageReleases.package_id, packageData.id),
-                eq(DB.Schema.packageReleases.versionWithLeiosPatch, versionWithLeiosPatch),
+                eq(DB.Schema.packageReleases.versionWithLeiosPatch, releaseData.versionWithLeiosPatch),
             )
         ).get();
 
@@ -54,7 +54,7 @@ export class PkgReleasesService {
 
         await DB.instance().insert(DB.Schema.packageReleases).values({
             package_id: packageData.id,
-            versionWithLeiosPatch,
+            ...releaseData,
             architectures: []
         });
 
@@ -83,6 +83,20 @@ export class PkgReleasesService {
 
         return APIResponse.success(c, "Package release retrieved successfully", releaseData satisfies PackageReleaseModel.GetReleaseByVersion.Response);
     }
+
+
+    static async updatePkgReleaseAfterMiddleware(c: Context, updateData: PackageReleaseModel.UpdateRelease.Body) {
+
+        // @ts-ignore
+        const releaseData = c.get("release") as DB.Models.PackageRelease;
+
+        await DB.instance().update(DB.Schema.packageReleases).set(updateData).where(
+            eq(DB.Schema.packageReleases.id, releaseData.id)
+        );
+
+        return APIResponse.successNoData(c, "Package release updated successfully");
+    }
+
 
     static async uploadReleaseAssetAfterMiddleware(c: Context, file: File, arch: "amd64" | "arm64", isAdmin = false) {
         // @ts-ignore

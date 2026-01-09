@@ -1,0 +1,1 @@
+ALTER TABLE `package_releases` ADD `changelog` text DEFAULT '' NOT NULL;

@@ -90,6 +90,7 @@ export const packageReleases = sqliteTable('package_releases', {
     // architecture: text({ enum: ['amd64', 'arm64'] }).notNull(),
     architectures: text({ mode: "json" }).$type<("amd64" | "arm64")[]>().notNull(),
     created_at: SQLUtils.getCreatedAtColumn(),
+    changelog: text().notNull(),
 });
 
 /**

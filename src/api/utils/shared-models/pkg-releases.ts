@@ -1,7 +1,7 @@
 import z from "zod";
 import { AptlyAPI } from "../../../aptly/api";
 import { DB } from "../../../db";
-import { createSelectSchema } from "drizzle-zod";
+import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 
 export namespace PackageReleaseModel {
 
@@ -41,11 +41,27 @@ export namespace PackageReleaseModel.GetAll {
 
 export namespace PackageReleaseModel.CreateRelease {
 
-    // export const Response = z.object({
-    //     version: z.string(),
-    //     arch: z.enum(["amd64", "arm64"]),
-    // });
-    // export type Response = z.infer<typeof Response>;
+    export const Body = createInsertSchema(DB.Schema.packageReleases, {
+        versionWithLeiosPatch: z.string().regex(versionWithLeiOSPatchRegex),
+        changelog: z.string().min(1, "Changelog cannot be empty").max(10000, "Changelog cannot exceed 10,000 characters")
+    }).omit({
+        id: true,
+        package_id: true,
+        created_at: true,
+        architectures: true
+    });
+
+    export type Body = z.infer<typeof Body>;
+
+}
+
+export namespace PackageReleaseModel.UpdateRelease {
+
+    export const Body = PackageReleaseModel.CreateRelease.Body.partial().omit({
+        versionWithLeiosPatch: true
+    });
+
+    export type Body = z.infer<typeof Body>;
 
 }
 

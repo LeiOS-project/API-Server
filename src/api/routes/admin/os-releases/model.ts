@@ -35,7 +35,7 @@ export namespace OSReleasesModel.GetAll {
 export namespace OSReleasesModel.CreateRelease {
 
     export const Body = createInsertSchema(DB.Schema.os_releases, {
-        changelog: z.string().min(1).max(10000),
+        changelog: z.string().min(1, "Changelog cannot be empty").max(10000, "Changelog cannot exceed 10,000 characters"),
     }).omit({
         id: true,
         created_at: true,

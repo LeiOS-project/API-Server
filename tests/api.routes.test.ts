@@ -292,6 +292,7 @@ describe("Public package routes", () => {
         const tempRelease = await DB.instance().insert(DB.Schema.packageReleases).values({
             package_id: tempPkg.id,
             versionWithLeiosPatch: "1.0.0",
+            changelog: "Initial release",
             architectures:  ["amd64"]
         }).returning().get();
 
