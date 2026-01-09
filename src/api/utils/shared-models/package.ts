@@ -103,14 +103,8 @@ export namespace PackageModel.CreatePackage {
 
 export namespace PackageModel.UpdatePackage {
 
-    export const Body = createUpdateSchema(DB.Schema.packages).omit({
-        name: true,
-        owner_user_id: true,
-        created_at: true,
-        latest_stable_release_amd64: true,
-        latest_stable_release_arm64: true,
-        latest_testing_release_amd64: true,
-        latest_testing_release_arm64: true
+    export const Body = PackageModel.CreatePackage.Body.omit({
+        name: true
     }).partial().refine(
         (data) => Object.values(data).some((value) => value !== undefined),
         { message: "At least one field must be provided" }
