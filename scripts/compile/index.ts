@@ -1,6 +1,6 @@
 import { CLIApp, type CLICMD, type CLICMDExecMeta } from "@cleverjs/cli";
-import { CompileAllCMD, CompileToTargetCMD } from "./compileCMD.js";
-import { Platforms } from "./compiler.js";
+import { CompileAllCMD, CompileToTargetCMD } from "./compileCMD";
+import { Platforms } from "./compiler";
 
 class CompileCMD extends CLIApp {
 

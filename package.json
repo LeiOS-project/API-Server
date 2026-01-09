@@ -4,14 +4,15 @@
     "type": "module",
     "private": true,
     "scripts": {
-        "test": "bun test",
-        "dev": "bun run --watch src/index.ts",
+        "aptly-api-client:generate": "openapi-ts -f ./openapi-ts.aptly-api.config.ts",
         "db:generate": "bun scripts/db-utils && drizzle-kit generate --config=drizzle.config.ts",
         "db:migrate": "bun scripts/db-utils && drizzle-kit migrate --config=drizzle.config.ts",
         "db:push": "bun scripts/db-utils && drizzle-kit push --config=drizzle.config.ts",
-        "start": "bun run scripts/entrypoint.ts",
+        "typecheck": "tsc -p ./tsconfig/tsconfig.typecheck.json && echo 'Typecheck passed!'",
+        "test": "bun test",
+        "dev": "bun run --watch src/index.ts",
         "compile": "bun run ./scripts/compile",
-        "aptly-api-client:generate": "openapi-ts -f ./openapi-ts.aptly-api.config.ts"
+        "start": "bun run scripts/entrypoint.ts"
     },
     "devDependencies": {
         "@cleverjs/cli": "^1.1.8",

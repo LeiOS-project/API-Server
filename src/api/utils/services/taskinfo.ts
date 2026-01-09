@@ -1,4 +1,4 @@
-import { Context } from "hono";
+import type { Context } from "hono";
 import { DB } from "../../../db";
 import { APIResponse } from "../api-res";
 import { eq, and, or, like, desc, asc } from "drizzle-orm";

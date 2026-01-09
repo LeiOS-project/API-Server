@@ -1,3 +1,4 @@
+import { Logger } from "../../utils/logger";
 
 export class OSReleaseUtils {
 
@@ -8,7 +9,15 @@ export class OSReleaseUtils {
 
         let releaseNumberThisMonth = 1;
         if (lastRelease.startsWith(`${year}.${month}.`)) {
-            const lastReleaseNumberThisMonth = parseInt(lastRelease.split(".")[2], 10);
+
+            const lastReleaseParts = lastRelease.split(".") as [string, string, string];
+            
+            if (lastReleaseParts.length !== 3) {
+                Logger.error("Invalid last release format:", lastRelease);
+                return `${year}.${month}.${String(releaseNumberThisMonth)}`;
+            }
+
+            const lastReleaseNumberThisMonth = parseInt(lastReleaseParts[2], 10);
             releaseNumberThisMonth = lastReleaseNumberThisMonth + 1;
         }
 

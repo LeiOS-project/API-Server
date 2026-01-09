@@ -134,17 +134,14 @@ export namespace AptlyAPI.Packages {
     export async function getAllInRepo(repoName: AptlyAPI.Utils.Repos, packageName: string) {
         const pkgs = await getInRepo(repoName, packageName);
         const returnData: {
-            [version: string]: {
-                "amd64"?: AptlyAPI.Packages.Models.PackageInfo,
-                "arm64"?: AptlyAPI.Packages.Models.PackageInfo
-            }
+            [version: string]: AptlyAPI.Packages.Models.getVersionInRepoResponse
         } = {};
 
         for (const pkg of pkgs) {
             if (!returnData[pkg.versionWithLeiosPatch]) {
                 returnData[pkg.versionWithLeiosPatch] = {};
             }
-            returnData[pkg.versionWithLeiosPatch][pkg.architecture] = pkg;
+            (returnData[pkg.versionWithLeiosPatch] as AptlyAPI.Packages.Models.getVersionInRepoResponse)[pkg.architecture] = pkg;
         }
         return returnData satisfies AptlyAPI.Packages.Models.getAllInRepoResponse;
     }

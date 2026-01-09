@@ -25,22 +25,29 @@ export class AuthUtils {
     }
 
     static getTokenParts(fullToken: string) {
-        const parts = fullToken.split(':');
+
+        const parts = fullToken.split(':') as [string, string];
+
         if (parts.length !== 2) {
             return null;
         }
+
         if (parts[0].startsWith(SessionHandler.SESSION_TOKEN_PREFIX)) {
+
             return {
                 prefix: SessionHandler.SESSION_TOKEN_PREFIX,
                 id: parts[0].substring(SessionHandler.SESSION_TOKEN_PREFIX.length),
                 base: parts[1]
             } satisfies AuthHandler.TokenParts;
+
         } else if (parts[0].startsWith(APIKeyHandler.API_KEY_PREFIX)) {
+
             return {
                 prefix: APIKeyHandler.API_KEY_PREFIX,
                 id: parts[0].substring(APIKeyHandler.API_KEY_PREFIX.length),
                 base: parts[1]
             } satisfies AuthHandler.TokenParts;
+            
         } else {
             return null;
         }

@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { beforeAll, afterAll, describe, expect, test } from "bun:test";
 import { API } from "../src/api";
 import { DB } from "../src/db";
 import { AuthHandler, AuthUtils, SessionHandler } from "../src/api/utils/authHandler";
@@ -8,15 +8,19 @@ import { eq } from "drizzle-orm";
 import { AuthModel } from "../src/api/routes/auth/model";
 import { makeAPIRequest } from "./helpers/api";
 import { AccountModel } from "../src/api/routes/account/model";
+import { PublicPackagesModel } from "../src/api/routes/public/packages/model";
 
-const PACKAGE_FILE_PATH = "./testdata/fastfetch_2.55.0_amd64.deb";
-const PACKAGE_NAME = "fastfetch";
-const PACKAGE_VERSION = "2.55.0";
-const PACKAGE_ARCH: Arch = "amd64";
-const PACKAGE_MAINTAINER_NAME = "Carter Li";
-const PACKAGE_MAINTAINER_EMAIL = "zhangsongcui@live.cn";
+// type Arch = AptlyAPI.Utils.Architectures;
 
-type Arch = AptlyAPI.Utils.Architectures;
+// const PACKAGE_FILE_PATH = "./testdata/fastfetch_2.55.0_amd64.deb";
+// const PACKAGE_NAME = "fastfetch";
+// const PACKAGE_VERSION = "2.55.0";
+// const PACKAGE_ARCH: Arch = "amd64";  
+// const PACKAGE_MAINTAINER_NAME = "Carter Li";
+// const PACKAGE_MAINTAINER_EMAIL = "zhangsongcui@live.cn";
+
+type SeededUser = Omit<DB.Models.User, "password_hash"> & { password: string };
+type SeededSession = Awaited<ReturnType<typeof SessionHandler.createSession>>;
 
 async function seedUser(role: "admin" | "developer" | "user", overrides: Partial<DB.Models.User> = {}, password = "TestP@ssw0rd") {
     const user = DB.instance().insert(DB.Schema.users).values({
@@ -27,18 +31,24 @@ async function seedUser(role: "admin" | "developer" | "user", overrides: Partial
         role,
     } as any).returning().get();
 
-    return { ...user, password } as Omit<typeof user & { password: string }, "password_hash">;
+    return { ...user, password } satisfies SeededUser;
 }
 
 async function seedSession(user_id: number) {
     const session = await SessionHandler.createSession(user_id);
-    return session;
-    
+    return session satisfies SeededSession;
 }
 
-let testAdmin = await seedUser("admin", { username: "testadmin" }, "AdminP@ss1");
-let testDeveloper = await seedUser("developer", { username: "testdeveloper" }, "DevP@ss1");
-let testUser = await seedUser("user", { username: "testuser" }, "UserP@ss1");
+let testUser: SeededUser;
+let testDeveloper: SeededUser;
+let testAdmin: SeededUser;
+
+beforeAll(async () => {
+    testUser = await seedUser("user", { username: "testuser" }, "UserP@ss1");
+    testDeveloper = await seedUser("developer", { username: "testdeveloper" }, "DevP@ss1");
+    testAdmin = await seedUser("admin", { username: "testadmin" }, "AdminP@ss1");
+});
+
 
 describe("Auth routes and access checks", async () => {
 
@@ -134,7 +144,11 @@ describe("Auth routes and access checks", async () => {
 
 describe("Account routes", async () => {
 
-    let session_token = await seedSession(testUser.id).then(s => s.token);
+    let session_token: string;
+
+    beforeAll(async () => {
+        session_token = await seedSession(testUser.id).then(s => s.token);
+    });
 
     test("GET /account returns current user", async () => {
 
@@ -264,7 +278,8 @@ describe("Account routes", async () => {
 });
 
 describe("Public package routes", () => {
-    test("Lists packages and returns details with releases", async () => {
+
+    test("GET /public/packages lists public packages", async () => {
 
         const tempPkg = await DB.instance().insert(DB.Schema.packages).values({
             name: "public-package",
@@ -280,17 +295,23 @@ describe("Public package routes", () => {
             architectures:  ["amd64"]
         }).returning().get();
 
-        const listRes = await API.getApp().request("/public/packages");
-        expect(listRes.status).toBe(200);
-        const listBody = await listRes.json();
-        expect(listBody.data.some((pkg: any) => pkg.id === tempPkg.id)).toBe(true);
+        // const listRes = await API.getApp().request("/public/packages");
+        // expect(listRes.status).toBe(200);
+        // const listBody = await listRes.json();
+        // expect(listBody.data.some((pkg: any) => pkg.id === tempPkg.id)).toBe(true);
 
-        // const detailRes = await API.getApp().request(`/public/packages/${tempPkg.name}`);
-        // expect(detailRes.status).toBe(200);
-        // const detailBody = await detailRes.json();
-        // expect(detailBody.data.id).toBe(tempPkg.id);
-        // expect(detailBody.data.releases.length).toBe(1);
-        // expect(detailBody.data.releases[0].id).toBe(tempRelease.id);
+        const data = await makeAPIRequest("/public/packages", {
+            expectedBodySchema: PublicPackagesModel.GetAll.Response
+        });
+
+        expect(data.length).toBe(1);
+
+        const pkg = data[0];
+        expect(pkg).toBeDefined();
+        if (!pkg) return;
+
+        expect(pkg.id).toBe(tempPkg.id);
+        expect(pkg.name).toBe(tempPkg.name);
 
         // Cleanup
         await DB.instance().delete(DB.Schema.packageReleases).where(eq(DB.Schema.packageReleases.id, tempRelease.id));

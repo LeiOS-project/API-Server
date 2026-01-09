@@ -1,7 +1,7 @@
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "drizzle-zod";
 import { DB } from "../../../../db";
 import { z } from "zod";
-import { TuplifyUnion, TaskHandler } from "@cleverjs/utils";
+import { type TuplifyUnion, TaskHandler } from "@cleverjs/utils";
 
 export namespace OSReleasesModel {
 

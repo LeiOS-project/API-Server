@@ -40,8 +40,12 @@ describe("Aptly Package Tests", () => {
     });
 
     test("Get Package Details", async () => {
+        
         const result = (await AptlyAPI.Packages.getInRepo("leios-archive", "fastfetch", "2.55.0", "amd64"))[0];
+
         expect(result).toBeDefined();
+        if (!result) return;
+
         expect(result.name).toBe("fastfetch");
         expect(result.versionWithLeiosPatch).toBe("2.55.0");
         expect(result.architecture).toBe("amd64");

@@ -1,7 +1,9 @@
 import { expect } from "bun:test";
 import { API } from "../../src/api";
-import z, { ZodType } from "zod";
+import { z, ZodType } from "zod";
 import { Logger } from "../../src/utils/logger";
+
+type HeadersInit = RequestInit["headers"];
 
 export async function makeAPIRequest<ReturnBody = null>(
     path: string,
@@ -48,7 +50,7 @@ export async function makeAPIRequest<ReturnBody = null>(
     }
 
     const contentType = res.headers.get("content-type") || "";
-    const resBody = contentType.includes("application/json") ? await res.json() : null;
+    const resBody = contentType.includes("application/json") ? await res.json() as any : null;
 
     if (opts.expectedBodySchema && resBody) {
 

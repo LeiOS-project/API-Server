@@ -1,4 +1,4 @@
-import { Context } from "hono";
+import type { Context } from "hono";
 import { DB } from "../../../db";
 import { APIResponse } from "../api-res";
 import { PackageModel } from "../shared-models/package";
@@ -8,6 +8,7 @@ import { AptlyAPI } from "../../../aptly/api";
 import { AptlyUtils } from "../../../aptly/utils";
 import { TaskScheduler } from "../../../tasks";
 import { RuntimeMetadata } from "../metadata";
+import type { PackageReleaseModel } from "../shared-models/pkg-releases";
 
 export class PkgReleasesService {
 
@@ -19,7 +20,7 @@ export class PkgReleasesService {
             eq(DB.Schema.packageReleases.package_id, packageData.id)
         );
 
-        return APIResponse.success(c, "Package releases retrieved successfully", releases);
+        return APIResponse.success(c, "Package releases retrieved successfully", releases satisfies PackageReleaseModel.GetAll.Response);
     }
 
     static async createRelease(c: Context, versionWithLeiosPatch: string) {
@@ -47,7 +48,7 @@ export class PkgReleasesService {
         await DB.instance().insert(DB.Schema.packageReleases).values({
             package_id: packageData.id,
             versionWithLeiosPatch,
-            architecture: []
+            architectures: []
         });
 
         return APIResponse.createdNoData(c, "Package release created successfully");
@@ -73,7 +74,7 @@ export class PkgReleasesService {
         // @ts-ignore
         const releaseData = c.get("release") as DB.Models.PackageRelease;
 
-        return APIResponse.success(c, "Package release retrieved successfully", releaseData);
+        return APIResponse.success(c, "Package release retrieved successfully", releaseData satisfies PackageReleaseModel.GetReleaseByVersion.Response);
     }
 
     static async uploadReleaseAssetAfterMiddleware(c: Context, file: File, arch: "amd64" | "arm64", isAdmin = false) {
@@ -90,7 +91,7 @@ export class PkgReleasesService {
             throw new Error("User is authenticated but not found in database");
         }
 
-        const existingArchForRelease = releaseData.architecture.includes(arch);
+        const existingArchForRelease = releaseData.architectures.includes(arch);
 
         if (existingArchForRelease) {
             return APIResponse.conflict(c, "Package release already contains a release for this architecture");
@@ -123,13 +124,13 @@ export class PkgReleasesService {
                 return APIResponse.serverError(c, "Failed to copy package release into testing repository");
             }
 
-            await TaskScheduler.enqueueTask("testing-repo:update", {}, { created_by_user_id: null, tag: `update-testing-repo-after-package-release-upload:${releaseData.id}:${arch}` });
+            await TaskScheduler.enqueueTask("testing-repo:update", {}, { created_by_user_id: null });
 
-            releaseData.architecture.push(arch);
+            releaseData.architectures.push(arch);
 
             await DB.instance().update(DB.Schema.packageReleases).set({
                 package_id: packageData.id,
-                architecture: releaseData.architecture
+                architectures: releaseData.architectures
             });
 
             if (arch === "amd64") {
@@ -173,7 +174,7 @@ export class PkgReleasesService {
 
         await AptlyAPI.Packages.deleteAllInAllRepos(packageData.name, releaseData.versionWithLeiosPatch, undefined);
 
-        await TaskScheduler.enqueueTask("testing-repo:update", {}, { created_by_user_id: null, tag: "update-testing-repo-after-package-release-deletion" });
+        await TaskScheduler.enqueueTask("testing-repo:update", {}, { created_by_user_id: null });
         
         return APIResponse.successNoData(c, "Package release deleted successfully");
     }

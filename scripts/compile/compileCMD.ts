@@ -1,5 +1,5 @@
 import { CLICMD, type CLICMDAlias, type CLICMDExecMeta } from "@cleverjs/cli";
-import { Compiler, type PlatformArg, Platforms } from "./compiler.js";
+import { Compiler, type PlatformArg, Platforms } from "./compiler";
 
 class CompileUtils {
     static async getPackageJSONVersion() {

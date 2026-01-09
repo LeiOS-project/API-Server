@@ -32,6 +32,12 @@ OsReleaseTask.addStep("Move packages from archive to local stable repo", async (
             }
 
             const pkgReleaseID = payload.pkgReleasesToIncludeByID[state.nextPackageIndexToMove];
+
+            if (!pkgReleaseID) {
+                logger.error("Invalid package release ID at index", state.nextPackageIndexToMove, ", skipping.");
+                continue;
+            }
+
             const release = DB.instance().select().from(DB.Schema.packageReleases).where(
                 eq(DB.Schema.packageReleases.id, pkgReleaseID)
             ).get();

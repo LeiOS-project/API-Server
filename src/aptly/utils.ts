@@ -1,4 +1,4 @@
-import fs from "fs/promises";
+import fs, { constants as FS_ACCESS_STATE } from "fs/promises";
 import path from "path";
 import { Logger } from "../utils/logger";
 import { AptlyAPIServer } from "./server";
@@ -24,7 +24,13 @@ export class AptlyUtils {
         if (!releaseResponse.ok) {
             throw new Error(`GitHub release request failed with status ${releaseResponse.status}`);
         }
-        const releaseData = await releaseResponse.json();
+        const releaseData = await releaseResponse.json() as {
+            tag_name: string;
+            assets: Array<{
+                name: string;
+                browser_download_url: string;
+            }>;
+        };
 
         const arch = process.arch === "x64" ? "amd64" : process.arch;
         const os = process.platform;
@@ -290,7 +296,9 @@ export namespace AptlyUtils.Signing {
 
     async function ensureBinaryGpgKeyring(sourcePath: string, outputPath: string) {
 
-        if (await fs.exists(outputPath)) {
+        const outputExists = await fs.access(outputPath, FS_ACCESS_STATE.R_OK).then(() => true).catch(() => false)
+
+        if (outputExists) {
             Logger.info(`GPG keyring already exists at ${outputPath}, skipping dearmoring.`);
             return outputPath;
         }

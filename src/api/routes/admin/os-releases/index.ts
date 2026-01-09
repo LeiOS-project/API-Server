@@ -11,7 +11,6 @@ import { TaskScheduler } from "../../../../tasks";
 import { RuntimeMetadata } from "../../../utils/metadata";
 import { OSReleaseUtils } from "../../../utils/os-release-utils";
 import { ApiHelperModels } from "../../../utils/shared-models/api-helper-models";
-import { p } from "@hey-api/openapi-ts/dist/config-DCoXG8pO";
 import { TaskHandler } from "@cleverjs/utils";
 import { TaskUtils } from "../../../../tasks/utils";
 
