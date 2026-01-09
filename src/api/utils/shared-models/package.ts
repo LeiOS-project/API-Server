@@ -64,6 +64,7 @@ export namespace PackageModel.GetAll {
 export namespace PackageModel.CreatePackageAsAdmin {
 
     export const Body = createInsertSchema(DB.Schema.packages, {
+
         name: z.string()
             .min(2, "Package names must be at least 2 characters long.")
             .max(63, "Package names cannot exceed 63 characters.")
@@ -78,7 +79,11 @@ export namespace PackageModel.CreatePackageAsAdmin {
             .regex(/^[a-z0-9][a-z0-9+.-]*[a-z0-9]$/, "Package names must be lowercase, may contain + - ., and start/end with a letter or number.")
             .refine((name) => !PackageModel.ForbiddenPackageNames.includes(name as any), {
                 message: "This package name is reserved and cannot be used."
-            })
+            }),
+
+        homepage_url: z.url("Homepage URL must be a valid URL."),
+        description: z.string().min(1, "Description is required").max(500, "Description cannot exceed 500 characters."),
+
     }).omit({
         id: true,
         created_at: true,
