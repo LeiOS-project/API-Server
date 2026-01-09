@@ -34,7 +34,8 @@ router.post('/:versionWithLeiosPatch',
 
         responses: APIResponseSpec.describeWithWrongInputs(
             APIResponseSpec.createdNoData("Package release created successfully"),
-            APIResponseSpec.conflict("Package release with this version already exists")
+            APIResponseSpec.conflict("Package release with this version already exists"),
+            APIResponseSpec.badRequest("Package requires leios patch suffix in version but is missing in version argument / Syntax or validation error in request")
         )
     }),
 
@@ -82,7 +83,7 @@ router.get('/:versionWithLeiosPatch',
 router.post('/:versionWithLeiosPatch/:arch',
 
     APIRouteSpec.authenticated({
-        summary: "Upload package release file for architecture",
+        summary: "Upload package release file for architecture and release into testing repository",
         description: "Upload a release file for the specified package and architecture.",
         tags: [DOCS_TAGS.ADMIN_API.PACKAGES_RELEASES],
 

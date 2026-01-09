@@ -8,7 +8,7 @@ import { AptlyAPI } from "../../../aptly/api";
 import { AptlyUtils } from "../../../aptly/utils";
 import { TaskScheduler } from "../../../tasks";
 import { RuntimeMetadata } from "../metadata";
-import type { PackageReleaseModel } from "../shared-models/pkg-releases";
+import { PackageReleaseModel } from "../shared-models/pkg-releases";
 
 export class PkgReleasesService {
 
@@ -26,6 +26,13 @@ export class PkgReleasesService {
     static async createRelease(c: Context, versionWithLeiosPatch: string) {
         // @ts-ignore
         const packageData = c.get("package") as DB.Models.Package;
+
+        if (packageData.requires_patching) {
+            const matches = versionWithLeiosPatch.match(PackageReleaseModel.versionWithRequiredLeiOSPatchRegex);
+            if (!matches) {
+                return APIResponse.badRequest(c, "Package requires leios patch suffix in version but is missing in version argument");
+            }
+        }
 
         const owner = DB.instance().select().from(DB.Schema.users).where(
             eq(DB.Schema.users.id, packageData.owner_user_id)

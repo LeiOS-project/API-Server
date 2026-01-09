@@ -46,34 +46,67 @@ describe("Testing Aptly Utilities", () => {
 
     test("test regex Version with leios Patch Suffix", () => {
 
-        expect("1.2.3leios1").toMatch(PackageReleaseModel.versionWithLeiosPatchRegex);
-        expect("4.5.6").toMatch(PackageReleaseModel.versionWithLeiosPatchRegex);
-        expect("7.8leios10").toMatch(PackageReleaseModel.versionWithLeiosPatchRegex);
-        expect("3.4.5leios0").toMatch(PackageReleaseModel.versionWithLeiosPatchRegex);
-        expect("10.11.12leios9.9.9").toMatch(PackageReleaseModel.versionWithLeiosPatchRegex);
-        expect("10.11.12-6leios9.9.9").toMatch(PackageReleaseModel.versionWithLeiosPatchRegex);
-        expect("10.11.12-6").toMatch(PackageReleaseModel.versionWithLeiosPatchRegex);
-        expect("1.2.3-1leios1").toMatch(PackageReleaseModel.versionWithLeiosPatchRegex);
-        expect("1.2.3+build.leios1").toMatch(PackageReleaseModel.versionWithLeiosPatchRegex);
-        expect("1.2.3~rc1leios1").toMatch(PackageReleaseModel.versionWithLeiosPatchRegex);
-        expect("1.2.3~rc1+beta-2").toMatch(PackageReleaseModel.versionWithLeiosPatchRegex);
-        expect("1.2.3~rc1+beta-2leios1.1").toMatch(PackageReleaseModel.versionWithLeiosPatchRegex);
-        expect("1.2.3~rc1+beta-2leios1.1.1").toMatch(PackageReleaseModel.versionWithLeiosPatchRegex);
-        expect("1.1.1~beta-1").toMatch(PackageReleaseModel.versionWithLeiosPatchRegex);
-        expect("1.2.3leio").toMatch(PackageReleaseModel.versionWithLeiosPatchRegex);
+        expect("1.2.3leios1").toMatch(PackageReleaseModel.versionWithLeiOSPatchRegex);
+        expect("4.5.6").toMatch(PackageReleaseModel.versionWithLeiOSPatchRegex);
+        expect("7.8leios10").toMatch(PackageReleaseModel.versionWithLeiOSPatchRegex);
+        expect("3.4.5leios0").toMatch(PackageReleaseModel.versionWithLeiOSPatchRegex);
+        expect("10.11.12leios9.9.9").toMatch(PackageReleaseModel.versionWithLeiOSPatchRegex);
+        expect("10.11.12-6leios9.9.9").toMatch(PackageReleaseModel.versionWithLeiOSPatchRegex);
+        expect("10.11.12-6").toMatch(PackageReleaseModel.versionWithLeiOSPatchRegex);
+        expect("1.2.3-1leios1").toMatch(PackageReleaseModel.versionWithLeiOSPatchRegex);
+        expect("1.2.3+build.leios1").toMatch(PackageReleaseModel.versionWithLeiOSPatchRegex);
+        expect("1.2.3~rc1leios1").toMatch(PackageReleaseModel.versionWithLeiOSPatchRegex);
+        expect("1.2.3~rc1+beta-2").toMatch(PackageReleaseModel.versionWithLeiOSPatchRegex);
+        expect("1.2.3~rc1+beta-2leios1.1").toMatch(PackageReleaseModel.versionWithLeiOSPatchRegex);
+        expect("1.2.3~rc1+beta-2leios1.1.1").toMatch(PackageReleaseModel.versionWithLeiOSPatchRegex);
+        expect("1.1.1~beta-1").toMatch(PackageReleaseModel.versionWithLeiOSPatchRegex);
+        expect("1.2.3leio").toMatch(PackageReleaseModel.versionWithLeiOSPatchRegex);
 
-        expect("leios1.2.3").not.toMatch(PackageReleaseModel.versionWithLeiosPatchRegex);
+        expect("leios1.2.3").not.toMatch(PackageReleaseModel.versionWithLeiOSPatchRegex);
         // version of path is missing
-        expect("0.1.2leios").not.toMatch(PackageReleaseModel.versionWithLeiosPatchRegex);
-        expect("1.2.3leios").not.toMatch(PackageReleaseModel.versionWithLeiosPatchRegex);
-        expect("1.2.3leios-1").not.toMatch(PackageReleaseModel.versionWithLeiosPatchRegex);
-        expect("version1.2.3leios1").not.toMatch(PackageReleaseModel.versionWithLeiosPatchRegex);
-        expect("1.2.3leios1patch").not.toMatch(PackageReleaseModel.versionWithLeiosPatchRegex);
+        expect("0.1.2leios").not.toMatch(PackageReleaseModel.versionWithLeiOSPatchRegex);
+        expect("1.2.3leios").not.toMatch(PackageReleaseModel.versionWithLeiOSPatchRegex);
+        expect("1.2.3leios-1").not.toMatch(PackageReleaseModel.versionWithLeiOSPatchRegex);
+        expect("version1.2.3leios1").not.toMatch(PackageReleaseModel.versionWithLeiOSPatchRegex);
+        expect("1.2.3leios1patch").not.toMatch(PackageReleaseModel.versionWithLeiOSPatchRegex);
         // patch can only have up to three dots in between
-        expect("1.2.3leios1.1.1.1").not.toMatch(PackageReleaseModel.versionWithLeiosPatchRegex);
-        expect("1.2.3~rc1+beta-2leios1.1.1.1").not.toMatch(PackageReleaseModel.versionWithLeiosPatchRegex);
-        expect("a1.2.3leios1").not.toMatch(PackageReleaseModel.versionWithLeiosPatchRegex);
-        expect("1.2.3leios1.1+beta").not.toMatch(PackageReleaseModel.versionWithLeiosPatchRegex);
+        expect("1.2.3leios1.1.1.1").not.toMatch(PackageReleaseModel.versionWithLeiOSPatchRegex);
+        expect("1.2.3~rc1+beta-2leios1.1.1.1").not.toMatch(PackageReleaseModel.versionWithLeiOSPatchRegex);
+        expect("a1.2.3leios1").not.toMatch(PackageReleaseModel.versionWithLeiOSPatchRegex);
+        expect("1.2.3leios1.1+beta").not.toMatch(PackageReleaseModel.versionWithLeiOSPatchRegex);
+
+
+        // when leios patch suffix is required
+
+        expect("1.2.3leios1").toMatch(PackageReleaseModel.versionWithRequiredLeiOSPatchRegex);
+        expect("7.8leios10").toMatch(PackageReleaseModel.versionWithRequiredLeiOSPatchRegex);
+        expect("3.4.5leios0").toMatch(PackageReleaseModel.versionWithRequiredLeiOSPatchRegex);
+        expect("10.11.12leios9.9.9").toMatch(PackageReleaseModel.versionWithRequiredLeiOSPatchRegex);
+        expect("10.11.12-6leios9.9.9").toMatch(PackageReleaseModel.versionWithRequiredLeiOSPatchRegex);
+        expect("1.2.3-1leios1").toMatch(PackageReleaseModel.versionWithRequiredLeiOSPatchRegex);
+        expect("1.2.3+build.leios1").toMatch(PackageReleaseModel.versionWithRequiredLeiOSPatchRegex);
+        expect("1.2.3~rc1leios1").toMatch(PackageReleaseModel.versionWithRequiredLeiOSPatchRegex);
+        expect("1.2.3~rc1+beta-2leios1.1").toMatch(PackageReleaseModel.versionWithRequiredLeiOSPatchRegex);
+        expect("1.2.3~rc1+beta-2leios1.1.1").toMatch(PackageReleaseModel.versionWithRequiredLeiOSPatchRegex);
+
+        expect("4.5.6").not.toMatch(PackageReleaseModel.versionWithRequiredLeiOSPatchRegex);
+        expect("leios1.2.3").not.toMatch(PackageReleaseModel.versionWithRequiredLeiOSPatchRegex);
+        expect("10.11.12-6").not.toMatch(PackageReleaseModel.versionWithRequiredLeiOSPatchRegex);
+        expect("1.1.1~beta-1").not.toMatch(PackageReleaseModel.versionWithRequiredLeiOSPatchRegex);
+        expect("1.2.3leio").not.toMatch(PackageReleaseModel.versionWithRequiredLeiOSPatchRegex);
+        expect("1.2.3~rc1+beta-2").not.toMatch(PackageReleaseModel.versionWithRequiredLeiOSPatchRegex);
+
+        // version of path is missing
+        expect("0.1.2leios").not.toMatch(PackageReleaseModel.versionWithRequiredLeiOSPatchRegex);
+        expect("1.2.3leios").not.toMatch(PackageReleaseModel.versionWithRequiredLeiOSPatchRegex);
+        expect("1.2.3leios-1").not.toMatch(PackageReleaseModel.versionWithRequiredLeiOSPatchRegex);
+        expect("version1.2.3leios1").not.toMatch(PackageReleaseModel.versionWithRequiredLeiOSPatchRegex);
+        expect("1.2.3leios1patch").not.toMatch(PackageReleaseModel.versionWithRequiredLeiOSPatchRegex);
+        // patch can only have up to three dots in between
+        expect("1.2.3leios1.1.1.1").not.toMatch(PackageReleaseModel.versionWithRequiredLeiOSPatchRegex);
+        expect("1.2.3~rc1+beta-2leios1.1.1.1").not.toMatch(PackageReleaseModel.versionWithRequiredLeiOSPatchRegex);
+        expect("a1.2.3leios1").not.toMatch(PackageReleaseModel.versionWithRequiredLeiOSPatchRegex);
+        expect("1.2.3leios1.1+beta").not.toMatch(PackageReleaseModel.versionWithRequiredLeiOSPatchRegex);
 
     });
 
