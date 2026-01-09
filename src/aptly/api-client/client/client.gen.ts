@@ -255,6 +255,7 @@ export const createClient = (config: Config = {}): Client => {
       const { opts, url } = await beforeRequest(options);
       return createSseClient({
         ...opts,
+        // @ts-ignore
         body: opts.body as BodyInit | null | undefined,
         headers: opts.headers as unknown as Record<string, string>,
         method,
@@ -267,6 +268,10 @@ export const createClient = (config: Config = {}): Client => {
           }
           return request;
         },
+        serializedBody: getValidRequestBody(opts) as
+          | BodyInit
+          | null
+          | undefined,
         url,
       });
     };
