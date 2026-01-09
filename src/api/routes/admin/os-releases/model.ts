@@ -57,3 +57,11 @@ export namespace OSReleasesModel.GetPublishingLogs {
     export type Response = z.infer<typeof Response>;
 
 }
+
+export namespace OSReleasesModel.UpdateRelease {
+
+    export const Body = OSReleasesModel.CreateRelease.Body.partial();
+
+    export type Body = z.infer<typeof Body>;
+
+}

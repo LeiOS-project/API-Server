@@ -198,3 +198,32 @@ router.get('/:version/publishing-logs',
 		return APIResponse.success(c, "Publishing logs retrieved", { logs } satisfies OSReleasesModel.GetPublishingLogs.Response);
 	}
 );
+
+router.put('/:version',
+
+	APIRouteSpec.authenticated({
+		summary: "Update OS release",
+		description: "Update details of a specific OS release by version.",
+		tags: [DOCS_TAGS.ADMIN_API.OS_RELEASES],
+
+		responses: APIResponseSpec.describeWithWrongInputs(
+			APIResponseSpec.successNoData("OS release updated successfully"),
+			APIResponseSpec.notFound("OS release not found")
+		)
+	}),
+
+	zValidator('json', OSReleasesModel.UpdateRelease.Body),
+
+	async (c) => {
+		// @ts-ignore
+		const release = c.get("osRelease") as DB.Models.OSRelease;
+
+		const updateData = c.req.valid('json');
+
+		await DB.instance().update(DB.Schema.os_releases).set(updateData).where(
+			eq(DB.Schema.os_releases.id, release.id)
+		);
+
+		return APIResponse.successNoData(c, "OS release updated successfully");
+	}
+);
