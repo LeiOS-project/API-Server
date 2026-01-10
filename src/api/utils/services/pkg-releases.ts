@@ -27,6 +27,10 @@ export class PkgReleasesService {
         // @ts-ignore
         const packageData = c.get("package") as DB.Models.Package;
 
+        if (packageData.flags.includes("SYSTEM-MANAGED")) {
+            return APIResponse.forbidden(c, "System-managed packages cannot have new releases created");
+        }
+
         if (packageData.requires_patching) {
             const matches = releaseData.versionWithLeiosPatch.match(PackageReleaseModel.versionWithRequiredLeiOSPatchRegex);
             if (!matches) {
@@ -86,6 +90,13 @@ export class PkgReleasesService {
 
 
     static async updatePkgReleaseAfterMiddleware(c: Context, updateData: PackageReleaseModel.UpdateRelease.Body) {
+        
+        // @ts-ignore
+        const packageData = c.get("package") as DB.Models.Package;
+
+        if (packageData.flags.includes("SYSTEM-MANAGED")) {
+            return APIResponse.forbidden(c, "System-managed packages cannot have their releases updated");
+        }
 
         // @ts-ignore
         const releaseData = c.get("release") as DB.Models.PackageRelease;
@@ -104,6 +115,10 @@ export class PkgReleasesService {
 
         // @ts-ignore
         const packageData = c.get("package") as DB.Models.Package;
+
+        if (packageData.flags.includes("SYSTEM-MANAGED")) {
+            return APIResponse.forbidden(c, "System-managed packages cannot have their releases updated");
+        }
 
         const owner = DB.instance().select().from(DB.Schema.users).where(
             eq(DB.Schema.users.id, packageData.owner_user_id)
@@ -182,6 +197,10 @@ export class PkgReleasesService {
 
         // @ts-ignore
         const packageData = c.get("package") as DB.Models.Package;
+
+        if (packageData.flags.includes("SYSTEM-MANAGED")) {
+            return APIResponse.forbidden(c, "System-managed packages cannot have their releases deleted");
+        }
 
         await RuntimeMetadata.removeOSReleasePendingPackageIfExists(releaseData.id);
 

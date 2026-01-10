@@ -93,7 +93,8 @@ router.put('/:packageName',
 
         responses: APIResponseSpec.describeWithWrongInputs(
             APIResponseSpec.successNoData("Package updated successfully"),
-            APIResponseSpec.notFound("Package with specified Name not found")
+            APIResponseSpec.notFound("Package with specified Name not found"),
+            APIResponseSpec.forbidden("System-managed packages cannot be updated")
         )
     }),
 

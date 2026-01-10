@@ -124,6 +124,9 @@ export class APIResponseSpec {
     static unauthorized(message = "Unauthorized: Authentication is required and has failed or has not yet been provided") {
         return this.genericError(401, message);
     }
+    static forbidden(message = "Forbidden: You do not have permission to access the requested resource") {
+        return this.genericError(403, message);
+    }
 
     static badRequest(message = "Bad Request: Syntax or validation error in request") {
         return this.genericError(400, message);
@@ -160,6 +163,6 @@ export namespace APIResponseSpec.Types {
         responses: DescribeRouteOptions['responses'];
     }
 
-    export type HTTP_ERROR_CODES = 400 | 401 | 404 | 409 | 429 | 500;
+    export type HTTP_ERROR_CODES = 400 | 401 | 403 | 404 | 409 | 429 | 500;
 
 }

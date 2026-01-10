@@ -31,6 +31,9 @@ export class APIResponse {
     static unauthorized(c: Context, message: string) {
         return c.json({ success: false, code: 401, message }, 401);
     }
+    static forbidden(c: Context, message: string) {
+        return c.json({ success: false, code: 403, message }, 403);
+    }
 
     static badRequest(c: Context, message: string) {
         return c.json({ success: false, code: 400, message }, 400);
@@ -99,6 +102,7 @@ export namespace APIResponse.Schema {
 
     export const serverError = APIResponse.Utils.createErrorSchemaFactory(500);
     export const unauthorized = APIResponse.Utils.createErrorSchemaFactory(401);
+    export const forbidden = APIResponse.Utils.createErrorSchemaFactory(403);
     export const badRequest = APIResponse.Utils.createErrorSchemaFactory(400);
     export const notFound = APIResponse.Utils.createErrorSchemaFactory(404);
     export const conflict = APIResponse.Utils.createErrorSchemaFactory(409);
@@ -118,6 +122,7 @@ export namespace APIResponse.Types {
         | z.infer<ReturnType<typeof APIResponse.Schema.created<any, z.ZodType<RequiredReturnData>>>>
         | z.infer<ReturnType<typeof APIResponse.Schema.serverError<any>>>
         | z.infer<ReturnType<typeof APIResponse.Schema.unauthorized<any>>>
+        | z.infer<ReturnType<typeof APIResponse.Schema.forbidden<any>>>
         | z.infer<ReturnType<typeof APIResponse.Schema.badRequest<any>>>
         | z.infer<ReturnType<typeof APIResponse.Schema.notFound<any>>>
         | z.infer<ReturnType<typeof APIResponse.Schema.conflict<any>>>

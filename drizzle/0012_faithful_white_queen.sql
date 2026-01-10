@@ -1,0 +1,1 @@
+ALTER TABLE `packages` ADD `flags` text DEFAULT '[]' NOT NULL;

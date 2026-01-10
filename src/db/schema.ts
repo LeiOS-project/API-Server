@@ -6,6 +6,7 @@ import {
     text
 } from 'drizzle-orm/sqlite-core';
 import { SQLUtils } from './utils';
+import type { PackageModel } from '../api/utils/shared-models/package';
 
 /**
  * @deprecated Use DB.Schema.users instead
@@ -69,6 +70,7 @@ export const packages = sqliteTable('packages', {
     id: int().primaryKey({ autoIncrement: true }),
     name: text().notNull().unique(),
     owner_user_id: int().notNull().references(() => users.id),
+    flags: text({ mode: 'json' }).$type<PackageModel.PackageFlags>().notNull().default(sql`'[]'`),
     description: text().notNull(),
     homepage_url: text().notNull(),
     requires_patching: int({ mode: 'boolean' }).notNull().default(sql`0`),

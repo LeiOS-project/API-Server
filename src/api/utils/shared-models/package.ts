@@ -44,6 +44,20 @@ export namespace PackageModel {
         "leicraft",
         "leios"
     ] as const;
+
+
+    export const PackageFlags = z.array(z.enum([
+
+        // Indicates that the package is fully managed by the system and cannot be modified or deleted by anyone including admins
+        "SYSTEM-MANAGED",
+
+        // Add more flags as needed
+    ])).refine((flags) => {
+        // Ensure no duplicate flags
+        return new Set(flags).size === flags.length;
+    }, { message: "Duplicate flags are not allowed." });
+
+    export type PackageFlags = z.infer<typeof PackageFlags>;
     
 }
 
@@ -87,6 +101,7 @@ export namespace PackageModel.CreatePackageAsAdmin {
     }).omit({
         id: true,
         created_at: true,
+        flags: true,
         latest_stable_release_amd64: true,
         latest_stable_release_arm64: true,
         latest_testing_release_amd64: true,

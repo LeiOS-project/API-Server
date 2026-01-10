@@ -108,6 +108,10 @@ export class PackagesService {
         // @ts-ignore
         const packageData = c.get("package") as DB.Models.Package;
 
+        if (packageData.flags.includes("SYSTEM-MANAGED")) {
+            return APIResponse.forbidden(c, "System-managed packages cannot be updated");
+        }
+
         await DB.instance().update(DB.Schema.packages).set(updateData).where(
             eq(DB.Schema.packages.id, packageData.id)
         );
@@ -118,6 +122,10 @@ export class PackagesService {
     static async deletePackageAfterMiddlewareAsAdmin(c: Context) {
         // @ts-ignore
         const packageData = c.get("package") as DB.Models.Package;
+
+        if (packageData.flags.includes("SYSTEM-MANAGED")) {
+            return APIResponse.forbidden(c, "System-managed packages cannot be deleted");
+        }
 
         const packageReleaseIDs = await DB.instance().select({
             id: DB.Schema.packageReleases.id
