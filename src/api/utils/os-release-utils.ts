@@ -2,7 +2,7 @@ import { Logger } from "../../utils/logger";
 
 export class OSReleaseUtils {
 
-    static getVersionString(date: Date, lastRelease = "0000.00.0") {
+    static getVersionString(date: Date, lastRelease = "0000.00.000") {
 
         const year = date.getUTCFullYear();
         const month = String(date.getUTCMonth() + 1).padStart(2, '0');
@@ -21,7 +21,7 @@ export class OSReleaseUtils {
             releaseNumberThisMonth = lastReleaseNumberThisMonth + 1;
         }
 
-        return `${year}.${month}.${String(releaseNumberThisMonth)}`;
+        return `${year}.${month}.${String(releaseNumberThisMonth).padStart(3, '0')}`;
     }
 
 }

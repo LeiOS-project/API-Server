@@ -82,7 +82,7 @@ router.post('/',
 			// check if any releases exist at all
 			const anyRelease = DB.instance().select().from(DB.Schema.os_releases).limit(1).get();
 			if (!anyRelease) {
-				lastReleaseVersion = "0000.00.0";
+				lastReleaseVersion = "0000.00.000";
 			}
 		}
 

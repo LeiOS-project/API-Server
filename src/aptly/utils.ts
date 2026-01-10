@@ -194,14 +194,14 @@ export class AptlyUtils {
                     name: "leios-stable"
                 },
                 body: {
-                    Name: "leios-stable-0000.00.0",
+                    Name: "leios-stable-0000.00.000",
                     Description: "Initial stable snapshot. This snapshot is empty.",
                 }
             });
             if (!createSnapshotResult.data) {
                 const errMsg = createSnapshotResult.error?.error || "";
                 if (errMsg.includes("already exists")) {
-                    Logger.info("Initial 'leios-stable-0000.00.0' snapshot already exists, skipping creation.");
+                    Logger.info("Initial 'leios-stable-0000.00.000' snapshot already exists, skipping creation.");
                 } else {
                     throw new Error("Failed to create initial snapshot for 'leios-stable' repository: " + errMsg);
                 }
@@ -215,7 +215,7 @@ export class AptlyUtils {
                     SourceKind: "snapshot",
                     Sources: [
                         {
-                            Name: "leios-stable-0000.00.0",
+                            Name: "leios-stable-0000.00.000",
                             Component: "main"
                         }
                     ],

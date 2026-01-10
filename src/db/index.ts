@@ -72,7 +72,7 @@ export class DB {
     static async createInitialOSReleasesMetaIfNeeded() {
 
         // const initalReleaseExists = await this.db.select().from(DB.Schema.os_releases).where(
-        //     eq(DB.Schema.os_releases.version, "0000.00.0")
+        //     eq(DB.Schema.os_releases.version, "0000.00.000")
         // ).get();
 
         // if (!initalReleaseExists) {
@@ -84,21 +84,21 @@ export class DB {
         //     }).returning().get().id;
 
         //     await this.db.insert(DB.Schema.os_releases).values({
-        //         version: "0000.00.0",
+        //         version: "0000.00.000",
         //         changelog: "Initial placeholder release",
         //         taskID,
         //         created_at: new Date(0).getTime(),
         //     });
-        //     Logger.info("Created initial OS release metadata entry (version 0000.00.0)");
+        //     Logger.info("Created initial OS release metadata entry (version 0000.00.000)");
         // }
 
         // no longr used, remove any existing placeholder entries
-        await this.db.delete(DB.Schema.os_releases).where(
-            eq(DB.Schema.os_releases.version, "0000.00.0")
-        );
-        await this.db.delete(DB.Schema.os_releases).where(
-            eq(DB.Schema.os_releases.version, "0000.00.00")
-        );
+        // await this.db.delete(DB.Schema.os_releases).where(
+        //     eq(DB.Schema.os_releases.version, "0000.00.0")
+        // );
+        // await this.db.delete(DB.Schema.os_releases).where(
+        //     eq(DB.Schema.os_releases.version, "0000.00.00")
+        // );
     }
 
     static instance() {
