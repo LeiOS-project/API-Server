@@ -1,6 +1,6 @@
 -- Custom SQL migration file, put your code below! --
-ALTER TABLE `packages` ADD `latest_stable_release` text DEFAULT '{"amd64": null, "arm64": null}';--> statement-breakpoint
-ALTER TABLE `packages` ADD `latest_testing_release` text DEFAULT '{"amd64": null, "arm64": null}';--> statement-breakpoint
+ALTER TABLE `packages` ADD `latest_stable_release` text DEFAULT '{"amd64": null, "arm64": null}' NOT NULL;--> statement-breakpoint
+ALTER TABLE `packages` ADD `latest_testing_release` text DEFAULT '{"amd64": null, "arm64": null}' NOT NULL;--> statement-breakpoint
 
 UPDATE `packages` SET `latest_stable_release` = json_object(
     'amd64', `latest_stable_release_amd64`, 

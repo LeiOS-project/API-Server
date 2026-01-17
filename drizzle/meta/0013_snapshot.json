@@ -1,8 +1,8 @@
 {
-  "id": "205c18d3-f1df-4723-8299-4df5344e738c",
-  "prevId": "597724e5-775b-465b-b156-83f3cfefb5e2",
   "version": "6",
   "dialect": "sqlite",
+  "id": "6d58576c-6ab3-4e8f-86cc-6379bc63edfd",
+  "prevId": "597724e5-775b-465b-b156-83f3cfefb5e2",
   "tables": {
     "api_keys": {
       "name": "api_keys",
@@ -63,28 +63,28 @@
         "api_keys_user_id_users_id_fk": {
           "name": "api_keys_user_id_users_id_fk",
           "tableFrom": "api_keys",
+          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "api_keys_user_role_users_role_fk": {
           "name": "api_keys_user_role_users_role_fk",
           "tableFrom": "api_keys",
+          "tableTo": "users",
           "columnsFrom": [
             "user_role"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "role"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -168,15 +168,15 @@
         "os_releases_taskID_scheduled_tasks_id_fk": {
           "name": "os_releases_taskID_scheduled_tasks_id_fk",
           "tableFrom": "os_releases",
+          "tableTo": "scheduled_tasks",
           "columnsFrom": [
             "taskID"
           ],
-          "tableTo": "scheduled_tasks",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -235,15 +235,15 @@
         "package_releases_package_id_packages_id_fk": {
           "name": "package_releases_package_id_packages_id_fk",
           "tableFrom": "package_releases",
+          "tableTo": "packages",
           "columnsFrom": [
             "package_id"
           ],
-          "tableTo": "packages",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -312,33 +312,21 @@
           "autoincrement": false,
           "default": "(unixepoch() * 1000)"
         },
-        "latest_stable_release_amd64": {
-          "name": "latest_stable_release_amd64",
+        "latest_stable_release": {
+          "name": "latest_stable_release",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'{\"amd64\": null, \"arm64\": null}'"
         },
-        "latest_stable_release_arm64": {
-          "name": "latest_stable_release_arm64",
+        "latest_testing_release": {
+          "name": "latest_testing_release",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "latest_testing_release_amd64": {
-          "name": "latest_testing_release_amd64",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "latest_testing_release_arm64": {
-          "name": "latest_testing_release_arm64",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'{\"amd64\": null, \"arm64\": null}'"
         }
       },
       "indexes": {
@@ -354,15 +342,15 @@
         "packages_owner_user_id_users_id_fk": {
           "name": "packages_owner_user_id_users_id_fk",
           "tableFrom": "packages",
+          "tableTo": "users",
           "columnsFrom": [
             "owner_user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -407,15 +395,15 @@
         "password_resets_user_id_users_id_fk": {
           "name": "password_resets_user_id_users_id_fk",
           "tableFrom": "password_resets",
+          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -511,15 +499,15 @@
         "scheduled_tasks_created_by_user_id_users_id_fk": {
           "name": "scheduled_tasks_created_by_user_id_users_id_fk",
           "tableFrom": "scheduled_tasks",
+          "tableTo": "users",
           "columnsFrom": [
             "created_by_user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -556,15 +544,15 @@
         "scheduled_tasks_paused_state_task_id_scheduled_tasks_id_fk": {
           "name": "scheduled_tasks_paused_state_task_id_scheduled_tasks_id_fk",
           "tableFrom": "scheduled_tasks_paused_state",
+          "tableTo": "scheduled_tasks",
           "columnsFrom": [
             "task_id"
           ],
-          "tableTo": "scheduled_tasks",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -623,28 +611,28 @@
         "sessions_user_id_users_id_fk": {
           "name": "sessions_user_id_users_id_fk",
           "tableFrom": "sessions",
+          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "sessions_user_role_users_role_fk": {
           "name": "sessions_user_role_users_role_fk",
           "tableFrom": "sessions",
+          "tableTo": "users",
           "columnsFrom": [
             "user_role"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "role"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -712,28 +700,28 @@
         "stable_promotion_requests_package_id_packages_id_fk": {
           "name": "stable_promotion_requests_package_id_packages_id_fk",
           "tableFrom": "stable_promotion_requests",
+          "tableTo": "packages",
           "columnsFrom": [
             "package_id"
           ],
-          "tableTo": "packages",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "stable_promotion_requests_package_release_id_package_releases_id_fk": {
           "name": "stable_promotion_requests_package_release_id_package_releases_id_fk",
           "tableFrom": "stable_promotion_requests",
+          "tableTo": "package_releases",
           "columnsFrom": [
             "package_release_id"
           ],
-          "tableTo": "package_releases",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -820,9 +808,9 @@
   "views": {},
   "enums": {},
   "_meta": {
-    "columns": {},
     "schemas": {},
-    "tables": {}
+    "tables": {},
+    "columns": {}
   },
   "internal": {
     "indexes": {}
