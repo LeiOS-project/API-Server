@@ -15,6 +15,7 @@ export namespace OSReleasesModel.GetByVersion {
 
     export const Response = createSelectSchema(DB.Schema.os_releases).extend({
         published_at: z.number().nullable(),
+        //@ts-ignore
         publishing_status: z.enum(["pending", "running", "paused", "failed", "completed"] satisfies TuplifyUnion<TaskHandler.BaseTaskData<{}>["status"]>)
     }).omit({
         taskID: true,

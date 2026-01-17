@@ -175,25 +175,28 @@ export class PkgReleasesService {
             });
 
             if (arch === "amd64") {
-                await DB.instance().update(DB.Schema.packages).set({
-                    latest_testing_release_amd64: releaseData.versionWithLeiosPatch
-                }).where(
-                    eq(DB.Schema.packages.id, packageData.id)
-                );
+
+                packageData.latest_testing_release.amd64 = releaseData.versionWithLeiosPatch;
+
             } else if (arch === "arm64") {
-                await DB.instance().update(DB.Schema.packages).set({
-                    latest_testing_release_arm64: releaseData.versionWithLeiosPatch
-                }).where(
-                    eq(DB.Schema.packages.id, packageData.id)
-                );
+
+                packageData.latest_testing_release.arm64 = releaseData.versionWithLeiosPatch;
+
             } else if (arch === "all") {
-                await DB.instance().update(DB.Schema.packages).set({
-                    latest_testing_release_amd64: releaseData.versionWithLeiosPatch,
-                    latest_testing_release_arm64: releaseData.versionWithLeiosPatch
-                }).where(
-                    eq(DB.Schema.packages.id, packageData.id)
-                );
+
+                packageData.latest_testing_release = {
+                    amd64: releaseData.versionWithLeiosPatch,
+                    arm64: releaseData.versionWithLeiosPatch
+                };
+            } else {
+                throw new Error("Unrecognized architecture: " + arch);
             }
+
+            await DB.instance().update(DB.Schema.packages).set({
+                latest_testing_release: packageData.latest_testing_release
+            }).where(
+                eq(DB.Schema.packages.id, packageData.id)
+            );
 
         } catch (error) {
             return APIResponse.serverError(c, "Failed to upload and verify package release: " + error);

@@ -75,7 +75,7 @@ export const packages = sqliteTable('packages', {
     homepage_url: text().notNull(),
     requires_patching: int({ mode: 'boolean' }).notNull().default(sql`0`),
     created_at: SQLUtils.getCreatedAtColumn(),
-    
+
     // version strings of version + leios patch if exists
     latest_stable_release: text({ mode: "json" }).notNull().$type<{
         amd64: string | null;
@@ -95,8 +95,15 @@ export const packageReleases = sqliteTable('package_releases', {
     id: int().primaryKey({ autoIncrement: true }),
     package_id: int().notNull().references(() => packages.id),
     versionWithLeiosPatch: text().notNull(),
+    
     // architecture: text({ enum: ['amd64', 'arm64'] }).notNull(),
-    architectures: text({ mode: "json" }).$type<("amd64" | "arm64")[]>().notNull(),
+    //architectures: text({ mode: "json" }).$type<("amd64" | "arm64")[]>().notNull(),
+    architectures: text({ mode: "json" }).notNull().$type<{
+        amd64: boolean;
+        arm64: boolean;
+        is_all: boolean;
+    }>().default(sql`'{"amd64": false, "arm64": false, "is_all": false}'`),
+
     created_at: SQLUtils.getCreatedAtColumn(),
     changelog: text().notNull(),
 });
