@@ -102,10 +102,8 @@ export namespace PackageModel.CreatePackageAsAdmin {
         id: true,
         created_at: true,
         flags: true,
-        latest_stable_release_amd64: true,
-        latest_stable_release_arm64: true,
-        latest_testing_release_amd64: true,
-        latest_testing_release_arm64: true
+        latest_stable_release: true,
+        latest_testing_release: true,
     });
 
     export type Body = z.infer<typeof Body>;

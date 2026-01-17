@@ -23,9 +23,7 @@ export namespace PackageReleaseModel {
 
 export namespace PackageReleaseModel.GetReleaseByVersion {
 
-    export const Response = createSelectSchema(DB.Schema.packageReleases, {
-        architectures: z.array(z.enum(["amd64", "arm64"]))
-    }).omit({
+    export const Response = createSelectSchema(DB.Schema.packageReleases).omit({
         package_id: true
     });
     export type Response = z.infer<typeof Response>;

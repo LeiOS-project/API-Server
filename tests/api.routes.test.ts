@@ -293,7 +293,11 @@ describe("Public package routes", () => {
             package_id: tempPkg.id,
             versionWithLeiosPatch: "1.0.0",
             changelog: "Initial release",
-            architectures:  ["amd64"]
+            architectures: {
+                amd64: true,
+                arm64: false,
+                is_all: false
+            }
         }).returning().get();
 
         // const listRes = await API.getApp().request("/public/packages");

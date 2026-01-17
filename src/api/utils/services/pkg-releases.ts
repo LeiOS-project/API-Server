@@ -59,7 +59,6 @@ export class PkgReleasesService {
         await DB.instance().insert(DB.Schema.packageReleases).values({
             package_id: packageData.id,
             ...releaseData,
-            architectures: []
         });
 
         return APIResponse.createdNoData(c, "Package release created successfully");
@@ -127,8 +126,8 @@ export class PkgReleasesService {
             throw new Error("User is authenticated but not found in database");
         }
 
-        // cammpt upload "all" when there is already some arch uploaded 
-        const existingArchForRelease = arch === "all" ? releaseData.architectures.length > 0 : releaseData.architectures.includes(arch);
+        // upload "all" when there is already some arch uploaded 
+        const existingArchForRelease = arch === "all" ? releaseData.architectures.is_all : releaseData.architectures[arch];
 
         if (existingArchForRelease) {
             return APIResponse.conflict(c, "Package release already contains a release for this architecture");
@@ -150,8 +149,15 @@ export class PkgReleasesService {
                 return APIResponse.serverError(c, "Failed to upload and verify package release asset");
             }
 
-            // cleanup everything in testing repo first but ensure we only cleanup for this architecture
-            const cleanupResult = await AptlyAPI.Packages.deleteInRepo("leios-testing", packageData.name, undefined, arch);
+            let cleanupResult: boolean;
+
+            if (arch === "all") {
+                // when uploading "all", we need to cleanup both architectures
+                cleanupResult = await AptlyAPI.Packages.deleteInRepo("leios-testing", packageData.name, undefined);
+            } else {
+                // cleanup everything in testing repo first but ensure we only cleanup for this architecture
+                cleanupResult = await AptlyAPI.Packages.deleteInRepo("leios-testing", packageData.name, undefined, arch);
+            }
             if (!cleanupResult) {
                 return APIResponse.serverError(c, "Failed to clean up existing package releases in testing repository");
             }
@@ -164,9 +170,13 @@ export class PkgReleasesService {
             await TaskScheduler.enqueueTask("testing-repo:update", {}, { created_by_user_id: null });
 
             if (arch === "all") {
-                releaseData.architectures = ["amd64", "arm64"];
+                releaseData.architectures = {
+                    amd64: true,
+                    arm64: true,
+                    is_all: true
+                };
             } else {
-                releaseData.architectures.push(arch);
+                releaseData.architectures[arch] = true;
             }
 
             await DB.instance().update(DB.Schema.packageReleases).set({
@@ -174,7 +184,13 @@ export class PkgReleasesService {
                 architectures: releaseData.architectures
             });
 
-            if (arch === "amd64") {
+            if (arch === "all") {
+
+                packageData.latest_testing_release = {
+                    amd64: releaseData.versionWithLeiosPatch,
+                    arm64: releaseData.versionWithLeiosPatch
+                };
+            } else if (arch === "amd64") {
 
                 packageData.latest_testing_release.amd64 = releaseData.versionWithLeiosPatch;
 
@@ -182,12 +198,6 @@ export class PkgReleasesService {
 
                 packageData.latest_testing_release.arm64 = releaseData.versionWithLeiosPatch;
 
-            } else if (arch === "all") {
-
-                packageData.latest_testing_release = {
-                    amd64: releaseData.versionWithLeiosPatch,
-                    arm64: releaseData.versionWithLeiosPatch
-                };
             } else {
                 throw new Error("Unrecognized architecture: " + arch);
             }

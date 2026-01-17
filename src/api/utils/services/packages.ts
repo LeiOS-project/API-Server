@@ -29,6 +29,8 @@ export class PackagesService {
         }
     }
 
+    static async createPackage(c: Context, packageData: PackageModel.CreatePackage.Body, asAdmin?: false): Promise<APIResponse.Types.BasicReturnData>;
+    static async createPackage(c: Context, packageData: PackageModel.CreatePackageAsAdmin.Body, asAdmin: true): Promise<APIResponse.Types.BasicReturnData>;
     static async createPackage(c: Context, packageData: PackageModel.CreatePackage.Body | PackageModel.CreatePackageAsAdmin.Body, asAdmin = false) {
 
         if (asAdmin) {

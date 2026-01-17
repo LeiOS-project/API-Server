@@ -116,6 +116,18 @@ export namespace APIResponse.Types {
 
     export type NonRequiredReturnData = null | RequiredReturnData;
 
+    export type BasicReturnData = 
+        | ReturnType<typeof APIResponse.success>
+        | ReturnType<typeof APIResponse.accepted>
+        | ReturnType<typeof APIResponse.created>
+        | ReturnType<typeof APIResponse.serverError>
+        | ReturnType<typeof APIResponse.unauthorized>
+        | ReturnType<typeof APIResponse.forbidden>
+        | ReturnType<typeof APIResponse.badRequest>
+        | ReturnType<typeof APIResponse.notFound>
+        | ReturnType<typeof APIResponse.conflict>
+        | ReturnType<typeof APIResponse.tooManyRequests>;
+
     export type BasicResponseSchema =
         | z.infer<ReturnType<typeof APIResponse.Schema.success<any, z.ZodType<NonRequiredReturnData>>>>
         | z.infer<ReturnType<typeof APIResponse.Schema.accepted<any, z.ZodType<RequiredReturnData>>>>

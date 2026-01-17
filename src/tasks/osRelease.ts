@@ -38,51 +38,80 @@ OsReleaseTask.addStep("Move packages from archive to local stable repo", async (
                 continue;
             }
 
-            const release = DB.instance().select().from(DB.Schema.packageReleases).where(
-                eq(DB.Schema.packageReleases.id, pkgReleaseID)
-            ).get();
+            const result = await DB.instance().transaction(async (tx) => {
 
-            if (!release) {
-                logger.error(`Package release with ID ${pkgReleaseID} not found, skipping.`);
-                continue;
-            }
+                const release = tx.select().from(DB.Schema.packageReleases).where(
+                    eq(DB.Schema.packageReleases.id, pkgReleaseID)
+                ).get();
 
-            const packageName = DB.instance().select().from(DB.Schema.packages).where(
-                eq(DB.Schema.packages.id, release.package_id)
-            ).get()?.name;
+                if (!release) {
+                    logger.error(`Package release with ID ${pkgReleaseID} not found, skipping.`);
+                    tx.rollback()
+                    return false;
+                }
 
-            if (!packageName) {
-                logger.error(`Package with ID ${release.package_id} not found for release ID ${pkgReleaseID}, skipping.`);
-                continue;
-            }
-
-            
-
-            if (release.architectures.includes("amd64")) {
-
-                // delete in stable for this package first but ensure we only delete for this architecture
-                await AptlyAPI.Packages.deleteInRepo("leios-stable", packageName, undefined, "amd64");
-
-                await AptlyAPI.Packages.copyIntoRepo("leios-stable", packageName, release.versionWithLeiosPatch, "amd64");
-
-                await DB.instance().update(DB.Schema.packages).set({
-                    latest_stable_release_amd64: release.versionWithLeiosPatch
-                }).where(
+                const packageData = tx.select().from(DB.Schema.packages).where(
                     eq(DB.Schema.packages.id, release.package_id)
-                );
-            }
-            if (release.architectures.includes("arm64")) {
+                ).get();
 
-                // delete in stable for this package first but ensure we only delete for this architecture
-                await AptlyAPI.Packages.deleteInRepo("leios-stable", packageName, undefined, "arm64");
+                if (!packageData?.name) {
+                    logger.error(`Package with ID ${release.package_id} not found for release ID ${pkgReleaseID}, skipping.`);
+                    tx.rollback()
+                    return false;
+                }
 
-                await AptlyAPI.Packages.copyIntoRepo("leios-stable", packageName, release.versionWithLeiosPatch, "arm64");
+                if (release.architectures.is_all) {
 
-                await DB.instance().update(DB.Schema.packages).set({
-                    latest_stable_release_arm64: release.versionWithLeiosPatch
+                    if (!release.architectures.amd64 || !release.architectures.arm64) {
+                        logger.error(`Release ID ${pkgReleaseID} marked as 'all' architectures but missing specific architectures, skipping.`);
+                        tx.rollback()
+                        return false;
+                    }
+
+                    // delete in stable for this package first
+                    await AptlyAPI.Packages.deleteInRepo("leios-stable", packageData.name);
+
+                    await AptlyAPI.Packages.copyIntoRepo("leios-stable", packageData.name, release.versionWithLeiosPatch, "all");
+
+                    packageData.latest_stable_release = {
+                        amd64: release.versionWithLeiosPatch,
+                        arm64: release.versionWithLeiosPatch
+                    };
+
+                } else {
+
+                    if (release.architectures.amd64) {
+
+                        // delete in stable for this package first but ensure we only delete for this architecture
+                        await AptlyAPI.Packages.deleteInRepo("leios-stable", packageData.name, undefined, "amd64");
+
+                        await AptlyAPI.Packages.copyIntoRepo("leios-stable", packageData.name, release.versionWithLeiosPatch, "amd64");
+
+                        packageData.latest_stable_release.amd64 = release.versionWithLeiosPatch;
+                    }
+                    if (release.architectures.arm64) {
+
+                        // delete in stable for this package first but ensure we only delete for this architecture
+                        await AptlyAPI.Packages.deleteInRepo("leios-stable", packageData.name, undefined, "arm64");
+
+                        await AptlyAPI.Packages.copyIntoRepo("leios-stable", packageData.name, release.versionWithLeiosPatch, "arm64");
+
+                        packageData.latest_stable_release.arm64 = release.versionWithLeiosPatch;
+                    }
+
+                }
+
+                await tx.update(DB.Schema.packages).set({
+                    latest_stable_release: packageData.latest_stable_release
                 }).where(
-                    eq(DB.Schema.packages.id, release.package_id)
+                    eq(DB.Schema.packages.id, packageData.id)
                 );
+
+                return true;
+            });
+
+            if (!result) {
+                continue;
             }
 
         } catch (err) {
