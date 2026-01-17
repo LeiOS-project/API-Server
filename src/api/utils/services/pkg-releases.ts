@@ -109,7 +109,7 @@ export class PkgReleasesService {
     }
 
 
-    static async uploadReleaseAssetAfterMiddleware(c: Context, file: File, arch: "amd64" | "arm64", isAdmin = false) {
+    static async uploadReleaseAssetAfterMiddleware(c: Context, file: File, arch: "amd64" | "arm64" | "all", isAdmin = false) {
         // @ts-ignore
         const releaseData = c.get("release") as DB.Models.PackageRelease;
 
@@ -127,7 +127,8 @@ export class PkgReleasesService {
             throw new Error("User is authenticated but not found in database");
         }
 
-        const existingArchForRelease = releaseData.architectures.includes(arch);
+        // cammpt upload "all" when there is already some arch uploaded 
+        const existingArchForRelease = arch === "all" ? releaseData.architectures.length > 0 : releaseData.architectures.includes(arch);
 
         if (existingArchForRelease) {
             return APIResponse.conflict(c, "Package release already contains a release for this architecture");
@@ -162,7 +163,11 @@ export class PkgReleasesService {
 
             await TaskScheduler.enqueueTask("testing-repo:update", {}, { created_by_user_id: null });
 
-            releaseData.architectures.push(arch);
+            if (arch === "all") {
+                releaseData.architectures = ["amd64", "arm64"];
+            } else {
+                releaseData.architectures.push(arch);
+            }
 
             await DB.instance().update(DB.Schema.packageReleases).set({
                 package_id: packageData.id,
@@ -177,6 +182,13 @@ export class PkgReleasesService {
                 );
             } else if (arch === "arm64") {
                 await DB.instance().update(DB.Schema.packages).set({
+                    latest_testing_release_arm64: releaseData.versionWithLeiosPatch
+                }).where(
+                    eq(DB.Schema.packages.id, packageData.id)
+                );
+            } else if (arch === "all") {
+                await DB.instance().update(DB.Schema.packages).set({
+                    latest_testing_release_amd64: releaseData.versionWithLeiosPatch,
                     latest_testing_release_arm64: releaseData.versionWithLeiosPatch
                 }).where(
                     eq(DB.Schema.packages.id, packageData.id)

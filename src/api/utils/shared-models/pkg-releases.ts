@@ -14,9 +14,9 @@ export namespace PackageReleaseModel {
         versionWithLeiosPatch: z.string().regex(versionWithLeiOSPatchRegex)
     });
 
-    export const ParamWithArch = z.object({
+    export const PostParamWithArch = z.object({
         // versionWithLeiosPatch: z.string().regex(versionWithLeiOSPatchRegex),
-        arch: z.enum(["amd64", "arm64"])
+        arch: z.enum(["amd64", "arm64", "all"])
     });
 
 }

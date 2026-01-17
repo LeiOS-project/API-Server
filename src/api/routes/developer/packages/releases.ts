@@ -119,7 +119,7 @@ router.post('/:versionWithLeiosPatch/:arch',
 
     zValidator("form", PackageReleaseModel.UploadReleaseAssetForArch.FileInput),
 
-    zValidator("param", PackageReleaseModel.ParamWithArch),
+    zValidator("param", PackageReleaseModel.PostParamWithArch),
 
     async (c) => {
         const { file } = c.req.valid("form");

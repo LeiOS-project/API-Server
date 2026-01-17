@@ -76,10 +76,14 @@ export const packages = sqliteTable('packages', {
     requires_patching: int({ mode: 'boolean' }).notNull().default(sql`0`),
     created_at: SQLUtils.getCreatedAtColumn(),
     // version strings of version + leios patch if exists
-    latest_stable_release_amd64: text(),
-    latest_stable_release_arm64: text(),
-    latest_testing_release_amd64: text(),
-    latest_testing_release_arm64: text(),
+    latest_stable_release: text({ mode: "json" }).$type<{
+        amd64: string | null;
+        arm64: string | null;
+    }>().default(sql`'{"amd64": null, "arm64": null}'`),
+    latest_testing_release: text({ mode: "json" }).$type<{
+        amd64: string | null;
+        arm64: string | null;
+    }>().default(sql`'{"amd64": null, "arm64": null}'`),
 });
 
 /**

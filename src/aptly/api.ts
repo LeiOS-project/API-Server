@@ -9,7 +9,7 @@ export namespace AptlyAPI.Utils {
     export const REPOS = ["leios-stable", "leios-testing", "leios-archive"] as const;
     export type Repos = (typeof REPOS)[number];
 
-    export const ARCHITECTURES = ["amd64", "arm64"] as const;
+    export const ARCHITECTURES = ["amd64", "arm64", "all"] as const;
     export type Architectures = (typeof ARCHITECTURES)[number];
 
 }
@@ -122,7 +122,8 @@ export namespace AptlyAPI.Packages {
         const pkgs = await getInRepo(repoName, packageName, packageVersionWithLeiosPatch);
         const returnData: {
             "amd64"?: AptlyAPI.Packages.Models.PackageInfo,
-            "arm64"?: AptlyAPI.Packages.Models.PackageInfo
+            "arm64"?: AptlyAPI.Packages.Models.PackageInfo,
+            "all"?: AptlyAPI.Packages.Models.PackageInfo
         } = {};
         
         for (const pkg of pkgs) {
@@ -368,7 +369,8 @@ export namespace AptlyAPI.Packages.Models {
 
     export const getVersionInRepoResponse = z.object({
         "amd64": PackageInfo.optional(),
-        "arm64": PackageInfo.optional()
+        "arm64": PackageInfo.optional(),
+        "all": PackageInfo.optional()
     });
     export type getVersionInRepoResponse = z.infer<typeof getVersionInRepoResponse>;
 
