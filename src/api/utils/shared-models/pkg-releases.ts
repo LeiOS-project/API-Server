@@ -23,7 +23,13 @@ export namespace PackageReleaseModel {
 
 export namespace PackageReleaseModel.GetReleaseByVersion {
 
-    export const Response = createSelectSchema(DB.Schema.packageReleases).omit({
+    export const Response = createSelectSchema(DB.Schema.packageReleases, {
+        architectures: z.object({
+            amd64: z.boolean(),
+            arm64: z.boolean(),
+            is_all: z.boolean()
+        })
+    }).omit({
         package_id: true
     });
     export type Response = z.infer<typeof Response>;

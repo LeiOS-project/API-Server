@@ -63,7 +63,17 @@ export namespace PackageModel {
 
 export namespace PackageModel.GetPackageByName {
     
-    export const Response = createSelectSchema(DB.Schema.packages);
+    export const Response = createSelectSchema(DB.Schema.packages, {
+        latest_stable_release: z.object({
+            amd64: z.string().nullable(),
+            arm64: z.string().nullable(),
+        }),
+        latest_testing_release: z.object({
+            amd64: z.string().nullable(),
+            arm64: z.string().nullable(),
+        })
+    });
+
     export type Response = z.infer<typeof Response>;
 
 }
