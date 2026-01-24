@@ -40,7 +40,7 @@ router.get('/',
 
         const requests = await query;
 
-        return APIResponse.success(c, "Stable promotion requests retrieved successfully", requests);;
+        return APIResponse.success(c, "Stable promotion requests retrieved successfully", requests satisfies StablePromotionRequestsModel.Entity[]);
     }
 );
 
@@ -90,6 +90,6 @@ router.post('/',
             status: "pending"
         }).returning().get();
 
-        return APIResponse.created(c, "Stable promotion request submitted", { id: result.id } );
+        return APIResponse.created(c, "Stable promotion request submitted", { id: result.id } satisfies StablePromotionRequestsModel.Create.Response );
     }
 )

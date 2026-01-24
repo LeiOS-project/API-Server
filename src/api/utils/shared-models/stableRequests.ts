@@ -17,13 +17,14 @@ export namespace StablePromotionRequestsModel {
     export type Pending = z.infer<typeof Pending>;
 
     export const Approved = Entity.extend({
-        status: z.literal("approved")
+        status: z.literal("approved"),
+        admin_note: z.string().nullable()
     });
     export type Approved = z.infer<typeof Approved>;
 
     export const Denied = Entity.extend({
         status: z.literal("denied"),
-        admin_note: z.string()
+        admin_note: z.string().nullable()
     });
     export type Denied = z.infer<typeof Denied>;
 
