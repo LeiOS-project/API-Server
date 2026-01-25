@@ -33,7 +33,27 @@ export async function setupPackageStablePromotionRequestRoutes(router: Hono, adm
 
             const filters = c.req.valid("query");
 
-            let query = DB.instance().select().from(DB.Schema.stablePromotionRequests).where(
+            let query = DB.instance().select({
+                id: DB.Schema.stablePromotionRequests.id,
+                package_id: DB.Schema.stablePromotionRequests.package_id,
+                package_release_id: DB.Schema.stablePromotionRequests.package_release_id,
+                created_at: DB.Schema.stablePromotionRequests.created_at,
+                status: DB.Schema.stablePromotionRequests.status,
+                admin_note: DB.Schema.stablePromotionRequests.admin_note,
+
+                package_name: DB.Schema.packages.name,
+                package_release_version: DB.Schema.packageReleases.versionWithLeiosPatch,
+            })
+            .from(DB.Schema.stablePromotionRequests)
+            .innerJoin(
+                DB.Schema.packages,
+                eq(DB.Schema.packages.id, DB.Schema.stablePromotionRequests.package_id),
+            )
+            .innerJoin(
+                DB.Schema.packageReleases,
+                eq(DB.Schema.packageReleases.id, DB.Schema.stablePromotionRequests.package_release_id),
+            )
+            .where(
                 eq(DB.Schema.stablePromotionRequests.package_id, packageData.id)
             ).$dynamic();
 
@@ -41,9 +61,9 @@ export async function setupPackageStablePromotionRequestRoutes(router: Hono, adm
                 query = query.where(eq(DB.Schema.stablePromotionRequests.status, filters.status));
             }
 
-            const requests = await query;
+            const requests = (await query satisfies StablePromotionRequestsModel.Entity[]) as StablePromotionRequestsModel.GetAll.Response;
 
-            return APIResponse.success(c, "Stable promotion requests retrieved successfully", requests satisfies StablePromotionRequestsModel.Entity[]);
+            return APIResponse.success(c, "Stable promotion requests retrieved successfully", requests satisfies StablePromotionRequestsModel.GetAll.Response);
         }
     );
 
@@ -110,17 +130,37 @@ export async function setupPackageStablePromotionRequestRoutes(router: Hono, adm
             // @ts-ignore
             const packageData = c.get("package") as DB.Models.Package;
 
-            const requestData = await DB.instance().select().from(DB.Schema.stablePromotionRequests).where(and(
+            const requestData = await DB.instance().select({
+                id: DB.Schema.stablePromotionRequests.id,
+                package_id: DB.Schema.stablePromotionRequests.package_id,
+                package_release_id: DB.Schema.stablePromotionRequests.package_release_id,
+                created_at: DB.Schema.stablePromotionRequests.created_at,
+                status: DB.Schema.stablePromotionRequests.status,
+                admin_note: DB.Schema.stablePromotionRequests.admin_note,
+
+                package_name: DB.Schema.packages.name,
+                package_release_version: DB.Schema.packageReleases.versionWithLeiosPatch,
+            })
+            .from(DB.Schema.stablePromotionRequests)
+            .innerJoin(
+                DB.Schema.packages,
+                eq(DB.Schema.packages.id, DB.Schema.stablePromotionRequests.package_id),
+            )
+            .innerJoin(
+                DB.Schema.packageReleases,
+                eq(DB.Schema.packageReleases.id, DB.Schema.stablePromotionRequests.package_release_id),
+            )
+            .where(and(
                 eq(DB.Schema.stablePromotionRequests.id, stablePromotionRequestID),
                 eq(DB.Schema.stablePromotionRequests.package_id, packageData.id)
-            )).get();
+            )).get() satisfies StablePromotionRequestsModel.Entity | undefined;
 
             if (!requestData) {
                 return APIResponse.notFound(c, "Stable promotion request not found for this package");
             }
 
             // @ts-ignore
-            c.set("stablePromotionRequest", requestData as DB.Models.StablePromotionRequest);
+            c.set("stablePromotionRequest", requestData);
 
             await next();
         }

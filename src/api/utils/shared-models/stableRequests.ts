@@ -7,7 +7,10 @@ export namespace StablePromotionRequestsModel {
     export const Status = z.enum(["pending", "approved", "denied"]);
     export type Status = z.infer<typeof Status>;
 
-    export const Entity = createSelectSchema(DB.Schema.stablePromotionRequests);
+    export const Entity = createSelectSchema(DB.Schema.stablePromotionRequests).extend({
+        package_name: z.string(),
+        package_release_version: z.string()
+    });
     export type Entity = z.infer<typeof Entity>;
 
     export const Pending = Entity.extend({
@@ -31,6 +34,17 @@ export namespace StablePromotionRequestsModel {
     export const Union = z.union([Pending, Approved, Denied]);
     export type Union = z.infer<typeof Union>;
 
+    
+    export type AsUnion<T extends Entity> =
+        T extends Pending ? Pending :
+        T extends Approved ? Approved :
+        T extends Denied ? Denied :
+        never;
+
+    export type MergegedUnion<T extends Union> = Entity
+
+    export type MergegedUnions<T extends (Approved | Denied | Pending)[]> = MergegedUnion<T[number]>;
+
 }
 
 export namespace StablePromotionRequestsModel.GetByID {
@@ -51,6 +65,7 @@ export namespace StablePromotionRequestsModel.GetAll {
 }
 
 export namespace StablePromotionRequestsModel.Create {
+
     export const Body = createInsertSchema(DB.Schema.stablePromotionRequests).omit({
         id: true,
         created_at: true,
