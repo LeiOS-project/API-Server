@@ -33,6 +33,12 @@ export namespace StablePromotionRequestsModel {
 
 }
 
+export namespace StablePromotionRequestsModel.GetByID {
+
+    export const Response = StablePromotionRequestsModel.Union;
+    export type Response = z.infer<typeof Response>;
+}
+
 export namespace StablePromotionRequestsModel.GetAll {
 
     export const Query = z.object({
@@ -40,7 +46,7 @@ export namespace StablePromotionRequestsModel.GetAll {
     });
     export type Query = z.infer<typeof Query>;
 
-    export const Response = z.array(Union);
+    export const Response = z.array(StablePromotionRequestsModel.GetByID.Response);
     export type Response = z.infer<typeof Response>;
 }
 
