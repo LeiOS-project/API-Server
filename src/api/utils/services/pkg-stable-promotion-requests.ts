@@ -96,22 +96,22 @@ export async function setupPackageStablePromotionRequestRoutes(router: Hono, adm
         }
     )
 
-    router.use('/:requestID',
+    router.use('/:stablePromotionRequestID',
         
         zValidator("param", z.object({
-            requestID: z.coerce.number().int().positive()
+            stablePromotionRequestID: z.coerce.number().int().positive()
         })),
 
         async (c, next) => {
 
             // @ts-ignore
-            const { requestID } = c.req.valid("param") as { requestID: number };
+            const { stablePromotionRequestID } = c.req.valid("param") as { stablePromotionRequestID: number };
 
             // @ts-ignore
             const packageData = c.get("package") as DB.Models.Package;
 
             const requestData = await DB.instance().select().from(DB.Schema.stablePromotionRequests).where(and(
-                eq(DB.Schema.stablePromotionRequests.id, requestID),
+                eq(DB.Schema.stablePromotionRequests.id, stablePromotionRequestID),
                 eq(DB.Schema.stablePromotionRequests.package_id, packageData.id)
             )).get();
 
@@ -127,7 +127,7 @@ export async function setupPackageStablePromotionRequestRoutes(router: Hono, adm
     );
 
 
-    router.get('/:requestID',
+    router.get('/:stablePromotionRequestID',
 
         APIRouteSpec.authenticated({
             summary: "Get a stable promotion request for a package",
@@ -147,7 +147,7 @@ export async function setupPackageStablePromotionRequestRoutes(router: Hono, adm
         }
     );
 
-    router.delete('/:requestID',
+    router.delete('/:stablePromotionRequestID',
 
         APIRouteSpec.authenticated({
             summary: "Delete a stable promotion request for a package",

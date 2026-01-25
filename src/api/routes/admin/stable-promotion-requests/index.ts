@@ -62,18 +62,18 @@ router.get('/',
     }
 );
 
-router.use('/:requestID/*',
+router.use('/:stablePromotionRequestID/*',
 
     zValidator("param", z.object({
-        requestID: z.coerce.number().int().positive()
+        stablePromotionRequestID: z.coerce.number().int().positive()
     })),
 
     async (c, next) => {
         // @ts-ignore
-        const { requestID } = c.req.valid("param") as { requestID: number };
+        const { stablePromotionRequestID } = c.req.valid("param") as { stablePromotionRequestID: number };
 
         const request = DB.instance().select().from(DB.Schema.stablePromotionRequests).where(
-            eq(DB.Schema.stablePromotionRequests.id, requestID)
+            eq(DB.Schema.stablePromotionRequests.id, stablePromotionRequestID)
         ).get();
 
         if (!request) {
@@ -87,7 +87,7 @@ router.use('/:requestID/*',
     }
 );
 
-router.get('/:requestID',
+router.get('/:stablePromotionRequestID',
 
     APIRouteSpec.authenticated({
         summary: "Get stable promotion request details",
@@ -133,7 +133,7 @@ router.get('/:requestID',
     }
 );
 
-router.post('/:requestID/decide',
+router.post('/:stablePromotionRequestID/decide',
 
     APIRouteSpec.authenticated({
         summary: "Decide on a stable promotion request",
