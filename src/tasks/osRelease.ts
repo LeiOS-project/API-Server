@@ -24,6 +24,9 @@ OsReleaseTask.addStep("Move packages from archive to local stable repo", async (
 
     for (; state.nextPackageIndexToMove < payload.pkgReleasesToIncludeByID.length; state.nextPackageIndexToMove++) {
 
+        let pkgName = "UNKNOWN";
+        let pkgReleaseVersion = "UNKNOWN";
+
         try {
 
             if (isPaused.valueOf()) {
@@ -59,6 +62,9 @@ OsReleaseTask.addStep("Move packages from archive to local stable repo", async (
                     tx.rollback()
                     return false;
                 }
+
+                pkgName = packageData.name;
+                pkgReleaseVersion = release.versionWithLeiosPatch;
 
                 if (release.architectures.is_all) {
 
@@ -114,7 +120,7 @@ OsReleaseTask.addStep("Move packages from archive to local stable repo", async (
                 continue;
             }
 
-            logger.info("Moved package release ID", pkgReleaseID, "to local stable repo.");
+            logger.info(`Successfully moved package ${pkgName} version ${pkgReleaseVersion} to local stable repo.`);
 
         } catch (err) {
             logger.error("Error moving package release ID", payload.pkgReleasesToIncludeByID[state.nextPackageIndexToMove], ":", err);
