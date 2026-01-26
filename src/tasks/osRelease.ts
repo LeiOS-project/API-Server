@@ -114,6 +114,8 @@ OsReleaseTask.addStep("Move packages from archive to local stable repo", async (
                 continue;
             }
 
+            logger.info("Moved package release ID", pkgReleaseID, "to local stable repo.");
+
         } catch (err) {
             logger.error("Error moving package release ID", payload.pkgReleasesToIncludeByID[state.nextPackageIndexToMove], ":", err);
         }
