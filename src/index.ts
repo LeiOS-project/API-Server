@@ -72,9 +72,12 @@ export class Main {
     private static async gracefulShutdown(type: NodeJS.Signals, code: number) {
         try {
             Logger.log(`Received ${type}, shutting down...`);
+
             await API.stop();
             await AptlyAPIServer.stop(type);
             await TaskScheduler.stopProcessing();
+            await DB.close();
+
             Logger.log("Shutdown complete, exiting.");
             process.exit(code);
         } catch {

@@ -75,6 +75,13 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+
+    await API.stop();
+
+    await AptlyAPIServer.stop();
+
+    await DB.close();
+
     if (TMP_ROOT) {
 
         await fs.rm(TMP_ROOT, { recursive: true, force: true });
