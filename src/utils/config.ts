@@ -111,6 +111,7 @@ export class ConfigHandler {
 
         .add("LRA_API_HOST", false)
         .add("LRA_API_PORT", false)
+        .add("LRA_API_DISABLE_DOCS", false, [true, false])
 
         .add("LRA_LOG_DIR", false)
 

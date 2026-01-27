@@ -58,7 +58,7 @@ export class Main {
             secretAccessKey: config.LRA_S3_SECRET_ACCESS_KEY
         }, config.LRA_PUBLIC_KEY_PATH ?? "./config/keys/public-key.gpg");
 
-        await API.init([config.LRA_HUB_URL || "https://hub.leios.dev"]);
+        await API.init([config.LRA_HUB_URL || "https://hub.leios.dev"], config.LRA_API_DISABLE_DOCS === true);
 
         await AptlyAPIServer.start();
 

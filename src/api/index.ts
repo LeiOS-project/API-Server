@@ -20,7 +20,8 @@ export class API {
 	];
 
 	static async init(
-		frontendUrls: string[] = []
+		frontendUrls: string[] = [],
+		disableDocs = false
 	) {
 
 		this.app = new Hono();
@@ -56,7 +57,7 @@ export class API {
 
 			Logger.error("API Error:", err);
 			return c.json({ success: false, message: 'Internal Server Error' }, 500);
-		})
+		});
 
 
 		// Apply global auth middleware
@@ -70,11 +71,16 @@ export class API {
 			return c.json({ status: "LeiOS API is running" });
 		});
 
-        this.app.get("/", (c) => {
-            return c.redirect("/docs");
-        });
-
-		setupDocs(this.app);
+		if (!disableDocs) {
+			this.app.get("/", (c) => {
+				return c.redirect("/docs");
+			});
+			setupDocs(this.app);
+		} else {
+			this.app.get("/", (c) => {
+				return c.json({ message: "LeiOS API is running. Documentation is disabled." });
+			});
+		}
 
 	}
 

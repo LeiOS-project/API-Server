@@ -22,7 +22,7 @@ import { PublicPackagesModel } from "../src/api/routes/public/packages/model";
 type SeededUser = Omit<DB.Models.User, "password_hash"> & { password: string };
 type SeededSession = Awaited<ReturnType<typeof SessionHandler.createSession>>;
 
-async function seedUser(role: "admin" | "developer" | "user", overrides: Partial<DB.Models.User> = {}, password = "TestP@ssw0rd") {
+async function seedUser(role: DB.Models.User["role"], overrides: Partial<DB.Models.User> = {}, password = "TestP@ssw0rd") {
     const user = DB.instance().insert(DB.Schema.users).values({
         username: overrides.username ?? `user_${randomUUID().slice(0, 8)}`,
         display_name: overrides.display_name ?? "Test User",
@@ -518,3 +518,29 @@ describe("Public package routes", () => {
 //         expect(deleted).toBeUndefined();
 //     });
 // });
+
+
+describe("Docs Routes", async () => {
+
+    test("GET /docs/openapi returns API docs if enabled", async () => {
+        await makeAPIRequest(`/docs/openapi`, {}, 200);
+    });
+
+    test("GET /docs returns API docs UI if enabled", async () => {
+        await makeAPIRequest(`/docs`, {}, 200);
+    });
+
+    test("GET /docs/openapi returns 404 if disabled", async () => {
+
+        await API.stop();
+        await API.init([], true);
+        await API.start(14123, "::");
+
+        await makeAPIRequest(`/docs/openapi`, {}, 404);
+    });
+
+    test("GET /docs returns 404 if disabled", async () => {
+
+        await makeAPIRequest(`/docs`, {}, 404);
+    });
+});
