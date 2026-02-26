@@ -15,5 +15,6 @@ router.use("*", async (c, next) => {
     await next();
 });
 
+router.route("/", (await import('./publishers')).router);
 router.route("/", (await import('./packages')).router);
 router.route("/", (await import('./tasks')).router);

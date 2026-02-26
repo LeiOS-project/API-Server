@@ -38,11 +38,12 @@ export class PkgReleasesService {
             }
         }
 
-        const owner = DB.instance().select().from(DB.Schema.users).where(
-            eq(DB.Schema.users.id, packageData.owner_user_id)
+        // Package is owned by publisher, created_by_user_id tracks who created it for audit purposes
+        const creator = DB.instance().select().from(DB.Schema.users).where(
+            eq(DB.Schema.users.id, packageData.created_by_user_id)
         ).get();
-        if (!owner) {
-            throw new Error("User is authenticated but not found in database");
+        if (!creator) {
+            throw new Error("Package creator not found in database");
         }
 
         const existingRelease = DB.instance().select().from(DB.Schema.packageReleases).where(
@@ -119,11 +120,12 @@ export class PkgReleasesService {
             return APIResponse.forbidden(c, "System-managed packages cannot have their releases updated");
         }
 
-        const owner = DB.instance().select().from(DB.Schema.users).where(
-            eq(DB.Schema.users.id, packageData.owner_user_id)
+        // Package is owned by publisher, created_by_user_id tracks who created it for audit purposes
+        const creator = DB.instance().select().from(DB.Schema.users).where(
+            eq(DB.Schema.users.id, packageData.created_by_user_id)
         ).get();
-        if (!owner) {
-            throw new Error("User is authenticated but not found in database");
+        if (!creator) {
+            throw new Error("Package creator not found in database");
         }
 
         // upload "all" when there is already some arch uploaded 
@@ -138,8 +140,8 @@ export class PkgReleasesService {
                     name: packageData.name,
                     versionWithLeiosPatch: releaseData.versionWithLeiosPatch,
                     architecture: arch,
-                    maintainer_name: owner.display_name,
-                    maintainer_email: owner.email
+                    maintainer_name: creator.display_name,
+                    maintainer_email: creator.email
                 },
                 file,
                 isAdmin

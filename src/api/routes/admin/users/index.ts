@@ -274,12 +274,31 @@ router.delete('/:userId',
         // @ts-ignore
         const user = c.get(TARGET_USER_KEY) as DB.Models.User;
 
-        const ownedPackages = await DB.instance().select().from(DB.Schema.packages).where(
-            eq(DB.Schema.packages.owner_user_id, user.id)
+        // Check if user is the only owner of any publishers
+        const ownerships = await DB.instance().select().from(DB.Schema.publisherMembers).where(
+            and(
+                eq(DB.Schema.publisherMembers.user_id, user.id),
+                eq(DB.Schema.publisherMembers.role, 'owner')
+            )
         );
 
-        if (ownedPackages.length > 0) {
-            return APIResponse.badRequest(c, "Reassign or delete the user's packages before deleting the account");
+        for (const ownership of ownerships) {
+            // Count other owners in this publisher
+            const ownerCount = await DB.instance().select().from(DB.Schema.publisherMembers).where(
+                and(
+                    eq(DB.Schema.publisherMembers.publisher_id, ownership.publisher_id),
+                    eq(DB.Schema.publisherMembers.role, 'owner')
+                )
+            ).all();
+
+            if (ownerCount.length <= 1) {
+                // Get publisher name for better error message
+                const publisher = await DB.instance().select().from(DB.Schema.publishers).where(
+                    eq(DB.Schema.publishers.id, ownership.publisher_id)
+                ).get();
+                
+                return APIResponse.badRequest(c, `User is the sole owner of publisher '${publisher?.name}'. Transfer ownership or delete the publisher first.`);
+            }
         }
 
         await AuthHandler.invalidateAllAuthContextsForUser(user.id);

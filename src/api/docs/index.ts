@@ -53,6 +53,11 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
             {
                 name: "Developer API",
                 tags: [
+                    "Developer API / Publishers",
+                    "Developer API / Publishers / Groups",
+                    "Developer API / Publishers / Members",
+                    "Developer API / Publishers / Packages",
+
                     "Developer API / Packages",
                     "Developer API / Packages / Releases",
                     "Developer API / Packages / Stable Promotion Requests",
@@ -112,6 +117,39 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
             //     name: "Developer API",
             //     description: "Endpoints for authenticated developers",
             // },
+            {
+                name: "Developer API / Publishers",
+                // @ts-ignore
+                "x-displayName": "Publishers",
+                summary: "Publishers",
+                parent: "Developer API",
+                description: "Endpoints for managing publishers (organizations/groups)",
+            },
+            {
+                name: "Developer API / Publishers / Groups",
+                // @ts-ignore
+                "x-displayName": "Groups",
+                summary: "Groups",
+                parent: "Developer API / Publishers",
+                description: "Endpoints for managing publisher subgroups",
+            },
+            {
+                name: "Developer API / Publishers / Members",
+                // @ts-ignore
+                "x-displayName": "Members",
+                summary: "Members",
+                parent: "Developer API / Publishers",
+                description: "Endpoints for managing publisher members and permissions",
+            },
+            {
+                name: "Developer API / Publishers / Packages",
+                // @ts-ignore
+                "x-displayName": "Packages",
+                summary: "Packages",
+                parent: "Developer API / Publishers",
+                description: "Endpoints for managing packages within publishers",
+            },
+
             {
                 name: "Developer API / Packages",
                 // @ts-ignore
@@ -251,6 +289,11 @@ export const DOCS_TAGS = {
     },
     DEV_API: {
         BASE: "Developer API",
+        PUBLISHERS: "Developer API / Publishers",
+        PUBLISHERS_GROUPS: "Developer API / Publishers / Groups",
+        PUBLISHERS_MEMBERS: "Developer API / Publishers / Members",
+        PUBLISHERS_PACKAGES: "Developer API / Publishers / Packages",
+
         PACKAGES: "Developer API / Packages",
         PACKAGES_RELEASES: "Developer API / Packages / Releases",
         PACKAGES_STABLE_REQUESTS: "Developer API / Packages / Stable Promotion Requests",
@@ -259,6 +302,8 @@ export const DOCS_TAGS = {
     },
     ADMIN_API: {
         BASE: "Admin API",
+        PUBLISHERS: "Admin API / Publishers",
+
         PACKAGES: "Admin API / Packages",
         PACKAGES_RELEASES: "Admin API / Packages / Releases",
         PACKAGES_STABLE_REQUESTS: "Admin API / Packages / Stable Promotion Requests",

@@ -69,13 +69,15 @@ export const apiKeys = sqliteTable('api_keys', {
  */
 export const packages = sqliteTable('packages', {
     id: integer().primaryKey({ autoIncrement: true }),
-    name: text().notNull().unique(),
-    owner_user_id: integer().notNull().references(() => users.id),
+    name: text().notNull().unique(), // Full hierarchical name: publisher.group.pkgname or publisher.pkgname
+    publisher_id: integer().notNull().references(() => publishers.id, { onDelete: 'cascade' }),
+    group_id: integer().references(() => publisherGroups.id, { onDelete: 'cascade' }), // NULL for publisher-level packages
     flags: text({ mode: 'json' }).$type<PackageModel.PackageFlags>().notNull().default(sql`'[]'`),
     description: text().notNull(),
     homepage_url: text().notNull(),
     requires_patching: integer({ mode: 'boolean' }).notNull().default(sql`0`),
     created_at: SQLUtils.getCreatedAtColumn(),
+    created_by_user_id: integer().notNull().references(() => users.id),
 
     // version strings of version + leios patch if exists
     latest_stable_release: text({ mode: "json" }).notNull().$type<{
@@ -167,4 +169,98 @@ export const os_releases = sqliteTable('os_releases', {
     created_at: SQLUtils.getCreatedAtColumn(),
     taskID: integer().notNull().references(() => scheduled_tasks.id),
     // published_at: int().references(() => scheduled_tasks.finished_at),
+});
+
+/**
+ * Publishers (Organizations/Groups) that own and manage packages
+ * @deprecated Use DB.Schema.publishers instead
+ */
+export const publishers = sqliteTable('publishers', {
+    id: integer().primaryKey({ autoIncrement: true }),
+    name: text().notNull().unique(), // URL-safe name like "microsoft", "mozilla-foundation"
+    display_name: text().notNull(),
+    description: text().notNull(),
+    homepage_url: text(),
+    avatar_url: text(),
+    visibility: text({ enum: ['public', 'private'] }).default('public').notNull(),
+    created_at: SQLUtils.getCreatedAtColumn(),
+    created_by_user_id: integer().notNull().references(() => users.id),
+});
+
+/**
+ * Hierarchical subgroups within publishers
+ * @deprecated Use DB.Schema.publisherGroups instead
+ */
+export const publisherGroups = sqliteTable('publisher_groups', {
+    id: integer().primaryKey({ autoIncrement: true }),
+    publisher_id: integer().notNull().references(() => publishers.id, { onDelete: 'cascade' }),
+    parent_group_id: integer().references((): any => publisherGroups.id, { onDelete: 'cascade' }), // NULL for top-level groups
+    name: text().notNull(), // URL-safe name like "vscode", "firefox"
+    display_name: text().notNull(),
+    description: text().notNull(),
+    visibility: text({ enum: ['public', 'private'] }).default('public').notNull(),
+    created_at: SQLUtils.getCreatedAtColumn(),
+    created_by_user_id: integer().notNull().references(() => users.id),
+});
+
+/**
+ * Members and their roles within publishers and groups
+ * @deprecated Use DB.Schema.publisherMembers instead
+ */
+export const publisherMembers = sqliteTable('publisher_members', {
+    id: integer().primaryKey({ autoIncrement: true }),
+    publisher_id: integer().notNull().references(() => publishers.id, { onDelete: 'cascade' }),
+    group_id: integer().references(() => publisherGroups.id, { onDelete: 'cascade' }), // NULL = publisher-level member
+    user_id: integer().notNull().references(() => users.id, { onDelete: 'cascade' }),
+    
+    // Roles: owner, maintainer, developer, reporter, guest
+    // owner: Full control, can delete publisher, manage all members
+    // maintainer: Manage packages, releases, and members (except owners)
+    // developer: Push packages and manage own packages
+    // reporter: View private packages, create issues (future)
+    // guest: View public packages only
+    role: text({ 
+        enum: ['owner', 'maintainer', 'developer', 'reporter', 'guest'] 
+    }).notNull().default('guest'),
+    
+    // Permission flags for fine-grained control
+    permissions: text({ mode: 'json' }).$type<{
+        canCreatePackages: boolean;
+        canEditPackages: boolean;
+        canDeletePackages: boolean;
+        canPushReleases: boolean;
+        canManageMembers: boolean;
+        canCreateGroups: boolean;
+        canRequestTopLevelAlias: boolean;
+    }>().notNull().default(sql`'{
+        "canCreatePackages": false,
+        "canEditPackages": false,
+        "canDeletePackages": false,
+        "canPushReleases": false,
+        "canManageMembers": false,
+        "canCreateGroups": false,
+        "canRequestTopLevelAlias": false
+    }'`),
+    
+    created_at: SQLUtils.getCreatedAtColumn(),
+    invited_by_user_id: integer().references(() => users.id),
+});
+
+/**
+ * Top-level package aliases (meta packages)
+ * e.g., "vscode" -> "microsoft.vscode"
+ * @deprecated Use DB.Schema.packageAliases instead
+ */
+export const packageAliases = sqliteTable('package_aliases', {
+    id: integer().primaryKey({ autoIncrement: true }),
+    alias_name: text().notNull().unique(), // The short name like "vscode"
+    target_package_id: integer().notNull().references(() => packages.id, { onDelete: 'cascade' }),
+    status: text({ 
+        enum: ['pending', 'approved', 'rejected'] 
+    }).default('pending').notNull(),
+    requested_by_user_id: integer().notNull().references(() => users.id),
+    reviewed_by_user_id: integer().references(() => users.id),
+    created_at: SQLUtils.getCreatedAtColumn(),
+    reviewed_at: integer(),
+    admin_note: text(),
 });

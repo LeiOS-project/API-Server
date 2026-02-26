@@ -40,11 +40,63 @@ export namespace PackageModel {
         "prod",
         "production",
 
-        // Forbiddden LeiCraft_MC related names
+        // Forbidden LeiCraft_MC related names
         "leicraft",
         "leios"
     ] as const;
 
+    /**
+     * Package naming convention:
+     * - publisher.pkgname (for publisher-level packages)
+     * - publisher.group.pkgname (for group packages)
+     * - publisher.subgroup1.subgroup2.pkgname (for nested groups)
+     * 
+     * Validation rules:
+     * - Must follow the hierarchical pattern
+     * - Each component must be lowercase alphanumeric with hyphens
+     * - Package short name cannot be a forbidden name
+     */
+    export const PackageNameSchema = z.string()
+        .min(3, "Package names must be at least 3 characters long (publisher.pkg).")
+        .max(200, "Package names cannot exceed 200 characters.")
+        .regex(
+            /^[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)+$/,
+            "Package name must follow pattern: publisher.pkgname or publisher.group.pkgname"
+        )
+        .refine((name) => {
+            // Extract final component (package short name)
+            const parts = name.split('.');
+            const pkgShortName = parts[parts.length - 1];
+            return !ForbiddenPackageNames.includes(pkgShortName as any);
+        }, {
+            message: "The package short name is reserved and cannot be used."
+        });
+
+    /**
+     * Helper to construct package name from publisher, groups, and package short name
+     */
+    export function constructPackageName(publisher: string, groups: string[], packageShortName: string): string {
+        return [publisher, ...groups, packageShortName].join('.');
+    }
+
+    /**
+     * Helper to parse package name into components
+     */
+    export function parsePackageName(packageName: string): {
+        publisher: string;
+        groups: string[];
+        packageShortName: string;
+    } {
+        const parts = packageName.split('.');
+        if (parts.length < 2) {
+            throw new Error("Invalid package name format");
+        }
+        return {
+            publisher: parts[0],
+            groups: parts.slice(1, -1),
+            packageShortName: parts[parts.length - 1],
+        };
+    }
 
     export const PackageFlags = z.array(z.enum([
 
@@ -88,32 +140,16 @@ export namespace PackageModel.GetAll {
 export namespace PackageModel.CreatePackageAsAdmin {
 
     export const Body = createInsertSchema(DB.Schema.packages, {
-
-        name: z.string()
-            .min(2, "Package names must be at least 2 characters long.")
-            .max(63, "Package names cannot exceed 63 characters.")
-            /*.regex(
-                /^[a-z0-9][a-z0-9+.-]{1,62}$/,
-                "Package names must be 2-63 chars, lowercase, and may contain + - ."
-            )*/
-            /* .regex(
-                /^[a-z0-9].*[a-z0-9]$/,
-                "Package names must start and end with a letter or number."
-            )*/
-            .regex(/^[a-z0-9][a-z0-9+.-]*[a-z0-9]$/, "Package names must be lowercase, may contain + - ., and start/end with a letter or number.")
-            .refine((name) => !PackageModel.ForbiddenPackageNames.includes(name as any), {
-                message: "This package name is reserved and cannot be used."
-            }),
-
-        homepage_url: z.url("Homepage URL must be a valid URL."),
+        name: PackageModel.PackageNameSchema,
+        homepage_url: z.string().url("Homepage URL must be a valid URL."),
         description: z.string().min(1, "Description is required").max(500, "Description cannot exceed 500 characters."),
-
     }).omit({
         id: true,
         created_at: true,
         flags: true,
         latest_stable_release: true,
         latest_testing_release: true,
+        created_by_user_id: true,
     });
 
     export type Body = z.infer<typeof Body>;
@@ -122,8 +158,17 @@ export namespace PackageModel.CreatePackageAsAdmin {
 
 export namespace PackageModel.CreatePackage {
 
-    export const Body = PackageModel.CreatePackageAsAdmin.Body.omit({
-        owner_user_id: true
+    export const Body = z.object({
+        name: z.string()
+            .min(1, "Package short name is required")
+            .max(50, "Package short name cannot exceed 50 characters")
+            .regex(/^[a-z0-9][a-z0-9+.-]*[a-z0-9]$/, "Package short name must be lowercase, may contain + - ., and start/end with alphanumeric")
+            .refine((name) => !PackageModel.ForbiddenPackageNames.includes(name as any), {
+                message: "This package short name is reserved and cannot be used."
+            }),
+        description: z.string().min(1, "Description is required").max(500, "Description cannot exceed 500 characters."),
+        homepage_url: z.string().url("Homepage URL must be a valid URL."),
+        requires_patching: z.boolean().default(false),
     });
 
     export type Body = z.infer<typeof Body>;

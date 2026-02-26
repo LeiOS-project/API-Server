@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { AccountModel } from './model'
 import { validator } from "hono-openapi";
 import { DB } from "../../../db";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { APIResponse } from "../../utils/api-res";
 import { APIResponseSpec, APIRouteSpec } from "../../utils/specHelpers";
 import { AuthHandler, SessionHandler } from "../../utils/authHandler";
@@ -153,13 +153,26 @@ router.delete('/',
         // @ts-ignore
         const authContext = c.get("authContext") as AuthHandler.SessionAuthContext;
 
-        // check if it have still packages owned
-        const ownedPackages = await DB.instance().select().from(DB.Schema.packages).where(
-            eq(DB.Schema.packages.owner_user_id, authContext.user_id)
+        // Check if user is the only owner of any publishers
+        const ownerships = await DB.instance().select().from(DB.Schema.publisherMembers).where(
+            and(
+                eq(DB.Schema.publisherMembers.user_id, authContext.user_id),
+                eq(DB.Schema.publisherMembers.role, 'owner')
+            )
         );
 
-        if (ownedPackages.length > 0) {
-            return APIResponse.badRequest(c, "You must delete all your packages before deleting your account.");
+        for (const ownership of ownerships) {
+            // Count other owners in this publisher
+            const ownerCount = await DB.instance().select().from(DB.Schema.publisherMembers).where(
+                and(
+                    eq(DB.Schema.publisherMembers.publisher_id, ownership.publisher_id),
+                    eq(DB.Schema.publisherMembers.role, 'owner')
+                )
+            ).all();
+
+            if (ownerCount.length <= 1) {
+                return APIResponse.badRequest(c, "You are the sole owner of one or more publishers. Transfer ownership or delete them before deleting your account.");
+            }
         }
 
         // invalidate all sessions for the user
