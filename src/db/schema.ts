@@ -69,15 +69,16 @@ export const apiKeys = sqliteTable('api_keys', {
  */
 export const packages = sqliteTable('packages', {
     id: integer().primaryKey({ autoIncrement: true }),
-    name: text().notNull().unique(), // Full hierarchical name: publisher.group.pkgname or publisher.pkgname
+    name: text().notNull().unique(), // Full hierarchical name: publisher.[...groups].pkgname or publisher.pkgname
     publisher_id: integer().notNull().references(() => publishers.id, { onDelete: 'cascade' }),
     group_id: integer().references(() => publisherGroups.id, { onDelete: 'cascade' }), // NULL for publisher-level packages
+
     flags: text({ mode: 'json' }).$type<PackageModel.PackageFlags>().notNull().default(sql`'[]'`),
+    requires_patching: integer({ mode: 'boolean' }).notNull().default(sql`0`),
+
     description: text().notNull(),
     homepage_url: text().notNull(),
-    requires_patching: integer({ mode: 'boolean' }).notNull().default(sql`0`),
     created_at: SQLUtils.getCreatedAtColumn(),
-    created_by_user_id: integer().notNull().references(() => users.id),
 
     // version strings of version + leios patch if exists
     latest_stable_release: text({ mode: "json" }).notNull().$type<{
