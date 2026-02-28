@@ -292,6 +292,7 @@ export const DOCS_TAGS = {
         PUBLISHERS: "Developer API / Publishers",
         PUBLISHERS_GROUPS: "Developer API / Publishers / Groups",
         PUBLISHERS_MEMBERS: "Developer API / Publishers / Members",
+        PUBLISHERS_ROLES: "Developer API / Publishers / Roles",
         PUBLISHERS_PACKAGES: "Developer API / Publishers / Packages",
 
         PACKAGES: "Developer API / Packages",

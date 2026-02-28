@@ -203,3 +203,178 @@ export namespace PublisherModel.GetAllMembers {
     export const Response = z.array(PublisherModel.GetMember.Response);
     export type Response = z.infer<typeof Response>;
 }
+
+// ==================== NEW ROLE-BASED PERMISSION SYSTEM ====================
+
+/**
+ * New comprehensive permission set for the role-based system
+ */
+export namespace PublisherModel {
+    export const RolePermissions = z.object({
+        canCreatePackages: z.boolean(),
+        canEditPackages: z.boolean(),
+        canDeletePackages: z.boolean(),
+        canPushReleases: z.boolean(),
+        canManageMembers: z.boolean(),
+        canManageRoles: z.boolean(),
+        canCreateGroups: z.boolean(),
+        canEditGroups: z.boolean(),
+        canDeleteGroups: z.boolean(),
+        canRequestTopLevelAlias: z.boolean(),
+        canViewPrivate: z.boolean(),
+    });
+    export type RolePermissions = z.infer<typeof RolePermissions>;
+
+    // System role names (predefined)
+    export const SystemRoleNames = ['owner', 'maintainer', 'developer', 'reporter', 'guest'] as const;
+    export type SystemRoleName = typeof SystemRoleNames[number];
+
+    // Default permissions for system roles
+    export const SystemRolePermissions: Record<SystemRoleName, RolePermissions> = {
+        owner: {
+            canCreatePackages: true,
+            canEditPackages: true,
+            canDeletePackages: true,
+            canPushReleases: true,
+            canManageMembers: true,
+            canManageRoles: true,
+            canCreateGroups: true,
+            canEditGroups: true,
+            canDeleteGroups: true,
+            canRequestTopLevelAlias: true,
+            canViewPrivate: true,
+        },
+        maintainer: {
+            canCreatePackages: true,
+            canEditPackages: true,
+            canDeletePackages: true,
+            canPushReleases: true,
+            canManageMembers: true,
+            canManageRoles: false,
+            canCreateGroups: true,
+            canEditGroups: true,
+            canDeleteGroups: true,
+            canRequestTopLevelAlias: true,
+            canViewPrivate: true,
+        },
+        developer: {
+            canCreatePackages: true,
+            canEditPackages: true,
+            canDeletePackages: false,
+            canPushReleases: true,
+            canManageMembers: false,
+            canManageRoles: false,
+            canCreateGroups: false,
+            canEditGroups: false,
+            canDeleteGroups: false,
+            canRequestTopLevelAlias: false,
+            canViewPrivate: true,
+        },
+        reporter: {
+            canCreatePackages: false,
+            canEditPackages: false,
+            canDeletePackages: false,
+            canPushReleases: false,
+            canManageMembers: false,
+            canManageRoles: false,
+            canCreateGroups: false,
+            canEditGroups: false,
+            canDeleteGroups: false,
+            canRequestTopLevelAlias: false,
+            canViewPrivate: true,
+        },
+        guest: {
+            canCreatePackages: false,
+            canEditPackages: false,
+            canDeletePackages: false,
+            canPushReleases: false,
+            canManageMembers: false,
+            canManageRoles: false,
+            canCreateGroups: false,
+            canEditGroups: false,
+            canDeleteGroups: false,
+            canRequestTopLevelAlias: false,
+            canViewPrivate: false,
+        },
+    };
+}
+
+/**
+ * Create a new role
+ */
+export namespace PublisherModel.CreateRole {
+    export const Body = z.object({
+        name: z.string()
+            .min(2, "Role name must be at least 2 characters long.")
+            .max(50, "Role name cannot exceed 50 characters.")
+            .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/, "Role name must be lowercase, may contain hyphens, and start/end with alphanumeric."),
+        display_name: z.string().min(1).max(100),
+        description: z.string().min(1).max(500),
+        permissions: PublisherModel.RolePermissions,
+    });
+    export type Body = z.infer<typeof Body>;
+}
+
+/**
+ * Update an existing role
+ */
+export namespace PublisherModel.UpdateRole {
+    export const Body = z.object({
+        display_name: z.string().min(1).max(100).optional(),
+        description: z.string().min(1).max(500).optional(),
+        permissions: PublisherModel.RolePermissions.optional(),
+    }).refine(
+        (data) => Object.values(data).some((value) => value !== undefined),
+        { message: "At least one field must be provided" }
+    );
+    export type Body = z.infer<typeof Body>;
+}
+
+/**
+ * Get role details
+ */
+export namespace PublisherModel.GetRole {
+    export const Response = createSelectSchema(DB.Schema.roles);
+    export type Response = z.infer<typeof Response>;
+}
+
+/**
+ * Get all roles
+ */
+export namespace PublisherModel.GetAllRoles {
+    export const Response = z.array(PublisherModel.GetRole.Response);
+    export type Response = z.infer<typeof Response>;
+}
+
+/**
+ * Assign a role to a user
+ */
+export namespace PublisherModel.AssignRole {
+    export const Body = z.object({
+        user_id: z.number().int().positive(),
+        role_id: z.number().int().positive(),
+        group_id: z.number().int().positive().optional(), // If specified, assigns at group level
+        package_id: z.number().int().positive().optional(), // If specified, assigns at package level
+    }).refine(
+        (data) => !(data.group_id && data.package_id),
+        { message: "Cannot assign role to both group and package at the same time" }
+    );
+    export type Body = z.infer<typeof Body>;
+}
+
+/**
+ * Get role assignment details
+ */
+export namespace PublisherModel.GetRoleAssignment {
+    export const Response = createSelectSchema(DB.Schema.roleAssignments);
+    export type Response = z.infer<typeof Response>;
+}
+
+/**
+ * Get all role assignments
+ */
+export namespace PublisherModel.GetAllRoleAssignments {
+    export const Response = z.array(PublisherModel.GetRoleAssignment.Response);
+    export type Response = z.infer<typeof Response>;
+}
+

@@ -265,3 +265,69 @@ export const packageAliases = sqliteTable('package_aliases', {
     reviewed_at: integer(),
     admin_note: text(),
 });
+
+/**
+ * Roles define sets of permissions that can be assigned to users
+ * Roles can be system-wide or publisher-specific
+ * @deprecated Use DB.Schema.roles instead
+ */
+export const roles = sqliteTable('roles', {
+    id: integer().primaryKey({ autoIncrement: true }),
+    name: text().notNull(), // e.g., "owner", "maintainer", "custom-role"
+    display_name: text().notNull(),
+    description: text().notNull(),
+    is_system: integer({ mode: 'boolean' }).notNull().default(sql`0`), // System roles can't be deleted
+    publisher_id: integer().references(() => publishers.id, { onDelete: 'cascade' }), // NULL for system roles
+    
+    // Permissions that this role grants
+    permissions: text({ mode: 'json' }).$type<{
+        canCreatePackages: boolean;
+        canEditPackages: boolean;
+        canDeletePackages: boolean;
+        canPushReleases: boolean;
+        canManageMembers: boolean;
+        canManageRoles: boolean;
+        canCreateGroups: boolean;
+        canEditGroups: boolean;
+        canDeleteGroups: boolean;
+        canRequestTopLevelAlias: boolean;
+        canViewPrivate: boolean;
+    }>().notNull().default(sql`'{
+        "canCreatePackages": false,
+        "canEditPackages": false,
+        "canDeletePackages": false,
+        "canPushReleases": false,
+        "canManageMembers": false,
+        "canManageRoles": false,
+        "canCreateGroups": false,
+        "canEditGroups": false,
+        "canDeleteGroups": false,
+        "canRequestTopLevelAlias": false,
+        "canViewPrivate": false
+    }'`),
+    
+    created_at: SQLUtils.getCreatedAtColumn(),
+    created_by_user_id: integer().references(() => users.id),
+});
+
+/**
+ * Role assignments link users to roles at different scopes
+ * Scope can be publisher-level, group-level, or package-level
+ * @deprecated Use DB.Schema.roleAssignments instead
+ */
+export const roleAssignments = sqliteTable('role_assignments', {
+    id: integer().primaryKey({ autoIncrement: true }),
+    role_id: integer().notNull().references(() => roles.id, { onDelete: 'cascade' }),
+    user_id: integer().notNull().references(() => users.id, { onDelete: 'cascade' }),
+    
+    // Scope: publisher_id is always required, group_id and package_id are optional
+    // - Only publisher_id: role applies to entire publisher
+    // - publisher_id + group_id: role applies to specific group
+    // - publisher_id + package_id: role applies to specific package
+    publisher_id: integer().notNull().references(() => publishers.id, { onDelete: 'cascade' }),
+    group_id: integer().references(() => publisherGroups.id, { onDelete: 'cascade' }),
+    package_id: integer().references(() => packages.id, { onDelete: 'cascade' }),
+    
+    created_at: SQLUtils.getCreatedAtColumn(),
+    assigned_by_user_id: integer().references(() => users.id),
+});

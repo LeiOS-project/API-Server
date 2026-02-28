@@ -12,6 +12,7 @@ import { AuthHandler } from "../../../utils/authHandler";
 import { router as groupsRouter } from "./groups";
 import { router as membersRouter } from "./members";
 import { router as packagesRouter } from "./packages";
+import rolesRouter from "./roles";
 
 export const router = new Hono().basePath('/publishers');
 
@@ -196,6 +197,7 @@ router.delete('/:publisherName',
 );
 
 // Mount sub-routes
+router.route('/:publisherName/roles', rolesRouter);
 router.route('/:publisherName', groupsRouter);
 router.route('/:publisherName', membersRouter);
 router.route('/:publisherName', packagesRouter);

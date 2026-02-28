@@ -215,4 +215,268 @@ export class PermissionsService {
             ...customPermissions
         };
     }
+
+    // ==================== NEW ROLE-BASED PERMISSION SYSTEM ====================
+
+    /**
+     * Get all role assignments for a user in a specific scope
+     * Includes inherited assignments from parent scopes
+     */
+    static async getRoleAssignments(params: {
+        userId: number;
+        publisherId: number;
+        groupId?: number;
+        packageId?: number;
+    }): Promise<Array<DB.Models.RoleAssignment & { role: DB.Models.Role }>> {
+        const { userId, publisherId, groupId, packageId } = params;
+
+        const assignments: Array<DB.Models.RoleAssignment & { role: DB.Models.Role }> = [];
+
+        // 1. Get publisher-level assignments
+        const publisherAssignments = await DB.instance()
+            .select()
+            .from(DB.Schema.roleAssignments)
+            .innerJoin(DB.Schema.roles, eq(DB.Schema.roleAssignments.role_id, DB.Schema.roles.id))
+            .where(and(
+                eq(DB.Schema.roleAssignments.user_id, userId),
+                eq(DB.Schema.roleAssignments.publisher_id, publisherId),
+                eq(DB.Schema.roleAssignments.group_id, null as any),
+                eq(DB.Schema.roleAssignments.package_id, null as any)
+            ))
+            .all();
+
+        assignments.push(...publisherAssignments.map(a => ({ ...a.role_assignments, role: a.roles })));
+
+        // 2. If checking for a group, get group-level assignments (including parent groups)
+        if (groupId !== undefined) {
+            const groupAssignments = await this.getGroupRoleAssignments({
+                userId,
+                publisherId,
+                groupId
+            });
+            assignments.push(...groupAssignments);
+        }
+
+        // 3. If checking for a package, get package-level assignments
+        if (packageId !== undefined) {
+            const packageAssignments = await DB.instance()
+                .select()
+                .from(DB.Schema.roleAssignments)
+                .innerJoin(DB.Schema.roles, eq(DB.Schema.roleAssignments.role_id, DB.Schema.roles.id))
+                .where(and(
+                    eq(DB.Schema.roleAssignments.user_id, userId),
+                    eq(DB.Schema.roleAssignments.publisher_id, publisherId),
+                    eq(DB.Schema.roleAssignments.package_id, packageId)
+                ))
+                .all();
+
+            assignments.push(...packageAssignments.map(a => ({ ...a.role_assignments, role: a.roles })));
+        }
+
+        return assignments;
+    }
+
+    /**
+     * Get role assignments for a user in a group (including parent groups)
+     */
+    private static async getGroupRoleAssignments(params: {
+        userId: number;
+        publisherId: number;
+        groupId: number;
+    }): Promise<Array<DB.Models.RoleAssignment & { role: DB.Models.Role }>> {
+        const { userId, publisherId, groupId } = params;
+        const assignments: Array<DB.Models.RoleAssignment & { role: DB.Models.Role }> = [];
+
+        // Get group-level assignments for this group
+        const groupAssignments = await DB.instance()
+            .select()
+            .from(DB.Schema.roleAssignments)
+            .innerJoin(DB.Schema.roles, eq(DB.Schema.roleAssignments.role_id, DB.Schema.roles.id))
+            .where(and(
+                eq(DB.Schema.roleAssignments.user_id, userId),
+                eq(DB.Schema.roleAssignments.publisher_id, publisherId),
+                eq(DB.Schema.roleAssignments.group_id, groupId)
+            ))
+            .all();
+
+        assignments.push(...groupAssignments.map(a => ({ ...a.role_assignments, role: a.roles })));
+
+        // Get parent group and recursively get its assignments
+        const group = await DB.instance()
+            .select()
+            .from(DB.Schema.publisherGroups)
+            .where(eq(DB.Schema.publisherGroups.id, groupId))
+            .get();
+
+        if (group?.parent_group_id) {
+            const parentAssignments = await this.getGroupRoleAssignments({
+                userId,
+                publisherId,
+                groupId: group.parent_group_id
+            });
+            assignments.push(...parentAssignments);
+        }
+
+        return assignments;
+    }
+
+    /**
+     * Get effective permissions for a user based on their role assignments
+     * Higher level permissions are accumulated (any "true" wins)
+     */
+    static async getEffectiveRolePermissions(params: {
+        userId: number;
+        publisherId: number;
+        groupId?: number;
+        packageId?: number;
+    }): Promise<PublisherModel.RolePermissions | null> {
+        const assignments = await this.getRoleAssignments(params);
+
+        if (assignments.length === 0) return null;
+
+        // Aggregate permissions (any "true" wins)
+        const effectivePermissions: PublisherModel.RolePermissions = {
+            canCreatePackages: false,
+            canEditPackages: false,
+            canDeletePackages: false,
+            canPushReleases: false,
+            canManageMembers: false,
+            canManageRoles: false,
+            canCreateGroups: false,
+            canEditGroups: false,
+            canDeleteGroups: false,
+            canRequestTopLevelAlias: false,
+            canViewPrivate: false,
+        };
+
+        for (const assignment of assignments) {
+            const perms = assignment.role.permissions as PublisherModel.RolePermissions;
+            Object.keys(effectivePermissions).forEach((key) => {
+                const k = key as keyof PublisherModel.RolePermissions;
+                if (perms[k]) {
+                    effectivePermissions[k] = true;
+                }
+            });
+        }
+
+        return effectivePermissions;
+    }
+
+    /**
+     * Check if user has a specific permission using the role-based system
+     */
+    static async hasRolePermission(params: {
+        userId: number;
+        publisherId: number;
+        groupId?: number;
+        packageId?: number;
+        permission: keyof PublisherModel.RolePermissions;
+    }): Promise<boolean> {
+        const { userId, publisherId, groupId, packageId, permission } = params;
+
+        const effectivePermissions = await this.getEffectiveRolePermissions({
+            userId,
+            publisherId,
+            groupId,
+            packageId
+        });
+
+        return effectivePermissions?.[permission] ?? false;
+    }
+
+    /**
+     * Check if user has a specific permission or is an admin (using role-based system)
+     */
+    static async hasRolePermissionOrAdmin(params: {
+        authContext: AuthHandler.AuthContext;
+        publisherId: number;
+        groupId?: number;
+        packageId?: number;
+        permission: keyof PublisherModel.RolePermissions;
+    }): Promise<boolean> {
+        const { authContext, publisherId, groupId, packageId, permission } = params;
+
+        // Admins bypass permission checks
+        if (authContext.user_role === 'admin') {
+            return true;
+        }
+
+        return await this.hasRolePermission({
+            userId: authContext.user_id,
+            publisherId,
+            groupId,
+            packageId,
+            permission
+        });
+    }
+
+    /**
+     * Check if user is a member (has any role assignment) in the specified scope
+     */
+    static async isRoleMember(params: {
+        userId: number;
+        publisherId: number;
+        groupId?: number;
+        packageId?: number;
+    }): Promise<boolean> {
+        const assignments = await this.getRoleAssignments(params);
+        return assignments.length > 0;
+    }
+
+    /**
+     * Check if user has the "owner" role in a publisher
+     */
+    static async hasOwnerRole(params: {
+        userId: number;
+        publisherId: number;
+    }): Promise<boolean> {
+        const assignments = await this.getRoleAssignments(params);
+        return assignments.some(a => a.role.name === 'owner');
+    }
+
+    /**
+     * Initialize system roles (should be called on first setup)
+     */
+    static async initializeSystemRoles(): Promise<void> {
+        for (const roleName of PublisherModel.SystemRoleNames) {
+            // Check if role already exists
+            const existing = await DB.instance()
+                .select()
+                .from(DB.Schema.roles)
+                .where(and(
+                    eq(DB.Schema.roles.name, roleName),
+                    eq(DB.Schema.roles.is_system, true)
+                ))
+                .get();
+
+            if (!existing) {
+                await DB.instance()
+                    .insert(DB.Schema.roles)
+                    .values({
+                        name: roleName,
+                        display_name: roleName.charAt(0).toUpperCase() + roleName.slice(1),
+                        description: `System role: ${roleName}`,
+                        is_system: true,
+                        publisher_id: null,
+                        permissions: PublisherModel.SystemRolePermissions[roleName],
+                        created_by_user_id: null,
+                    });
+            }
+        }
+    }
+
+    /**
+     * Get system role by name
+     */
+    static async getSystemRole(roleName: PublisherModel.SystemRoleName): Promise<DB.Models.Role | undefined> {
+        return await DB.instance()
+            .select()
+            .from(DB.Schema.roles)
+            .where(and(
+                eq(DB.Schema.roles.name, roleName),
+                eq(DB.Schema.roles.is_system, true)
+            ))
+            .get();
+    }
 }
+
