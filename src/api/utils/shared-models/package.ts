@@ -159,13 +159,7 @@ export namespace PackageModel.CreatePackageAsAdmin {
 export namespace PackageModel.CreatePackage {
 
     export const Body = z.object({
-        name: z.string()
-            .min(1, "Package short name is required")
-            .max(50, "Package short name cannot exceed 50 characters")
-            .regex(/^[a-z0-9][a-z0-9+.-]*[a-z0-9]$/, "Package short name must be lowercase, may contain + - ., and start/end with alphanumeric")
-            .refine((name) => !PackageModel.ForbiddenPackageNames.includes(name as any), {
-                message: "This package short name is reserved and cannot be used."
-            }),
+        name: PackageModel.PackageNameSchema,
         description: z.string().min(1, "Description is required").max(500, "Description cannot exceed 500 characters."),
         homepage_url: z.string().url("Homepage URL must be a valid URL."),
         requires_patching: z.boolean().default(false),
