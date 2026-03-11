@@ -8,6 +8,7 @@ import {
 import { SQLUtils } from './utils';
 import type { PackageModel } from '../api/utils/shared-models/package';
 import { UserAccountSettings } from '../api/utils/shared-models/accountData';
+import { PermissionHelper } from '../utils/permission-helper';
 
 /**
  * @deprecated Use DB.Schema.users instead
@@ -177,13 +178,13 @@ export const os_releases = sqliteTable('os_releases', {
  * @deprecated Use DB.Schema.publishers instead
  */
 export const publishers = sqliteTable('publishers', {
+
     id: integer().primaryKey({ autoIncrement: true }),
     name: text().notNull().unique(), // URL-safe name like "microsoft", "mozilla-foundation"
     display_name: text().notNull(),
     description: text().notNull(),
     homepage_url: text(),
     avatar_url: text(),
-    visibility: text({ enum: ['public', 'private'] }).default('public').notNull(),
     created_at: SQLUtils.getCreatedAtColumn(),
     created_by_user_id: integer().notNull().references(() => users.id),
 });
@@ -214,35 +215,12 @@ export const publisherMembers = sqliteTable('publisher_members', {
     group_id: integer().references(() => publisherGroups.id, { onDelete: 'cascade' }), // NULL = publisher-level member
     user_id: integer().notNull().references(() => users.id, { onDelete: 'cascade' }),
     
-    // Roles: owner, maintainer, developer, reporter, guest
-    // owner: Full control, can delete publisher, manage all members
-    // maintainer: Manage packages, releases, and members (except owners)
-    // developer: Push packages and manage own packages
-    // reporter: View private packages, create issues (future)
-    // guest: View public packages only
+
     role: text({ 
-        enum: ['owner', 'maintainer', 'developer', 'reporter', 'guest'] 
-    }).notNull().default('guest'),
+        enum: PermissionHelper.OrgRolesAsTuple
+    }).notNull().default(PermissionHelper.OrgRoles.VIEWER),
     
-    // Permission flags for fine-grained control
-    permissions: text({ mode: 'json' }).$type<{
-        canCreatePackages: boolean;
-        canEditPackages: boolean;
-        canDeletePackages: boolean;
-        canPushReleases: boolean;
-        canManageMembers: boolean;
-        canCreateGroups: boolean;
-        canRequestTopLevelAlias: boolean;
-    }>().notNull().default(sql`'{
-        "canCreatePackages": false,
-        "canEditPackages": false,
-        "canDeletePackages": false,
-        "canPushReleases": false,
-        "canManageMembers": false,
-        "canCreateGroups": false,
-        "canRequestTopLevelAlias": false
-    }'`),
-    
+
     created_at: SQLUtils.getCreatedAtColumn(),
     invited_by_user_id: integer().references(() => users.id),
 });
@@ -264,50 +242,6 @@ export const packageAliases = sqliteTable('package_aliases', {
     created_at: SQLUtils.getCreatedAtColumn(),
     reviewed_at: integer(),
     admin_note: text(),
-});
-
-/**
- * Roles define sets of permissions that can be assigned to users
- * Roles can be system-wide or publisher-specific
- * @deprecated Use DB.Schema.roles instead
- */
-export const roles = sqliteTable('roles', {
-    id: integer().primaryKey({ autoIncrement: true }),
-    name: text().notNull(), // e.g., "owner", "maintainer", "custom-role"
-    display_name: text().notNull(),
-    description: text().notNull(),
-    is_system: integer({ mode: 'boolean' }).notNull().default(sql`0`), // System roles can't be deleted
-    publisher_id: integer().references(() => publishers.id, { onDelete: 'cascade' }), // NULL for system roles
-    
-    // Permissions that this role grants
-    permissions: text({ mode: 'json' }).$type<{
-        canCreatePackages: boolean;
-        canEditPackages: boolean;
-        canDeletePackages: boolean;
-        canPushReleases: boolean;
-        canManageMembers: boolean;
-        canManageRoles: boolean;
-        canCreateGroups: boolean;
-        canEditGroups: boolean;
-        canDeleteGroups: boolean;
-        canRequestTopLevelAlias: boolean;
-        canViewPrivate: boolean;
-    }>().notNull().default(sql`'{
-        "canCreatePackages": false,
-        "canEditPackages": false,
-        "canDeletePackages": false,
-        "canPushReleases": false,
-        "canManageMembers": false,
-        "canManageRoles": false,
-        "canCreateGroups": false,
-        "canEditGroups": false,
-        "canDeleteGroups": false,
-        "canRequestTopLevelAlias": false,
-        "canViewPrivate": false
-    }'`),
-    
-    created_at: SQLUtils.getCreatedAtColumn(),
-    created_by_user_id: integer().references(() => users.id),
 });
 
 /**

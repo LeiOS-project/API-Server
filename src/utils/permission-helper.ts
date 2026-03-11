@@ -17,6 +17,8 @@ export namespace PermissionHelper {
         VIEWER = "VIEWER"
     }
 
+    export const OrgRolesAsTuple = [OrgRoles.ADMIN, OrgRoles.MAINTAINER, OrgRoles.DEVELOPER, OrgRoles.VIEWER] as const;
+
     export interface OrgPermissions {
 
         packages: {
