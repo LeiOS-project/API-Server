@@ -49,6 +49,7 @@ router.get('/',
 
 // Create a new role
 router.post('/',
+
     APIRouteSpec.authenticated({
         summary: "Create role",
         description: "Create a custom role for a publisher. Requires canManageRoles permission.",
@@ -60,10 +61,13 @@ router.post('/',
             APIResponseSpec.notFound("Publisher not found")
         )
     }),
+
     zValidator("param", z.object({
         publisherName: z.string()
     })),
+
     zValidator("json", PublisherModel.CreateRole.Body),
+    
     async (c) => {
         // @ts-ignore
         const { publisherName } = c.req.valid("param") as { publisherName: string };

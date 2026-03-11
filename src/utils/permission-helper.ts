@@ -14,7 +14,7 @@ export namespace PermissionHelper {
         ADMIN = "ADMIN",
         MAINTAINER = "MAINTAINER",
         DEVELOPER = "DEVELOPER",
-        GUEST = "GUEST"
+        VIEWER = "VIEWER"
     }
 
     export interface OrgPermissions {
@@ -126,7 +126,7 @@ export namespace PermissionHelper {
             }
         },
 
-        [OrgRoles.GUEST]: {
+        [OrgRoles.VIEWER]: {
             packages: {
                 create: false,
                 update: false,
