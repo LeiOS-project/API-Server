@@ -251,7 +251,9 @@ export const packageAliases = sqliteTable('package_aliases', {
  */
 export const roleAssignments = sqliteTable('role_assignments', {
     id: integer().primaryKey({ autoIncrement: true }),
-    role_id: integer().notNull().references(() => roles.id, { onDelete: 'cascade' }),
+    role: text({
+        enum: PermissionHelper.OrgRolesAsTuple
+    }).notNull(),
     user_id: integer().notNull().references(() => users.id, { onDelete: 'cascade' }),
     
     // Scope: publisher_id is always required, group_id and package_id are optional
