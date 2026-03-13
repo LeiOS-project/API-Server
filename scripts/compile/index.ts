@@ -9,18 +9,6 @@ class CompileCMD extends CLIApp {
         console.log("Platforms: " + Object.keys(Platforms).join(", "));
     }
 
-    override async dispatch(args: string[], ctx: CLICommandContext) {
-        const cmd_name = args[0] as string | undefined;
-
-        if (!cmd_name) {
-            return (this.registry.get(["auto"] as any) as CLIBaseCommand).run({ args: {}, flags: {} }, ctx);
-        }
-
-        ctx.raw_parent_args.push("bun", "compile");
-
-        return super.dispatch(args, ctx);
-    }
-
 };
 
 
