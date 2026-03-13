@@ -70,7 +70,8 @@ export const apiKeys = sqliteTable('api_keys', {
  */
 export const packages = sqliteTable('packages', {
     id: integer().primaryKey({ autoIncrement: true }),
-    name: text().notNull().unique(), // Full hierarchical name: publisher.[...groups].pkgname or publisher.pkgname
+    name: text().notNull(), // URL-safe name like "vscode" (not unique, only unique within publisher/group)
+    fullname: text().notNull().unique(), // Full hierarchical name: publisher.[...groups].pkgname or publisher.pkgname
     publisher_id: integer().notNull().references(() => publishers.id, { onDelete: 'cascade' }),
     group_id: integer().references(() => publisherGroups.id, { onDelete: 'cascade' }), // NULL for publisher-level packages
 
