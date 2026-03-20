@@ -2,22 +2,21 @@ import { Logger } from "../utils/logger";
 import { authMiddleware } from "./middleware/auth";
 import { Hono } from "hono";
 import { prettyJSON } from "hono/pretty-json";
-import { setupDocs } from "./docs";
+import { setupDocs } from "./versions/v1/docs";
 import { cors } from "hono/cors";
 import { HTTPException } from 'hono/http-exception'
+import type { APIVersionRouter } from "./utils/apiVersionRouter";
+import { APIv0Router } from "./versions/v0";
+import { APIv1Router } from "./versions/v1";
 
 export class API {
 
 	protected static server: Bun.Server<undefined>;
 	protected static app: Hono;
 
-	protected static routers = [
-		(import('./routes/public')),
-		(import('./routes/auth')),
-		(import('./routes/account')),
-		(import('./routes/developer')),
-		(import('./routes/admin')),
-	];
+	protected static registerVersion(versionRouter: APIVersionRouter) {
+		this.app.route(`/v${versionRouter.version}`, versionRouter.router);
+	}
 
 	static async init(
 		frontendUrls: string[] = [],
@@ -63,10 +62,11 @@ export class API {
 		// Apply global auth middleware
 		this.app.use(authMiddleware);
 
-		for (const router of this.routers) {
-			this.app.route("/", (await router).router);
-		}
 
+		this.registerVersion(new APIv0Router);
+		this.registerVersion(new APIv1Router);
+
+		
 		this.app.get("/health", (c) => {
 			return c.json({ status: "LeiOS API is running" });
 		});

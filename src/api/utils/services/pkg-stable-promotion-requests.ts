@@ -6,7 +6,7 @@ import { APIResponse } from "../api-res";
 import { APIResponseSpec, APIRouteSpec } from "../specHelpers";
 import { z } from "zod";
 import { StablePromotionRequestsModel } from "../shared-models/stableRequests";
-import { DOCS_TAGS } from "../../docs";
+import { DOCS_TAGS } from "../../versions/v1/docs";
 
 export async function setupPackageStablePromotionRequestRoutes(router: Hono, admin: boolean) {
 

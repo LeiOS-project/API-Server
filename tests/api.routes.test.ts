@@ -5,10 +5,10 @@ import { AuthHandler, AuthUtils, SessionHandler } from "../src/api/utils/authHan
 import { AptlyAPI } from "../src/aptly/api";
 import { randomUUID } from "crypto";
 import { eq } from "drizzle-orm";
-import { AuthModel } from "../src/api/routes/auth/model";
+import { AuthModel } from "../src/api/versions/v1/routes/auth/model";
 import { makeAPIRequest } from "./helpers/api";
-import { AccountModel } from "../src/api/routes/account/model";
-import { PublicPackagesModel } from "../src/api/routes/public/packages/model";
+import { AccountModel } from "../src/api/versions/v1/routes/account/model";
+import { PublicPackagesModel } from "../src/api/versions/v1/routes/public/packages/model";
 
 // type Arch = AptlyAPI.Utils.Architectures;
 
