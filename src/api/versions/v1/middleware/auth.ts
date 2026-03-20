@@ -1,16 +1,13 @@
 import { createMiddleware } from 'hono/factory'
-import { APIResponse } from "../utils/api-res";
-import { AuthHandler } from '../utils/authHandler';
+import { APIResponse } from "../../../utils/api-res";
+import { AuthHandler } from '../../../utils/authHandler';
 
-export const authMiddleware = createMiddleware(async (c, next) => {
+export const authMiddlewareV1 = createMiddleware(async (c, next) => {
 
     if (
-        c.req.path.startsWith("/auth/login") || c.req.path.startsWith("/auth/signup") ||
-        c.req.path.startsWith("/auth/reset-password") ||
-        c.req.path.startsWith("/public") ||
-        c.req.path.startsWith("/docs") ||
-        c.req.path.startsWith("/favicon.ico") ||
-        c.req.path === "/"
+        c.req.path.startsWith("/v1/auth/login") || c.req.path.startsWith("/v1/auth/signup") ||
+        c.req.path.startsWith("/v1/auth/reset-password") ||
+        c.req.path.startsWith("/v1/public")
     ) {
         return await next();
     }

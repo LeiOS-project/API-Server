@@ -1,18 +1,18 @@
 import { Hono } from "hono";
 import type { GenerateSpecOptions } from "hono-openapi";
-import type { BlankEnv, BlankSchema, H } from "hono/types";
+import { HonoBase } from "hono/hono-base";
 
 export abstract class APIVersionRouter<T extends APIVersionRouter.InitSettings = APIVersionRouter.InitSettings> {
 
     readonly version: number;
     readonly openAPIConfig: Readonly<APIVersionRouter.OpenAPIConfig>;
-    readonly router: Hono;
+    readonly router: HonoBase;
 
     protected constructor(settings: Readonly<T>) {
         this.version = settings.version;
         this.openAPIConfig = settings.openAPIConfig;
 
-        if (settings.routes instanceof Hono) {
+        if (settings.routes instanceof HonoBase) {
 
             this.router = settings.routes;
 
@@ -20,14 +20,16 @@ export abstract class APIVersionRouter<T extends APIVersionRouter.InitSettings =
 
             this.router = new Hono();
 
-            for (const route of (settings.routes as Array<{ router: Hono }> | Array<Hono>)) {
-                if (route instanceof Hono) {
+            for (const route of (settings.routes as Array<{ router: HonoBase } | HonoBase>)) {
+
+                if (route instanceof HonoBase) {
                     this.router.route("/", route);
                 }
-                else if ('router' in route && route.router instanceof Hono) {
+                else if ('router' in route && route.router instanceof HonoBase) {
                     this.router.route("/", route.router);
                 }
                 else {
+                    console.error("Invalid route configuration: Each route must be a Hono instance or an object with a 'router' property that is a Hono instance.", route);
                     throw new Error("Invalid route configuration: Each route must be a Hono instance or an object with a 'router' property that is a Hono instance.");
                 }
             }
@@ -48,7 +50,7 @@ export namespace APIVersionRouter {
 
     export type OpenAPIConfig = Partial<GenerateSpecOptions>;
     
-    export type Routable = Hono | Array<{ router: Hono } | Hono>;
+    export type Routable = HonoBase | Array<{ router: HonoBase } | HonoBase>;
 
 }
 

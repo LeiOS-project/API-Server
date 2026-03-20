@@ -129,7 +129,6 @@ export namespace DB.Schema {
     export const publisherGroups = TableSchema.publisherGroups;
     export const publisherMembers = TableSchema.publisherMembers;
 
-    export const roles = TableSchema.roles;
     export const roleAssignments = TableSchema.roleAssignments;
 
     export const packages = TableSchema.packages;
@@ -156,7 +155,6 @@ export namespace DB.Models {
     export type PublisherGroup = typeof DB.Schema.publisherGroups.$inferSelect;
     export type PublisherMember = typeof DB.Schema.publisherMembers.$inferSelect;
 
-    export type Role = typeof DB.Schema.roles.$inferSelect;
     export type RoleAssignment = typeof DB.Schema.roleAssignments.$inferSelect;
 
     export type Package = typeof DB.Schema.packages.$inferSelect;

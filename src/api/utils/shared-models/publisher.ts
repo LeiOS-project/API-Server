@@ -94,12 +94,13 @@ export namespace PublisherModel {
 
 export namespace PublisherModel.CreatePublisher {
     export const Body = createInsertSchema(DB.Schema.publishers, {
+
         name: PublisherModel.PublisherNameSchema,
         display_name: z.string().min(1).max(100),
         description: z.string().min(1).max(500),
         homepage_url: z.string().url().optional(),
         avatar_url: z.string().url().optional(),
-        visibility: z.enum(['public', 'private']).default('public'),
+
     }).omit({
         id: true,
         created_at: true,
@@ -329,23 +330,6 @@ export namespace PublisherModel.UpdateRole {
     );
     export type Body = z.infer<typeof Body>;
 }
-
-/**
- * Get role details
- */
-export namespace PublisherModel.GetRole {
-    export const Response = createSelectSchema(DB.Schema.roles);
-    export type Response = z.infer<typeof Response>;
-}
-
-/**
- * Get all roles
- */
-export namespace PublisherModel.GetAllRoles {
-    export const Response = z.array(PublisherModel.GetRole.Response);
-    export type Response = z.infer<typeof Response>;
-}
-
 /**
  * Assign a role to a user
  */

@@ -6,6 +6,7 @@ import { router as authRouter } from "./routes/auth";
 import { router as accountRouter } from "./routes/account";
 import { router as developerRouter } from "./routes/developer";
 import { router as adminRouter } from "./routes/admin";
+import { authMiddlewareV0 } from "./middleware/auth";
 
 const openAPIConfig: Partial<GenerateSpecOptions> = {
 
@@ -275,19 +276,22 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
     }
 }
 
+const router = new Hono();
+
+router.use(authMiddlewareV0);
+
+router.route("/", publicRouter);
+router.route("/", authRouter);
+router.route("/", accountRouter);
+router.route("/", developerRouter);
+router.route("/", adminRouter);
 
 export class APIv0Router extends APIVersionRouter {
     constructor() {
         super({
             version: 0,
             openAPIConfig,
-            routes: [
-                publicRouter,
-                authRouter,
-                accountRouter,
-                developerRouter,
-                adminRouter,
-            ]
+            routes: router,
         });
     }
 }
