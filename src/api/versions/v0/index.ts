@@ -39,11 +39,11 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
 
         servers: [
             {
-                url: "http://localhost:12151/v1/",
+                url: "http://localhost:12151/v0/",
                 description: "Local development server",
             },
             {
-                url: "https://api.leios.dev/v1/",
+                url: "https://api.leios.dev/v0/",
                 description: "Production server",
             },
         ],
