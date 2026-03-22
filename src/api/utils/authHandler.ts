@@ -246,7 +246,7 @@ export class AuthHandler {
         }
     }
 
-    static async getAuthContext(fullToken: string): Promise<AuthHandler.AuthContext | null> {
+    static async getAuthContext(fullToken: string): Promise<AuthHandler.AuthenticatedAuthContext | null> {
 
         const tokenParts = AuthUtils.getTokenParts(fullToken);
         if (!tokenParts) {
@@ -279,7 +279,7 @@ export class AuthHandler {
 
     }
 
-    static async isValidAuthContext(authContext: AuthHandler.AuthContext): Promise<boolean> {
+    static async isValidAuthContext(authContext: AuthHandler.AuthenticatedAuthContext): Promise<boolean> {
         switch (authContext.type) {
             case 'session':
                 return await SessionHandler.isValidSession(authContext);
@@ -290,7 +290,7 @@ export class AuthHandler {
         }
     }
 
-    static async invalidateAuthContext(authContext: AuthHandler.AuthContext): Promise<void> {
+    static async invalidateAuthContext(authContext: AuthHandler.AuthenticatedAuthContext): Promise<void> {
         switch (authContext.type) {
             case 'session':
                 await SessionHandler.inValidateSession(authContext.id);
@@ -321,7 +321,8 @@ export namespace AuthHandler {
 
     export type TOKEN_PREFIX = typeof SessionHandler.SESSION_TOKEN_PREFIX | typeof APIKeyHandler.API_KEY_PREFIX;
 
-    export type AuthContext = SessionAuthContext | ApiKeyAuthContext;
+    export type AuthenticatedAuthContext = SessionAuthContext | ApiKeyAuthContext;
+    export type AuthContext = AuthenticatedAuthContext | UnauthenticatedAuthContext;
 
     export interface SessionAuthContext extends DB.Models.Session {
         readonly type: 'session';
@@ -329,6 +330,10 @@ export namespace AuthHandler {
 
     export interface ApiKeyAuthContext extends DB.Models.ApiKey {
         readonly type: 'apiKey';
+    }
+
+    export interface UnauthenticatedAuthContext {
+        readonly type: 'unauthenticated';
     }
 
     export interface TokenParts {

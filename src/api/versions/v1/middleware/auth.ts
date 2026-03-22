@@ -4,23 +4,23 @@ import { AuthHandler } from '../../../utils/authHandler';
 
 export const authMiddlewareV1 = createMiddleware(async (c, next) => {
 
-    if (
-        c.req.path.startsWith("/v1/auth/login") || c.req.path.startsWith("/v1/auth/signup") ||
-        c.req.path.startsWith("/v1/auth/reset-password") ||
-        c.req.path.startsWith("/v1/public")
-    ) {
+    const authHeader = c.req.header("Authorization");
+
+    if (!authHeader) {
+        const authContext: AuthHandler.UnauthenticatedAuthContext = { type: 'unauthenticated' };
+
+        c.set("authContext", authContext);
+
         return await next();
     }
 
-    const authHeader = c.req.header("Authorization");
-
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-        return APIResponse.unauthorized(c, "Missing or invalid Authorization header");
+    if (!authHeader.startsWith("Bearer ")) {
+        return APIResponse.unauthorized(c, "Invalid Authorization header");
     }
 
     const token = authHeader.substring("Bearer ".length);
 
-    const authContext = await AuthHandler.getAuthContext(token);
+    const authContext: AuthHandler.AuthenticatedAuthContext | null = await AuthHandler.getAuthContext(token);
 
     if (!authContext || !(await AuthHandler.isValidAuthContext(authContext))) {
         return APIResponse.unauthorized(c, "Invalid or expired token");
