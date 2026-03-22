@@ -20,6 +20,7 @@ router.post('/',
 
         responses: APIResponseSpec.describeWithWrongInputs(
             APIResponseSpec.badRequest("Invalid reset token"),
+            APIResponseSpec.unauthorized("You are already authenticated"),
             APIResponseSpec.serverError("User for reset token not found"),
             APIResponseSpec.successNoData("Password has been reset successfully")
         ),
@@ -28,6 +29,12 @@ router.post('/',
     zValidator("json", ResetPasswordModel.Reset.Body),
 
     async (c) => {
+        //@ts-ignore
+        const authContext = c.get("authContext") as AuthHandler.AuthContext;
+        if (authContext.type !== 'unauthenticated') {
+            return APIResponse.unauthorized(c, "You are already authenticated");
+        }
+
         const resetData = c.req.valid("json");
 
         const checkToken = DB.instance().select().from(DB.Schema.passwordResets).where(
@@ -77,6 +84,7 @@ router.post('/request',
         tags: [DOCS_TAGS.AUTHENTICATION],
 
         responses: APIResponseSpec.describeWithWrongInputs(
+            APIResponseSpec.unauthorized("You are already authenticated"),
             APIResponseSpec.successNoData("If the username exists, a password reset has been requested")
         ),
     }),
@@ -84,6 +92,13 @@ router.post('/request',
     zValidator("json", ResetPasswordModel.RequestReset.Body),
 
     async (c) => {
+        //@ts-ignore
+        const authContext = c.get("authContext") as AuthHandler.AuthContext;
+        if (authContext.type !== 'unauthenticated') {
+            return APIResponse.unauthorized(c, "You are already authenticated");
+        }
+
+
         const requestData = c.req.valid("json");
 
         const user = DB.instance().select().from(DB.Schema.users).where(

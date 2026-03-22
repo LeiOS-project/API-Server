@@ -51,7 +51,7 @@ router.get('/',
         const userWithoutSensitive = AccountModel.GetInfo.Response.parse(user);
 
         return APIResponse.success(c, "Account information retrieved successfully", userWithoutSensitive);
-    },
+    }
 );
 
 router.put('/',
@@ -80,7 +80,7 @@ router.put('/',
         ).run();
 
         return APIResponse.successNoData(c, "Account information updated successfully");
-    },
+    }
 );
 
 router.put('/password',
@@ -132,7 +132,7 @@ router.put('/password',
         await SessionHandler.inValidateAllSessionsForUser(authContext.user_id);
 
         return APIResponse.successNoData(c, "Password changed successfully");
-    },
+    }
 );
 
 

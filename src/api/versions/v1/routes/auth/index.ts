@@ -51,7 +51,7 @@ router.post('/login',
 
         responses: APIResponseSpec.describeWithWrongInputs(
             APIResponseSpec.success("Login successful", AuthModel.Login.Response),
-            APIResponseSpec.unauthorized("Unauthorized: Invalid username or password"),
+            APIResponseSpec.unauthorized("Invalid username or password / You are already authenticated"),
             APIResponseSpec.tooManyRequests("Too many login attempts. Try again later.")
         ),
 
@@ -60,6 +60,12 @@ router.post('/login',
     zValidator("json", AuthModel.Login.Body),
     
     async (c) => {
+        //@ts-ignore
+        const authContext = c.get("authContext") as AuthHandler.AuthContext;
+        if (authContext.type !== 'unauthenticated') {
+            return APIResponse.unauthorized(c, "You are already authenticated");
+        }
+
         const clientId = getClientId(c);
         const rate = isLoginRateLimited(clientId);
         if (rate.limited) {
