@@ -1,9 +1,15 @@
 import type { TaskHandler } from '@cleverjs/utils';
-import { desc, sql } from 'drizzle-orm';
+import { desc, sql, Table } from 'drizzle-orm';
 import {
     sqliteTable,
     integer,
-    text
+    text,
+    unique,
+    index,
+    uniqueIndex,
+    foreignKey,
+    primaryKey,
+    check
 } from 'drizzle-orm/sqlite-core';
 import { SQLUtils } from './utils';
 import type { PackageModel } from '../api/utils/shared-models/package';
@@ -121,7 +127,9 @@ export const publisherMembers = sqliteTable('publisher_members', {
     }).notNull().default(PermissionHelper.OrgRoles.VIEWER),
 
     created_at: SQLUtils.getCreatedAtColumn(),
-});
+}, (table) => ([
+    unique().on(table.publisher_id, table.group_id, table.user_id)
+]));
 
 
 /**
@@ -145,8 +153,10 @@ export const roleAssignments = sqliteTable('role_assignments', {
     }).notNull(),
     
     created_at: SQLUtils.getCreatedAtColumn(),
-    assigned_by_user_id: integer().references(() => users.id),
-});
+    assigned_by_user_id: integer().references(() => users.id)
+}, (table) => ([
+    unique().on(table.user_id, table.publisher_id, table.group_id, table.package_id)
+]));
 
 
 
