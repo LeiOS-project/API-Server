@@ -56,7 +56,7 @@ describe("Auth routes and access checks", async () => {
 
     test("POST /auth/login authenticates and creates session", async () => {
 
-        const data = await makeAPIRequest("/auth/login", {
+        const data = await makeAPIRequest("/v1/auth/login", {
             method: "POST",
             body: { username: testUser.username, password: testUser.password },
             expectedBodySchema: AuthModel.Login.Response
@@ -87,7 +87,7 @@ describe("Auth routes and access checks", async () => {
 
     test("POST /auth/login with invalid credentials fails", async () => {
 
-        await makeAPIRequest("/auth/login", {
+        await makeAPIRequest("/v1/auth/login", {
             method: "POST",
             body: { username: testUser.username, password: "WrongPassword" },
         }, 401);
@@ -96,7 +96,7 @@ describe("Auth routes and access checks", async () => {
 
     test("GET /auth/session returns current session info", async () => {
 
-        const data = await makeAPIRequest("/auth/session", {
+        const data = await makeAPIRequest("/v1/auth/session", {
             authToken: session_token,
             expectedBodySchema: AuthModel.Session.Response
         });
@@ -107,7 +107,7 @@ describe("Auth routes and access checks", async () => {
 
     test("GET /auth/session with invalid token fails", async () => {
 
-        await makeAPIRequest("/auth/session", {
+        await makeAPIRequest("/v1/auth/session", {
             authToken: "invalid_token",
         }, 401);
 
@@ -115,7 +115,7 @@ describe("Auth routes and access checks", async () => {
     
     test("GET /dev as admin succeeds", async () => {
 
-        await makeAPIRequest("/dev", {
+        await makeAPIRequest("/v1/dev", {
             authToken: session_token,
         }, 401);
 
@@ -123,7 +123,7 @@ describe("Auth routes and access checks", async () => {
 
     test("GET /admin as non-admin fails", async () => {
 
-        await makeAPIRequest("/admin", {
+        await makeAPIRequest("/v1/admin", {
             authToken: session_token,
         }, 401);
 
@@ -131,7 +131,7 @@ describe("Auth routes and access checks", async () => {
 
     test("POST /auth/logout invalidates session", async () => {
 
-        await makeAPIRequest("/auth/logout", {
+        await makeAPIRequest("/v1/auth/logout", {
             method: "POST",
             authToken: session_token
         });
@@ -152,7 +152,7 @@ describe("Account routes", async () => {
 
     test("GET /account returns current user", async () => {
 
-        const data = await makeAPIRequest("/account", {
+        const data = await makeAPIRequest("/v1/account", {
             authToken: session_token,
             expectedBodySchema: AccountModel.GetInfo.Response
         });
@@ -172,7 +172,7 @@ describe("Account routes", async () => {
             email: "updated@example.com"
         }
 
-        await makeAPIRequest("/account", {
+        await makeAPIRequest("/v1/account", {
             method: "PUT",
             authToken: session_token,
             body: newUserData
@@ -191,7 +191,7 @@ describe("Account routes", async () => {
 
     test("PUT /account try updating role fails", async () => {
         
-        await makeAPIRequest("/account", {
+        await makeAPIRequest("/v1/account", {
             method: "PUT",
             authToken: session_token,
             body: { role: "admin" }
@@ -206,7 +206,7 @@ describe("Account routes", async () => {
         const oldPassword = testUser.password;
         const newPassword = "NewP@ssw0rd1";
 
-        await makeAPIRequest("/account/password", {
+        await makeAPIRequest("/v1/account/password", {
             method: "PUT",
             authToken: session_token,
             body: {
@@ -218,18 +218,18 @@ describe("Account routes", async () => {
         testUser.password = newPassword;
 
         // Old session should be invalidated
-        await makeAPIRequest("/account", {
+        await makeAPIRequest("/v1/account", {
             authToken: session_token,
         }, 401);
 
         // Login with old password should fail
-        await makeAPIRequest("/auth/login", {
+        await makeAPIRequest("/v1/auth/login", {
             method: "POST",
             body: { username: testUser.username, password: oldPassword }
         }, 401);
 
         // Login with new password should succeed
-        const data = await makeAPIRequest("/auth/login", {
+        const data = await makeAPIRequest("/v1/auth/login", {
             method: "POST",
             body: { username: testUser.username, password: newPassword },
             expectedBodySchema: AuthModel.Login.Response
@@ -250,7 +250,7 @@ describe("Account routes", async () => {
             requires_patching: false
         }).returning().get();
 
-        await makeAPIRequest("/account", {
+        await makeAPIRequest("/v1/account", {
             method: "DELETE",
             authToken: session_token
         }, 400);
@@ -264,7 +264,7 @@ describe("Account routes", async () => {
 
     test("DELETE /account removes user without packages", async () => {
         
-        await makeAPIRequest("/account", {
+        await makeAPIRequest("/v1/account", {
             method: "DELETE",
             authToken: session_token
         });
@@ -305,7 +305,7 @@ describe("Public package routes", () => {
         // const listBody = await listRes.json();
         // expect(listBody.data.some((pkg: any) => pkg.id === tempPkg.id)).toBe(true);
 
-        const data = await makeAPIRequest("/public/packages", {
+        const data = await makeAPIRequest("/v1/public/packages", {
             expectedBodySchema: PublicPackagesModel.GetAll.Response
         });
 
@@ -522,25 +522,25 @@ describe("Public package routes", () => {
 
 describe("Docs Routes", async () => {
 
-    test("GET /docs/openapi returns API docs if enabled", async () => {
-        await makeAPIRequest(`/docs/openapi`, {}, 200);
+    test("GET /docs/v1/openapi returns API docs if enabled", async () => {
+        await makeAPIRequest("/docs/v1/openapi", {}, 200);
     });
 
-    test("GET /docs returns API docs UI if enabled", async () => {
-        await makeAPIRequest(`/docs`, {}, 200);
+    test("GET /docs/v1 returns API docs UI if enabled", async () => {
+        await makeAPIRequest("/docs/v1", {}, 200);
     });
 
-    test("GET /docs/openapi returns 404 if disabled", async () => {
+    test("GET /docs/v1/openapi returns 404 if disabled", async () => {
 
         await API.stop();
         await API.init([], true);
         await API.start(14123, "::");
 
-        await makeAPIRequest(`/docs/openapi`, {}, 404);
+        await makeAPIRequest("/docs/v1/openapi", {}, 404);
     });
 
-    test("GET /docs returns 404 if disabled", async () => {
+    test("GET /docs/v1 returns 404 if disabled", async () => {
 
-        await makeAPIRequest(`/docs`, {}, 404);
+        await makeAPIRequest("/docs/v1", {}, 404);
     });
 });

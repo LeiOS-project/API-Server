@@ -65,6 +65,87 @@ export const apiKeys = sqliteTable('api_keys', {
 });
 
 
+
+/**
+ * Publishers (Organizations/Groups) that own and manage packages
+ * @deprecated Use DB.Schema.publishers instead
+ */
+export const publishers = sqliteTable('publishers', {
+    id: integer().primaryKey({ autoIncrement: true }),
+
+    name: text().notNull().unique(), // URL-safe name like "microsoft", "mozilla-foundation"
+    display_name: text().notNull(),
+    description: text().notNull(),
+    homepage_url: text(),
+    avatar_url: text(),
+
+    owner_user_id: integer().notNull().references(() => users.id),
+    created_at: SQLUtils.getCreatedAtColumn()
+});
+
+/**
+ * Hierarchical subgroups within publishers
+ * @deprecated Use DB.Schema.publisherGroups instead
+ */
+export const publisherGroups = sqliteTable('publisher_groups', {
+    id: integer().primaryKey({ autoIncrement: true }),
+    publisher_id: integer().notNull().references(() => publishers.id, { onDelete: 'cascade' }),
+    parent_group_id: integer().references((): any => publisherGroups.id, { onDelete: 'cascade' }), // NULL for top-level groups
+    name: text().notNull(), // URL-safe name like "vscode", "firefox"
+    display_name: text().notNull(),
+    description: text().notNull(),
+    visibility: text({ enum: ['public', 'private'] }).default('public').notNull(),
+    created_at: SQLUtils.getCreatedAtColumn(),
+    created_by_user_id: integer().notNull().references(() => users.id),
+});
+
+/**
+ * Members and their roles within publishers and groups
+ * @deprecated Use DB.Schema.publisherMembers instead
+ */
+export const publisherMembers = sqliteTable('publisher_members', {
+    id: integer().primaryKey({ autoIncrement: true }),
+    publisher_id: integer().notNull().references(() => publishers.id, { onDelete: 'cascade' }),
+    group_id: integer().references(() => publisherGroups.id, { onDelete: 'cascade' }), // NULL = publisher-level member
+    user_id: integer().notNull().references(() => users.id, { onDelete: 'cascade' }),
+    
+
+    role: text({ 
+        enum: PermissionHelper.OrgRolesAsTuple
+    }).notNull().default(PermissionHelper.OrgRoles.VIEWER),
+    
+
+    created_at: SQLUtils.getCreatedAtColumn(),
+    invited_by_user_id: integer().references(() => users.id),
+});
+
+
+/**
+ * Role assignments link users to roles at different scopes
+ * Scope can be publisher-level, group-level, or package-level
+ * @deprecated Use DB.Schema.roleAssignments instead
+ */
+export const roleAssignments = sqliteTable('role_assignments', {
+    id: integer().primaryKey({ autoIncrement: true }),
+    role: text({
+        enum: PermissionHelper.OrgRolesAsTuple
+    }).notNull(),
+    user_id: integer().notNull().references(() => users.id, { onDelete: 'cascade' }),
+    
+    // Scope: publisher_id is always required, group_id and package_id are optional
+    // - Only publisher_id: role applies to entire publisher
+    // - publisher_id + group_id: role applies to specific group
+    // - publisher_id + package_id: role applies to specific package
+    publisher_id: integer().notNull().references(() => publishers.id, { onDelete: 'cascade' }),
+    group_id: integer().references(() => publisherGroups.id, { onDelete: 'cascade' }),
+    package_id: integer().references(() => packages.id, { onDelete: 'cascade' }),
+    
+    created_at: SQLUtils.getCreatedAtColumn(),
+    assigned_by_user_id: integer().references(() => users.id),
+});
+
+
+
 /**
  * @deprecated Use DB.Schema.packages instead
  */
@@ -115,6 +196,26 @@ export const packageReleases = sqliteTable('package_releases', {
 });
 
 /**
+ * Top-level package aliases (meta packages)
+ * e.g., "vscode" -> "microsoft.vscode"
+ * @deprecated Use DB.Schema.packageAliases instead
+ */
+export const packageAliases = sqliteTable('package_aliases', {
+    id: integer().primaryKey({ autoIncrement: true }),
+    alias_name: text().notNull().unique(), // The short name like "vscode"
+    target_package_id: integer().notNull().references(() => packages.id, { onDelete: 'cascade' }),
+    status: text({ 
+        enum: ['pending', 'approved', 'rejected'] 
+    }).default('pending').notNull(),
+    requested_by_user_id: integer().notNull().references(() => users.id),
+    reviewed_by_user_id: integer().references(() => users.id),
+    created_at: SQLUtils.getCreatedAtColumn(),
+    reviewed_at: integer(),
+    admin_note: text(),
+});
+
+
+/**
  * @deprecated Use DB.Schema.stablePromotionRequests instead
  */
 export const stablePromotionRequests = sqliteTable('stable_promotion_requests', {
@@ -125,6 +226,24 @@ export const stablePromotionRequests = sqliteTable('stable_promotion_requests', 
     created_at: SQLUtils.getCreatedAtColumn(),
     admin_note: text(),
 });
+
+
+
+/**
+ * @deprecated Use DB.Models.os_releases instead
+ */
+export const os_releases = sqliteTable('os_releases', {
+    id: integer().primaryKey({ autoIncrement: true }),
+    // YYYY.MM.(release_this_month) format
+    version: text().notNull().unique(),
+    changelog: text().notNull(),
+    created_at: SQLUtils.getCreatedAtColumn(),
+    taskID: integer().notNull().references(() => scheduled_tasks.id),
+    // published_at: int().references(() => scheduled_tasks.finished_at),
+});
+
+
+
 
 /**
  * @deprecated Use DB.Schema.scheduled_tasks instead
@@ -161,110 +280,4 @@ export const metadata = sqliteTable('metadata', {
 });
 
 
-/**
- * @deprecated Use DB.Models.os_releases instead
- */
-export const os_releases = sqliteTable('os_releases', {
-    id: integer().primaryKey({ autoIncrement: true }),
-    // YYYY.MM.(release_this_month) format
-    version: text().notNull().unique(),
-    changelog: text().notNull(),
-    created_at: SQLUtils.getCreatedAtColumn(),
-    taskID: integer().notNull().references(() => scheduled_tasks.id),
-    // published_at: int().references(() => scheduled_tasks.finished_at),
-});
 
-/**
- * Publishers (Organizations/Groups) that own and manage packages
- * @deprecated Use DB.Schema.publishers instead
- */
-export const publishers = sqliteTable('publishers', {
-
-    id: integer().primaryKey({ autoIncrement: true }),
-    name: text().notNull().unique(), // URL-safe name like "microsoft", "mozilla-foundation"
-    display_name: text().notNull(),
-    description: text().notNull(),
-    homepage_url: text(),
-    avatar_url: text(),
-    created_at: SQLUtils.getCreatedAtColumn(),
-    created_by_user_id: integer().notNull().references(() => users.id),
-});
-
-/**
- * Hierarchical subgroups within publishers
- * @deprecated Use DB.Schema.publisherGroups instead
- */
-export const publisherGroups = sqliteTable('publisher_groups', {
-    id: integer().primaryKey({ autoIncrement: true }),
-    publisher_id: integer().notNull().references(() => publishers.id, { onDelete: 'cascade' }),
-    parent_group_id: integer().references((): any => publisherGroups.id, { onDelete: 'cascade' }), // NULL for top-level groups
-    name: text().notNull(), // URL-safe name like "vscode", "firefox"
-    display_name: text().notNull(),
-    description: text().notNull(),
-    visibility: text({ enum: ['public', 'private'] }).default('public').notNull(),
-    created_at: SQLUtils.getCreatedAtColumn(),
-    created_by_user_id: integer().notNull().references(() => users.id),
-});
-
-/**
- * Members and their roles within publishers and groups
- * @deprecated Use DB.Schema.publisherMembers instead
- */
-export const publisherMembers = sqliteTable('publisher_members', {
-    id: integer().primaryKey({ autoIncrement: true }),
-    publisher_id: integer().notNull().references(() => publishers.id, { onDelete: 'cascade' }),
-    group_id: integer().references(() => publisherGroups.id, { onDelete: 'cascade' }), // NULL = publisher-level member
-    user_id: integer().notNull().references(() => users.id, { onDelete: 'cascade' }),
-    
-
-    role: text({ 
-        enum: PermissionHelper.OrgRolesAsTuple
-    }).notNull().default(PermissionHelper.OrgRoles.VIEWER),
-    
-
-    created_at: SQLUtils.getCreatedAtColumn(),
-    invited_by_user_id: integer().references(() => users.id),
-});
-
-/**
- * Top-level package aliases (meta packages)
- * e.g., "vscode" -> "microsoft.vscode"
- * @deprecated Use DB.Schema.packageAliases instead
- */
-export const packageAliases = sqliteTable('package_aliases', {
-    id: integer().primaryKey({ autoIncrement: true }),
-    alias_name: text().notNull().unique(), // The short name like "vscode"
-    target_package_id: integer().notNull().references(() => packages.id, { onDelete: 'cascade' }),
-    status: text({ 
-        enum: ['pending', 'approved', 'rejected'] 
-    }).default('pending').notNull(),
-    requested_by_user_id: integer().notNull().references(() => users.id),
-    reviewed_by_user_id: integer().references(() => users.id),
-    created_at: SQLUtils.getCreatedAtColumn(),
-    reviewed_at: integer(),
-    admin_note: text(),
-});
-
-/**
- * Role assignments link users to roles at different scopes
- * Scope can be publisher-level, group-level, or package-level
- * @deprecated Use DB.Schema.roleAssignments instead
- */
-export const roleAssignments = sqliteTable('role_assignments', {
-    id: integer().primaryKey({ autoIncrement: true }),
-    role: text({
-        enum: PermissionHelper.OrgRolesAsTuple
-    }).notNull(),
-    user_id: integer().notNull().references(() => users.id, { onDelete: 'cascade' }),
-    
-    // Scope: publisher_id is always required, group_id and package_id are optional
-    // - Only publisher_id: role applies to entire publisher
-    // - publisher_id + group_id: role applies to specific group
-    // - publisher_id + package_id: role applies to specific package
-    publisher_id: integer().notNull().references(() => publishers.id, { onDelete: 'cascade' }),
-    group_id: integer().references(() => publisherGroups.id, { onDelete: 'cascade' }),
-    package_id: integer().references(() => packages.id, { onDelete: 'cascade' }),
-    
-    created_at: SQLUtils.getCreatedAtColumn(),
-    assigned_by_user_id: integer().references(() => users.id),
-});
