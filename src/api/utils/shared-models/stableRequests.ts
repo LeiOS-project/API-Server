@@ -7,7 +7,7 @@ export namespace StablePromotionRequestsModel {
     export const Status = z.enum(["pending", "approved", "denied"]);
     export type Status = z.infer<typeof Status>;
 
-    export const Entity = createSelectSchema(DB.Schema.stablePromotionRequests).extend({
+    export const Entity = createSelectSchema(DB.Tables.stablePromotionRequests).extend({
         package_name: z.string(),
         package_release_version: z.string()
     });
@@ -66,7 +66,7 @@ export namespace StablePromotionRequestsModel.GetAll {
 
 export namespace StablePromotionRequestsModel.Create {
 
-    export const Body = createInsertSchema(DB.Schema.stablePromotionRequests).omit({
+    export const Body = createInsertSchema(DB.Tables.stablePromotionRequests).omit({
         id: true,
         created_at: true,
         package_id: true,

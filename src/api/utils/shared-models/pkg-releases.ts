@@ -23,7 +23,7 @@ export namespace PackageReleaseModel {
 
 export namespace PackageReleaseModel.GetReleaseByVersion {
 
-    export const Response = createSelectSchema(DB.Schema.packageReleases, {
+    export const Response = createSelectSchema(DB.Tables.packageReleases, {
         architectures: z.object({
             amd64: z.boolean(),
             arm64: z.boolean(),
@@ -45,7 +45,7 @@ export namespace PackageReleaseModel.GetAll {
 
 export namespace PackageReleaseModel.CreateRelease {
 
-    export const Body = createInsertSchema(DB.Schema.packageReleases, {
+    export const Body = createInsertSchema(DB.Tables.packageReleases, {
         versionWithLeiosPatch: z.string().regex(versionWithLeiOSPatchRegex),
         changelog: z.string().min(1, "Changelog cannot be empty").max(10000, "Changelog cannot exceed 10,000 characters")
     }).omit({

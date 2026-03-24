@@ -35,12 +35,12 @@ export class DB {
     }
 
     static async createInitialAdminUserIfNeeded(configBaseDir: string) {
-        const usersTableEmpty = (await this.db.select().from(DB.Schema.users).limit(1)).length === 0;
+        const usersTableEmpty = (await this.db.select().from(DB.Tables.users).limit(1)).length === 0;
         if (!usersTableEmpty) return;
 
         const username = "admin";
 
-        const admin_user_id = await this.db.insert(DB.Schema.users).values({
+        const admin_user_id = await this.db.insert(DB.Tables.users).values({
             username,
             email: "admin@leios.local",
             password_hash: await Bun.password.hash(crypto_randomBytes(32).toString('hex')),
@@ -49,7 +49,7 @@ export class DB {
         }).returning().get().id;
 
         const passwordResetToken = crypto_randomBytes(64).toString('hex');
-        await this.db.insert(DB.Schema.passwordResets).values({
+        await this.db.insert(DB.Tables.passwordResets).values({
             token: passwordResetToken,
             user_id: admin_user_id,
             expires_at: Date.now() + 7 * 24 * 60 * 60 * 1000 // 7 Days
@@ -71,19 +71,19 @@ export class DB {
 
     static async createInitialOSReleasesMetaIfNeeded() {
 
-        // const initalReleaseExists = await this.db.select().from(DB.Schema.os_releases).where(
-        //     eq(DB.Schema.os_releases.version, "0000.00.000")
+        // const initalReleaseExists = await this.db.select().from(DB.Tables.os_releases).where(
+        //     eq(DB.Tables.os_releases.version, "0000.00.000")
         // ).get();
 
         // if (!initalReleaseExists) {
-        //     const taskID = await this.db.insert(DB.Schema.scheduled_tasks).values({
+        //     const taskID = await this.db.insert(DB.Tables.scheduled_tasks).values({
         //         function: "os-release:create",
         //         status: "completed",
         //         created_at: new Date(0).getTime(),
         //         args: {}
         //     }).returning().get().id;
 
-        //     await this.db.insert(DB.Schema.os_releases).values({
+        //     await this.db.insert(DB.Tables.os_releases).values({
         //         version: "0000.00.000",
         //         changelog: "Initial placeholder release",
         //         taskID,
@@ -93,11 +93,11 @@ export class DB {
         // }
 
         // no longr used, remove any existing placeholder entries
-        // await this.db.delete(DB.Schema.os_releases).where(
-        //     eq(DB.Schema.os_releases.version, "0000.00.0")
+        // await this.db.delete(DB.Tables.os_releases).where(
+        //     eq(DB.Tables.os_releases.version, "0000.00.0")
         // );
-        // await this.db.delete(DB.Schema.os_releases).where(
-        //     eq(DB.Schema.os_releases.version, "0000.00.00")
+        // await this.db.delete(DB.Tables.os_releases).where(
+        //     eq(DB.Tables.os_releases.version, "0000.00.00")
         // );
     }
 
@@ -119,7 +119,7 @@ export class DB {
 }
 
 
-export namespace DB.Schema {
+export namespace DB.Tables {
     export const users = TableSchema.users;
     export const sessions = TableSchema.sessions;
     export const passwordResets = TableSchema.passwordResets;
@@ -146,27 +146,27 @@ export namespace DB.Schema {
 }
 
 export namespace DB.Models {
-    export type User = typeof DB.Schema.users.$inferSelect;
-    export type Session = typeof DB.Schema.sessions.$inferSelect;
-    export type PasswordReset = typeof DB.Schema.passwordResets.$inferSelect;
-    export type ApiKey = typeof DB.Schema.apiKeys.$inferSelect;
+    export type User = typeof DB.Tables.users.$inferSelect;
+    export type Session = typeof DB.Tables.sessions.$inferSelect;
+    export type PasswordReset = typeof DB.Tables.passwordResets.$inferSelect;
+    export type ApiKey = typeof DB.Tables.apiKeys.$inferSelect;
 
-    export type Publisher = typeof DB.Schema.publishers.$inferSelect;
-    export type PublisherGroup = typeof DB.Schema.publisherGroups.$inferSelect;
-    export type PublisherMember = typeof DB.Schema.publisherMembers.$inferSelect;
+    export type Publisher = typeof DB.Tables.publishers.$inferSelect;
+    export type PublisherGroup = typeof DB.Tables.publisherGroups.$inferSelect;
+    export type PublisherMember = typeof DB.Tables.publisherMembers.$inferSelect;
 
-    export type RoleAssignment = typeof DB.Schema.roleAssignments.$inferSelect;
+    export type RoleAssignment = typeof DB.Tables.roleAssignments.$inferSelect;
 
-    export type Package = typeof DB.Schema.packages.$inferSelect;
-    export type PackageRelease = typeof DB.Schema.packageReleases.$inferSelect;
-    export type PackageAlias = typeof DB.Schema.packageAliases.$inferSelect;
+    export type Package = typeof DB.Tables.packages.$inferSelect;
+    export type PackageRelease = typeof DB.Tables.packageReleases.$inferSelect;
+    export type PackageAlias = typeof DB.Tables.packageAliases.$inferSelect;
 
-    export type StablePromotionRequest = typeof DB.Schema.stablePromotionRequests.$inferSelect;
+    export type StablePromotionRequest = typeof DB.Tables.stablePromotionRequests.$inferSelect;
 
-    export type OSRelease = typeof DB.Schema.os_releases.$inferSelect;
+    export type OSRelease = typeof DB.Tables.os_releases.$inferSelect;
 
-    export type ScheduledTask = typeof DB.Schema.scheduled_tasks.$inferSelect;
-    export type ScheduledTaskPausedState = typeof DB.Schema.scheduled_tasks_paused_state.$inferSelect;
+    export type ScheduledTask = typeof DB.Tables.scheduled_tasks.$inferSelect;
+    export type ScheduledTaskPausedState = typeof DB.Tables.scheduled_tasks_paused_state.$inferSelect;
 
-    export type Metadata = typeof DB.Schema.metadata.$inferSelect;
+    export type Metadata = typeof DB.Tables.metadata.$inferSelect;
 }

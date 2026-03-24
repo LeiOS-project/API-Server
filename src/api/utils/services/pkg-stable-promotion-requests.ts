@@ -34,31 +34,31 @@ export async function setupPackageStablePromotionRequestRoutes(router: Hono, adm
             const filters = c.req.valid("query");
 
             let query = DB.instance().select({
-                id: DB.Schema.stablePromotionRequests.id,
-                package_id: DB.Schema.stablePromotionRequests.package_id,
-                package_release_id: DB.Schema.stablePromotionRequests.package_release_id,
-                created_at: DB.Schema.stablePromotionRequests.created_at,
-                status: DB.Schema.stablePromotionRequests.status,
-                admin_note: DB.Schema.stablePromotionRequests.admin_note,
+                id: DB.Tables.stablePromotionRequests.id,
+                package_id: DB.Tables.stablePromotionRequests.package_id,
+                package_release_id: DB.Tables.stablePromotionRequests.package_release_id,
+                created_at: DB.Tables.stablePromotionRequests.created_at,
+                status: DB.Tables.stablePromotionRequests.status,
+                admin_note: DB.Tables.stablePromotionRequests.admin_note,
 
-                package_name: DB.Schema.packages.name,
-                package_release_version: DB.Schema.packageReleases.versionWithLeiosPatch,
+                package_name: DB.Tables.packages.name,
+                package_release_version: DB.Tables.packageReleases.versionWithLeiosPatch,
             })
-            .from(DB.Schema.stablePromotionRequests)
+            .from(DB.Tables.stablePromotionRequests)
             .innerJoin(
-                DB.Schema.packages,
-                eq(DB.Schema.packages.id, DB.Schema.stablePromotionRequests.package_id),
+                DB.Tables.packages,
+                eq(DB.Tables.packages.id, DB.Tables.stablePromotionRequests.package_id),
             )
             .innerJoin(
-                DB.Schema.packageReleases,
-                eq(DB.Schema.packageReleases.id, DB.Schema.stablePromotionRequests.package_release_id),
+                DB.Tables.packageReleases,
+                eq(DB.Tables.packageReleases.id, DB.Tables.stablePromotionRequests.package_release_id),
             )
             .where(
-                eq(DB.Schema.stablePromotionRequests.package_id, packageData.id)
+                eq(DB.Tables.stablePromotionRequests.package_id, packageData.id)
             ).$dynamic();
 
             if (filters.status) {
-                query = query.where(eq(DB.Schema.stablePromotionRequests.status, filters.status));
+                query = query.where(eq(DB.Tables.stablePromotionRequests.status, filters.status));
             }
 
             const requests = (await query satisfies StablePromotionRequestsModel.Entity[]) as StablePromotionRequestsModel.GetAll.Response;
@@ -89,24 +89,24 @@ export async function setupPackageStablePromotionRequestRoutes(router: Hono, adm
             // @ts-ignore
             const packageData = c.get("package") as DB.Models.Package;
 
-            const releaseExists = DB.instance().select().from(DB.Schema.packageReleases).where(and(
-                eq(DB.Schema.packageReleases.id, requestData.package_release_id),
-                eq(DB.Schema.packageReleases.package_id, packageData.id)
+            const releaseExists = DB.instance().select().from(DB.Tables.packageReleases).where(and(
+                eq(DB.Tables.packageReleases.id, requestData.package_release_id),
+                eq(DB.Tables.packageReleases.package_id, packageData.id)
             )).get();
 
             if (!releaseExists) {
                 return APIResponse.notFound(c, "Release not found in archive repository");
             }
 
-            const alreadyExists = DB.instance().select().from(DB.Schema.stablePromotionRequests).where(
-                eq(DB.Schema.stablePromotionRequests.package_release_id, requestData.package_release_id)
+            const alreadyExists = DB.instance().select().from(DB.Tables.stablePromotionRequests).where(
+                eq(DB.Tables.stablePromotionRequests.package_release_id, requestData.package_release_id)
             ).get();
 
             if (alreadyExists) {
                 return APIResponse.conflict(c, "A request already for this release already exists or the release is already stable");
             }
 
-            const result = await DB.instance().insert(DB.Schema.stablePromotionRequests).values({
+            const result = await DB.instance().insert(DB.Tables.stablePromotionRequests).values({
                 package_id: packageData.id,
                 package_release_id: requestData.package_release_id,
                 status: "pending"
@@ -131,28 +131,28 @@ export async function setupPackageStablePromotionRequestRoutes(router: Hono, adm
             const packageData = c.get("package") as DB.Models.Package;
 
             const requestData = await DB.instance().select({
-                id: DB.Schema.stablePromotionRequests.id,
-                package_id: DB.Schema.stablePromotionRequests.package_id,
-                package_release_id: DB.Schema.stablePromotionRequests.package_release_id,
-                created_at: DB.Schema.stablePromotionRequests.created_at,
-                status: DB.Schema.stablePromotionRequests.status,
-                admin_note: DB.Schema.stablePromotionRequests.admin_note,
+                id: DB.Tables.stablePromotionRequests.id,
+                package_id: DB.Tables.stablePromotionRequests.package_id,
+                package_release_id: DB.Tables.stablePromotionRequests.package_release_id,
+                created_at: DB.Tables.stablePromotionRequests.created_at,
+                status: DB.Tables.stablePromotionRequests.status,
+                admin_note: DB.Tables.stablePromotionRequests.admin_note,
 
-                package_name: DB.Schema.packages.name,
-                package_release_version: DB.Schema.packageReleases.versionWithLeiosPatch,
+                package_name: DB.Tables.packages.name,
+                package_release_version: DB.Tables.packageReleases.versionWithLeiosPatch,
             })
-            .from(DB.Schema.stablePromotionRequests)
+            .from(DB.Tables.stablePromotionRequests)
             .innerJoin(
-                DB.Schema.packages,
-                eq(DB.Schema.packages.id, DB.Schema.stablePromotionRequests.package_id),
+                DB.Tables.packages,
+                eq(DB.Tables.packages.id, DB.Tables.stablePromotionRequests.package_id),
             )
             .innerJoin(
-                DB.Schema.packageReleases,
-                eq(DB.Schema.packageReleases.id, DB.Schema.stablePromotionRequests.package_release_id),
+                DB.Tables.packageReleases,
+                eq(DB.Tables.packageReleases.id, DB.Tables.stablePromotionRequests.package_release_id),
             )
             .where(and(
-                eq(DB.Schema.stablePromotionRequests.id, stablePromotionRequestID),
-                eq(DB.Schema.stablePromotionRequests.package_id, packageData.id)
+                eq(DB.Tables.stablePromotionRequests.id, stablePromotionRequestID),
+                eq(DB.Tables.stablePromotionRequests.package_id, packageData.id)
             )).get() satisfies StablePromotionRequestsModel.Entity | undefined;
 
             if (!requestData) {
@@ -203,8 +203,8 @@ export async function setupPackageStablePromotionRequestRoutes(router: Hono, adm
             // @ts-ignore
             const requestData = c.get("stablePromotionRequest") as DB.Models.StablePromotionRequest;
 
-            await DB.instance().delete(DB.Schema.stablePromotionRequests).where(
-                eq(DB.Schema.stablePromotionRequests.id, requestData.id)
+            await DB.instance().delete(DB.Tables.stablePromotionRequests).where(
+                eq(DB.Tables.stablePromotionRequests.id, requestData.id)
             );
 
             return APIResponse.success(c, "Stable promotion request deleted successfully", {});

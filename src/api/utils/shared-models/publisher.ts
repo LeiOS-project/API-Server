@@ -93,7 +93,7 @@ export namespace PublisherModel {
 }
 
 export namespace PublisherModel.CreatePublisher {
-    export const Body = createInsertSchema(DB.Schema.publishers, {
+    export const Body = createInsertSchema(DB.Tables.publishers, {
 
         name: PublisherModel.PublisherNameSchema,
         display_name: z.string().min(1).max(100),
@@ -122,7 +122,7 @@ export namespace PublisherModel.UpdatePublisher {
 }
 
 export namespace PublisherModel.GetPublisher {
-    export const Response = createSelectSchema(DB.Schema.publishers);
+    export const Response = createSelectSchema(DB.Tables.publishers);
     export type Response = z.infer<typeof Response>;
 }
 
@@ -132,7 +132,7 @@ export namespace PublisherModel.GetAllPublishers {
 }
 
 export namespace PublisherModel.CreateGroup {
-    export const Body = createInsertSchema(DB.Schema.publisherGroups, {
+    export const Body = createInsertSchema(DB.Tables.publisherGroups, {
         name: z.string()
             .min(2, "Group name must be at least 2 characters long.")
             .max(50, "Group name cannot exceed 50 characters.")
@@ -163,7 +163,7 @@ export namespace PublisherModel.UpdateGroup {
 }
 
 export namespace PublisherModel.GetGroup {
-    export const Response = createSelectSchema(DB.Schema.publisherGroups);
+    export const Response = createSelectSchema(DB.Tables.publisherGroups);
     export type Response = z.infer<typeof Response>;
 }
 
@@ -196,7 +196,7 @@ export namespace PublisherModel.UpdateMember {
 }
 
 export namespace PublisherModel.GetMember {
-    export const Response = createSelectSchema(DB.Schema.publisherMembers);
+    export const Response = createSelectSchema(DB.Tables.publisherMembers);
     export type Response = z.infer<typeof Response>;
 }
 
@@ -350,7 +350,7 @@ export namespace PublisherModel.AssignRole {
  * Get role assignment details
  */
 export namespace PublisherModel.GetRoleAssignment {
-    export const Response = createSelectSchema(DB.Schema.roleAssignments);
+    export const Response = createSelectSchema(DB.Tables.roleAssignments);
     export type Response = z.infer<typeof Response>;
 }
 

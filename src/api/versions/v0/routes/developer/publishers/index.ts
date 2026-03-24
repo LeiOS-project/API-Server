@@ -120,8 +120,8 @@ router.put('/:publisherName',
         // Get publisher
         const publisher = await DB.instance()
             .select()
-            .from(DB.Schema.publishers)
-            .where(eq(DB.Schema.publishers.name, publisherName))
+            .from(DB.Tables.publishers)
+            .where(eq(DB.Tables.publishers.name, publisherName))
             .get();
 
         if (!publisher) {
@@ -172,8 +172,8 @@ router.delete('/:publisherName',
         // Get publisher
         const publisher = await DB.instance()
             .select()
-            .from(DB.Schema.publishers)
-            .where(eq(DB.Schema.publishers.name, publisherName))
+            .from(DB.Tables.publishers)
+            .where(eq(DB.Tables.publishers.name, publisherName))
             .get();
 
         if (!publisher) {

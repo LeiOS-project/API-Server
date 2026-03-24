@@ -1,13 +1,13 @@
 import { Hono } from "hono";
 import { validator as zValidator } from "hono-openapi";
 import { z } from "zod";
-import { PublisherModel } from "../../../../../utils/shared-models/publisher";
-import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers";
-import { PublishersService } from "../../../../../utils/services/publishers";
-import { DOCS_TAGS } from "../../../docs";
-import { AuthHandler } from "../../../../../utils/authHandler";
-import { APIResponse } from "../../../../../utils/api-res";
-import { DB } from "../../../../../../db";
+import { PublisherModel } from "../../../../utils/shared-models/publisher";
+import { APIResponseSpec, APIRouteSpec } from "../../../../utils/specHelpers";
+import { PublishersService } from "../../../../utils/services/publishers";
+import { DOCS_TAGS } from "../../docs";
+import { AuthHandler } from "../../../../utils/authHandler";
+import { APIResponse } from "../../../../utils/api-res";
+import { DB } from "../../../../../db";
 import { eq } from "drizzle-orm";
 
 export const router = new Hono().basePath('/groups');
@@ -40,8 +40,8 @@ router.get('/',
         // Get publisher
         const publisher = await DB.instance()
             .select()
-            .from(DB.Schema.publishers)
-            .where(eq(DB.Schema.publishers.name, publisherName))
+            .from(DB.Tables.publishers)
+            .where(eq(DB.Tables.publishers.name, publisherName))
             .get();
 
         if (!publisher) {
@@ -82,8 +82,8 @@ router.post('/',
         // Get publisher
         const publisher = await DB.instance()
             .select()
-            .from(DB.Schema.publishers)
-            .where(eq(DB.Schema.publishers.name, publisherName))
+            .from(DB.Tables.publishers)
+            .where(eq(DB.Tables.publishers.name, publisherName))
             .get();
 
         if (!publisher) {
@@ -118,8 +118,8 @@ router.get('/:groupId',
 
         const group = await DB.instance()
             .select()
-            .from(DB.Schema.publisherGroups)
-            .where(eq(DB.Schema.publisherGroups.id, groupId))
+            .from(DB.Tables.publisherGroups)
+            .where(eq(DB.Tables.publisherGroups.id, groupId))
             .get();
 
         if (!group) {
@@ -160,8 +160,8 @@ router.put('/:groupId',
 
         const group = await DB.instance()
             .select()
-            .from(DB.Schema.publisherGroups)
-            .where(eq(DB.Schema.publisherGroups.id, groupId))
+            .from(DB.Tables.publisherGroups)
+            .where(eq(DB.Tables.publisherGroups.id, groupId))
             .get();
 
         if (!group) {
@@ -169,7 +169,7 @@ router.put('/:groupId',
         }
 
         // Check permission
-        const { PermissionsService } = await import("../../../../../utils/services/permissions");
+        const { PermissionsService } = await import("../../../../utils/services/permissions");
         const hasPermission = await PermissionsService.hasPermissionOrAdmin({
             authContext,
             publisherId: group.publisher_id,
@@ -182,9 +182,9 @@ router.put('/:groupId',
         }
 
         await DB.instance()
-            .update(DB.Schema.publisherGroups)
+            .update(DB.Tables.publisherGroups)
             .set(updateData)
-            .where(eq(DB.Schema.publisherGroups.id, groupId));
+            .where(eq(DB.Tables.publisherGroups.id, groupId));
 
         return APIResponse.successNoData(c, "Group updated successfully");
     }
@@ -218,8 +218,8 @@ router.delete('/:groupId',
 
         const group = await DB.instance()
             .select()
-            .from(DB.Schema.publisherGroups)
-            .where(eq(DB.Schema.publisherGroups.id, groupId))
+            .from(DB.Tables.publisherGroups)
+            .where(eq(DB.Tables.publisherGroups.id, groupId))
             .get();
 
         if (!group) {
@@ -227,7 +227,7 @@ router.delete('/:groupId',
         }
 
         // Check permission
-        const { PermissionsService } = await import("../../../../../utils/services/permissions");
+        const { PermissionsService } = await import("../../../../utils/services/permissions");
         const hasPermission = await PermissionsService.hasPermissionOrAdmin({
             authContext,
             publisherId: group.publisher_id,
@@ -242,8 +242,8 @@ router.delete('/:groupId',
         // Check if group has packages
         const packages = await DB.instance()
             .select()
-            .from(DB.Schema.packages)
-            .where(eq(DB.Schema.packages.group_id, groupId))
+            .from(DB.Tables.packages)
+            .where(eq(DB.Tables.packages.group_id, groupId))
             .limit(1)
             .all();
 
@@ -254,8 +254,8 @@ router.delete('/:groupId',
         // Check if group has subgroups
         const subgroups = await DB.instance()
             .select()
-            .from(DB.Schema.publisherGroups)
-            .where(eq(DB.Schema.publisherGroups.parent_group_id, groupId))
+            .from(DB.Tables.publisherGroups)
+            .where(eq(DB.Tables.publisherGroups.parent_group_id, groupId))
             .limit(1)
             .all();
 
@@ -265,8 +265,8 @@ router.delete('/:groupId',
 
         // Delete group
         await DB.instance()
-            .delete(DB.Schema.publisherGroups)
-            .where(eq(DB.Schema.publisherGroups.id, groupId));
+            .delete(DB.Tables.publisherGroups)
+            .where(eq(DB.Tables.publisherGroups.id, groupId));
 
         return APIResponse.successNoData(c, "Group deleted successfully");
     }

@@ -34,23 +34,23 @@ router.get('/',
 		const { limit, offset, order } = c.req.valid("query");
 
 		const releases = await DB.instance().select({
-			id: DB.Schema.os_releases.id,
-			version: DB.Schema.os_releases.version,
-			changelog: DB.Schema.os_releases.changelog,
-			created_at: DB.Schema.os_releases.created_at,
+			id: DB.Tables.os_releases.id,
+			version: DB.Tables.os_releases.version,
+			changelog: DB.Tables.os_releases.changelog,
+			created_at: DB.Tables.os_releases.created_at,
 
-			published_at: DB.Schema.scheduled_tasks.finished_at,
-			publishing_status: DB.Schema.scheduled_tasks.status,
+			published_at: DB.Tables.scheduled_tasks.finished_at,
+			publishing_status: DB.Tables.scheduled_tasks.status,
 		})
-		.from(DB.Schema.os_releases)
+		.from(DB.Tables.os_releases)
 		.innerJoin(
-			DB.Schema.scheduled_tasks,
-			eq(DB.Schema.scheduled_tasks.id, DB.Schema.os_releases.taskID)
+			DB.Tables.scheduled_tasks,
+			eq(DB.Tables.scheduled_tasks.id, DB.Tables.os_releases.taskID)
 		)
 		.orderBy(
 			order === "newest" ?
-				desc(DB.Schema.os_releases.created_at) :
-				DB.Schema.os_releases.created_at
+				desc(DB.Tables.os_releases.created_at) :
+				DB.Tables.os_releases.created_at
 		)
 		.limit(limit)
 		.offset(offset);
@@ -77,10 +77,10 @@ router.post('/',
 
 		const newReleaseData = c.req.valid('json');
 		
-		let lastReleaseVersion = DB.instance().select().from(DB.Schema.os_releases).orderBy(desc(DB.Schema.os_releases.created_at)).limit(1).get()?.version;
+		let lastReleaseVersion = DB.instance().select().from(DB.Tables.os_releases).orderBy(desc(DB.Tables.os_releases.created_at)).limit(1).get()?.version;
 		if (!lastReleaseVersion) {
 			// check if any releases exist at all
-			const anyRelease = DB.instance().select().from(DB.Schema.os_releases).limit(1).get();
+			const anyRelease = DB.instance().select().from(DB.Tables.os_releases).limit(1).get();
 			if (!anyRelease) {
 				lastReleaseVersion = "0000.00.000";
 			}
@@ -101,7 +101,7 @@ router.post('/',
 		});
 
 		const result = {
-			...await DB.instance().insert(DB.Schema.os_releases).values({
+			...await DB.instance().insert(DB.Tables.os_releases).values({
 				version,
 				changelog: newReleaseData.changelog,
 				taskID,
@@ -122,8 +122,8 @@ router.use('/:version/*',
 		// @ts-ignore
 		const { version } = c.req.valid("param") as { version: string };
 
-		const release = await DB.instance().select().from(DB.Schema.os_releases).where(
-			eq(DB.Schema.os_releases.version, version)
+		const release = await DB.instance().select().from(DB.Tables.os_releases).where(
+			eq(DB.Tables.os_releases.version, version)
 		).get();
 
 		if (!release) {
@@ -154,8 +154,8 @@ router.get('/:version',
 		// @ts-ignore
 		const release = c.get("osRelease") as DB.Models.OSRelease;
 
-		const task = await DB.instance().select().from(DB.Schema.scheduled_tasks).where(
-			eq(DB.Schema.scheduled_tasks.id, release.taskID)
+		const task = await DB.instance().select().from(DB.Tables.scheduled_tasks).where(
+			eq(DB.Tables.scheduled_tasks.id, release.taskID)
 		).get();
 
 		if (!task) {
@@ -220,8 +220,8 @@ router.put('/:version',
 
 		const updateData = c.req.valid('json');
 
-		await DB.instance().update(DB.Schema.os_releases).set(updateData).where(
-			eq(DB.Schema.os_releases.id, release.id)
+		await DB.instance().update(DB.Tables.os_releases).set(updateData).where(
+			eq(DB.Tables.os_releases.id, release.id)
 		);
 
 		return APIResponse.successNoData(c, "OS release updated successfully");

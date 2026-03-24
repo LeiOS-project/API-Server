@@ -22,11 +22,11 @@ export class PermissionsService {
         if (groupId !== undefined) {
             const groupMember = await DB.instance()
                 .select()
-                .from(DB.Schema.publisherMembers)
+                .from(DB.Tables.publisherMembers)
                 .where(and(
-                    eq(DB.Schema.publisherMembers.user_id, userId),
-                    eq(DB.Schema.publisherMembers.publisher_id, publisherId),
-                    eq(DB.Schema.publisherMembers.group_id, groupId)
+                    eq(DB.Tables.publisherMembers.user_id, userId),
+                    eq(DB.Tables.publisherMembers.publisher_id, publisherId),
+                    eq(DB.Tables.publisherMembers.group_id, groupId)
                 ))
                 .get();
             
@@ -36,11 +36,11 @@ export class PermissionsService {
         // Fall back to publisher-level membership
         const publisherMember = await DB.instance()
             .select()
-            .from(DB.Schema.publisherMembers)
+            .from(DB.Tables.publisherMembers)
             .where(and(
-                eq(DB.Schema.publisherMembers.user_id, userId),
-                eq(DB.Schema.publisherMembers.publisher_id, publisherId),
-                eq(DB.Schema.publisherMembers.group_id, null as any)
+                eq(DB.Tables.publisherMembers.user_id, userId),
+                eq(DB.Tables.publisherMembers.publisher_id, publisherId),
+                eq(DB.Tables.publisherMembers.group_id, null as any)
             ))
             .get();
 
@@ -60,10 +60,10 @@ export class PermissionsService {
         // Get all memberships for this user in this publisher
         const memberships = await DB.instance()
             .select()
-            .from(DB.Schema.publisherMembers)
+            .from(DB.Tables.publisherMembers)
             .where(and(
-                eq(DB.Schema.publisherMembers.user_id, userId),
-                eq(DB.Schema.publisherMembers.publisher_id, publisherId)
+                eq(DB.Tables.publisherMembers.user_id, userId),
+                eq(DB.Tables.publisherMembers.publisher_id, publisherId)
             ))
             .all();
 
@@ -71,8 +71,8 @@ export class PermissionsService {
         if (groupId !== undefined) {
             const group = await DB.instance()
                 .select()
-                .from(DB.Schema.publisherGroups)
-                .where(eq(DB.Schema.publisherGroups.id, groupId))
+                .from(DB.Tables.publisherGroups)
+                .where(eq(DB.Tables.publisherGroups.id, groupId))
                 .get();
 
             if (group?.parent_group_id) {
@@ -235,13 +235,13 @@ export class PermissionsService {
         // 1. Get publisher-level assignments
         const publisherAssignments = await DB.instance()
             .select()
-            .from(DB.Schema.roleAssignments)
-            .innerJoin(DB.Schema.roles, eq(DB.Schema.roleAssignments.role_id, DB.Schema.roles.id))
+            .from(DB.Tables.roleAssignments)
+            .innerJoin(DB.Tables.roles, eq(DB.Tables.roleAssignments.role_id, DB.Tables.roles.id))
             .where(and(
-                eq(DB.Schema.roleAssignments.user_id, userId),
-                eq(DB.Schema.roleAssignments.publisher_id, publisherId),
-                eq(DB.Schema.roleAssignments.group_id, null as any),
-                eq(DB.Schema.roleAssignments.package_id, null as any)
+                eq(DB.Tables.roleAssignments.user_id, userId),
+                eq(DB.Tables.roleAssignments.publisher_id, publisherId),
+                eq(DB.Tables.roleAssignments.group_id, null as any),
+                eq(DB.Tables.roleAssignments.package_id, null as any)
             ))
             .all();
 
@@ -261,12 +261,12 @@ export class PermissionsService {
         if (packageId !== undefined) {
             const packageAssignments = await DB.instance()
                 .select()
-                .from(DB.Schema.roleAssignments)
-                .innerJoin(DB.Schema.roles, eq(DB.Schema.roleAssignments.role_id, DB.Schema.roles.id))
+                .from(DB.Tables.roleAssignments)
+                .innerJoin(DB.Tables.roles, eq(DB.Tables.roleAssignments.role_id, DB.Tables.roles.id))
                 .where(and(
-                    eq(DB.Schema.roleAssignments.user_id, userId),
-                    eq(DB.Schema.roleAssignments.publisher_id, publisherId),
-                    eq(DB.Schema.roleAssignments.package_id, packageId)
+                    eq(DB.Tables.roleAssignments.user_id, userId),
+                    eq(DB.Tables.roleAssignments.publisher_id, publisherId),
+                    eq(DB.Tables.roleAssignments.package_id, packageId)
                 ))
                 .all();
 
@@ -290,12 +290,12 @@ export class PermissionsService {
         // Get group-level assignments for this group
         const groupAssignments = await DB.instance()
             .select()
-            .from(DB.Schema.roleAssignments)
-            .innerJoin(DB.Schema.roles, eq(DB.Schema.roleAssignments.role_id, DB.Schema.roles.id))
+            .from(DB.Tables.roleAssignments)
+            .innerJoin(DB.Tables.roles, eq(DB.Tables.roleAssignments.role_id, DB.Tables.roles.id))
             .where(and(
-                eq(DB.Schema.roleAssignments.user_id, userId),
-                eq(DB.Schema.roleAssignments.publisher_id, publisherId),
-                eq(DB.Schema.roleAssignments.group_id, groupId)
+                eq(DB.Tables.roleAssignments.user_id, userId),
+                eq(DB.Tables.roleAssignments.publisher_id, publisherId),
+                eq(DB.Tables.roleAssignments.group_id, groupId)
             ))
             .all();
 
@@ -304,8 +304,8 @@ export class PermissionsService {
         // Get parent group and recursively get its assignments
         const group = await DB.instance()
             .select()
-            .from(DB.Schema.publisherGroups)
-            .where(eq(DB.Schema.publisherGroups.id, groupId))
+            .from(DB.Tables.publisherGroups)
+            .where(eq(DB.Tables.publisherGroups.id, groupId))
             .get();
 
         if (group?.parent_group_id) {
@@ -442,16 +442,16 @@ export class PermissionsService {
             // Check if role already exists
             const existing = await DB.instance()
                 .select()
-                .from(DB.Schema.roles)
+                .from(DB.Tables.roles)
                 .where(and(
-                    eq(DB.Schema.roles.name, roleName),
-                    eq(DB.Schema.roles.is_system, true)
+                    eq(DB.Tables.roles.name, roleName),
+                    eq(DB.Tables.roles.is_system, true)
                 ))
                 .get();
 
             if (!existing) {
                 await DB.instance()
-                    .insert(DB.Schema.roles)
+                    .insert(DB.Tables.roles)
                     .values({
                         name: roleName,
                         display_name: roleName.charAt(0).toUpperCase() + roleName.slice(1),
@@ -471,10 +471,10 @@ export class PermissionsService {
     static async getSystemRole(roleName: PublisherModel.SystemRoleName): Promise<DB.Models.Role | undefined> {
         return await DB.instance()
             .select()
-            .from(DB.Schema.roles)
+            .from(DB.Tables.roles)
             .where(and(
-                eq(DB.Schema.roles.name, roleName),
-                eq(DB.Schema.roles.is_system, true)
+                eq(DB.Tables.roles.name, roleName),
+                eq(DB.Tables.roles.is_system, true)
             ))
             .get();
     }

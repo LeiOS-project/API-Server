@@ -1,13 +1,13 @@
 import { Hono } from "hono";
 import { validator as zValidator } from "hono-openapi";
 import { z } from "zod";
-import { PackageModel } from "../../../../../utils/shared-models/package";
-import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers";
-import { PackagesService } from "../../../../../utils/services/packages";
-import { DOCS_TAGS } from "../../../docs";
-import { AuthHandler } from "../../../../../utils/authHandler";
-import { APIResponse } from "../../../../../utils/api-res";
-import { DB } from "../../../../../../db";
+import { PackageModel } from "../../../../utils/shared-models/package";
+import { APIResponseSpec, APIRouteSpec } from "../../../../utils/specHelpers";
+import { PackagesService } from "../../../../utils/services/packages";
+import { DOCS_TAGS } from "../../docs";
+import { AuthHandler } from "../../../../utils/authHandler";
+import { APIResponse } from "../../../../utils/api-res";
+import { DB } from "../../../../../db";
 import { eq, and } from "drizzle-orm";
 
 export const router = new Hono().basePath('/packages');
@@ -41,8 +41,8 @@ router.get('/',
         // Get publisher
         const publisher = await DB.instance()
             .select()
-            .from(DB.Schema.publishers)
-            .where(eq(DB.Schema.publishers.name, publisherName))
+            .from(DB.Tables.publishers)
+            .where(eq(DB.Tables.publishers.name, publisherName))
             .get();
 
         if (!publisher) {
@@ -58,13 +58,13 @@ router.get('/',
             for (const groupName of groupNames) {
                 const group = await DB.instance()
                     .select()
-                    .from(DB.Schema.publisherGroups)
+                    .from(DB.Tables.publisherGroups)
                     .where(and(
-                        eq(DB.Schema.publisherGroups.publisher_id, publisher.id),
-                        eq(DB.Schema.publisherGroups.name, groupName),
+                        eq(DB.Tables.publisherGroups.publisher_id, publisher.id),
+                        eq(DB.Tables.publisherGroups.name, groupName),
                         currentParentId === null
-                            ? eq(DB.Schema.publisherGroups.parent_group_id, null as any)
-                            : eq(DB.Schema.publisherGroups.parent_group_id, currentParentId)
+                            ? eq(DB.Tables.publisherGroups.parent_group_id, null as any)
+                            : eq(DB.Tables.publisherGroups.parent_group_id, currentParentId)
                     ))
                     .get();
 

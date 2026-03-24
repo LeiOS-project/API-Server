@@ -79,8 +79,8 @@ async function main() {
         // Get user info
         const user = await DB.instance()
             .select()
-            .from(DB.Schema.users)
-            .where(eq(DB.Schema.users.id, userId))
+            .from(DB.Tables.users)
+            .where(eq(DB.Tables.users.id, userId))
             .get();
 
         if (!user) {
@@ -101,8 +101,8 @@ async function main() {
         while (true) {
             const existing = await DB.instance()
                 .select()
-                .from(DB.Schema.publishers)
-                .where(eq(DB.Schema.publishers.name, finalPublisherName))
+                .from(DB.Tables.publishers)
+                .where(eq(DB.Tables.publishers.name, finalPublisherName))
                 .get();
             
             if (!existing) break;
@@ -116,7 +116,7 @@ async function main() {
         if (!DRY_RUN) {
             // Create publisher
             const publisher = await DB.instance()
-                .insert(DB.Schema.publishers)
+                .insert(DB.Tables.publishers)
                 .values({
                     name: finalPublisherName,
                     display_name: user.display_name || user.username,
@@ -131,7 +131,7 @@ async function main() {
 
             // Add user as owner
             await DB.instance()
-                .insert(DB.Schema.publisherMembers)
+                .insert(DB.Tables.publisherMembers)
                 .values({
                     publisher_id: publisher.id,
                     user_id: userId,

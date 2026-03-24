@@ -42,7 +42,7 @@ export namespace PackageAliasModel.UpdateAliasRequest {
 }
 
 export namespace PackageAliasModel.GetAlias {
-    export const Response = createSelectSchema(DB.Schema.packageAliases);
+    export const Response = createSelectSchema(DB.Tables.packageAliases);
     export type Response = z.infer<typeof Response>;
 }
 

@@ -40,8 +40,8 @@ router.get('/',
         // @ts-ignore
         const authContext = c.get("authContext") as AuthHandler.SessionAuthContext;
 
-        const user = DB.instance().select().from(DB.Schema.users).where(
-            eq(DB.Schema.users.id, authContext.user_id)
+        const user = DB.instance().select().from(DB.Tables.users).where(
+            eq(DB.Tables.users.id, authContext.user_id)
         ).get();
 
         if (!user) {
@@ -75,8 +75,8 @@ router.put('/',
 
         const body = c.req.valid("json") as AccountModel.UpdateInfo.Body;
 
-        DB.instance().update(DB.Schema.users).set(body).where(
-            eq(DB.Schema.users.id, authContext.user_id)
+        DB.instance().update(DB.Tables.users).set(body).where(
+            eq(DB.Tables.users.id, authContext.user_id)
         ).run();
 
         return APIResponse.successNoData(c, "Account information updated successfully");
@@ -109,8 +109,8 @@ router.put('/password',
 
         const body = c.req.valid("json")
 
-        const user = DB.instance().select().from(DB.Schema.users).where(
-            eq(DB.Schema.users.id, authContext.user_id)
+        const user = DB.instance().select().from(DB.Tables.users).where(
+            eq(DB.Tables.users.id, authContext.user_id)
         ).get();
     
         if (!user) {
@@ -123,10 +123,10 @@ router.put('/password',
 
         const newPasswordHash = await Bun.password.hash(body.new_password);
 
-        DB.instance().update(DB.Schema.users).set({
+        DB.instance().update(DB.Tables.users).set({
             password_hash: newPasswordHash
         }).where(
-            eq(DB.Schema.users.id, authContext.user_id)
+            eq(DB.Tables.users.id, authContext.user_id)
         ).run();
 
         await SessionHandler.inValidateAllSessionsForUser(authContext.user_id);
@@ -154,19 +154,19 @@ router.delete('/',
         const authContext = c.get("authContext") as AuthHandler.SessionAuthContext;
 
         // Check if user is the only owner of any publishers
-        const ownerships = await DB.instance().select().from(DB.Schema.publisherMembers).where(
+        const ownerships = await DB.instance().select().from(DB.Tables.publisherMembers).where(
             and(
-                eq(DB.Schema.publisherMembers.user_id, authContext.user_id),
-                eq(DB.Schema.publisherMembers.role, 'owner')
+                eq(DB.Tables.publisherMembers.user_id, authContext.user_id),
+                eq(DB.Tables.publisherMembers.role, 'owner')
             )
         );
 
         for (const ownership of ownerships) {
             // Count other owners in this publisher
-            const ownerCount = await DB.instance().select().from(DB.Schema.publisherMembers).where(
+            const ownerCount = await DB.instance().select().from(DB.Tables.publisherMembers).where(
                 and(
-                    eq(DB.Schema.publisherMembers.publisher_id, ownership.publisher_id),
-                    eq(DB.Schema.publisherMembers.role, 'owner')
+                    eq(DB.Tables.publisherMembers.publisher_id, ownership.publisher_id),
+                    eq(DB.Tables.publisherMembers.role, 'owner')
                 )
             ).all();
 
@@ -179,13 +179,13 @@ router.delete('/',
         await SessionHandler.inValidateAllSessionsForUser(authContext.user_id);
 
         // delete password resets
-        DB.instance().delete(DB.Schema.passwordResets).where(
-            eq(DB.Schema.passwordResets.user_id, authContext.user_id)
+        DB.instance().delete(DB.Tables.passwordResets).where(
+            eq(DB.Tables.passwordResets.user_id, authContext.user_id)
         ).run();
 
         // finally, delete the user account
-        DB.instance().delete(DB.Schema.users).where(
-            eq(DB.Schema.users.id, authContext.user_id)
+        DB.instance().delete(DB.Tables.users).where(
+            eq(DB.Tables.users.id, authContext.user_id)
         ).run();
 
         return APIResponse.successNoData(c, "Account deleted successfully");

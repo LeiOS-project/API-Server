@@ -2,13 +2,13 @@ import { Hono } from "hono";
 import { validator as zValidator } from "hono-openapi";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
-import { DB } from "../../../../../../db";
-import { APIResponse } from "../../../../../utils/api-res";
-import { PublisherModel } from "../../../../../utils/shared-models/publisher";
-import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers";
-import { PublishersService } from "../../../../../utils/services/publishers";
-import { DOCS_TAGS } from "../../../docs";
-import { AuthHandler } from "../../../../../utils/authHandler";
+import { DB } from "../../../../../db";
+import { APIResponse } from "../../../../utils/api-res";
+import { PublisherModel } from "../../../../utils/shared-models/publisher";
+import { APIResponseSpec, APIRouteSpec } from "../../../../utils/specHelpers";
+import { PublishersService } from "../../../../utils/services/publishers";
+import { DOCS_TAGS } from "../../docs";
+import { AuthHandler } from "../../../../utils/authHandler";
 import { router as groupsRouter } from "./groups";
 import { router as membersRouter } from "./members";
 import { router as packagesRouter } from "./packages";
@@ -120,8 +120,8 @@ router.put('/:publisherName',
         // Get publisher
         const publisher = await DB.instance()
             .select()
-            .from(DB.Schema.publishers)
-            .where(eq(DB.Schema.publishers.name, publisherName))
+            .from(DB.Tables.publishers)
+            .where(eq(DB.Tables.publishers.name, publisherName))
             .get();
 
         if (!publisher) {
@@ -130,7 +130,7 @@ router.put('/:publisherName',
 
         // Check visibility
         if (publisher.visibility === 'private') {
-            const { PermissionsService } = await import("../../../../../utils/services/permissions");
+            const { PermissionsService } = await import("../../../../utils/services/permissions");
             const isMember = await PermissionsService.isMember({
                 userId: authContext.user_id,
                 publisherId: publisher.id
@@ -172,8 +172,8 @@ router.delete('/:publisherName',
         // Get publisher
         const publisher = await DB.instance()
             .select()
-            .from(DB.Schema.publishers)
-            .where(eq(DB.Schema.publishers.name, publisherName))
+            .from(DB.Tables.publishers)
+            .where(eq(DB.Tables.publishers.name, publisherName))
             .get();
 
         if (!publisher) {
@@ -182,7 +182,7 @@ router.delete('/:publisherName',
 
         // Check visibility
         if (publisher.visibility === 'private') {
-            const { PermissionsService } = await import("../../../../../utils/services/permissions");
+            const { PermissionsService } = await import("../../../../utils/services/permissions");
             const isMember = await PermissionsService.isMember({
                 userId: authContext.user_id,
                 publisherId: publisher.id

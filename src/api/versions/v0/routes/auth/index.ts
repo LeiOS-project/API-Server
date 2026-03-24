@@ -70,7 +70,7 @@ router.post('/login',
 
         const { username, password } = c.req.valid("json");
 
-        const user = DB.instance().select().from(DB.Schema.users).where(eq(DB.Schema.users.username, username)).get();
+        const user = DB.instance().select().from(DB.Tables.users).where(eq(DB.Tables.users.username, username)).get();
         if (!user) {
             return APIResponse.unauthorized(c, "Invalid username or password");
         }

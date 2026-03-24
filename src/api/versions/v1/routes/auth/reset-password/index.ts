@@ -37,8 +37,8 @@ router.post('/',
 
         const resetData = c.req.valid("json");
 
-        const checkToken = DB.instance().select().from(DB.Schema.passwordResets).where(
-            eq(DB.Schema.passwordResets.token, resetData.reset_token)
+        const checkToken = DB.instance().select().from(DB.Tables.passwordResets).where(
+            eq(DB.Tables.passwordResets.token, resetData.reset_token)
         ).get();
 
         if (!checkToken) {
@@ -49,8 +49,8 @@ router.post('/',
             return APIResponse.badRequest(c, "Invalid reset token");
         }
 
-        const user = DB.instance().select().from(DB.Schema.users).where(
-            eq(DB.Schema.users.id, checkToken.user_id)
+        const user = DB.instance().select().from(DB.Tables.users).where(
+            eq(DB.Tables.users.id, checkToken.user_id)
         ).get();
 
         if (!user) {
@@ -59,17 +59,17 @@ router.post('/',
 
         const newPasswordHash = await Bun.password.hash(resetData.new_password);
 
-        DB.instance().update(DB.Schema.users).set({
+        DB.instance().update(DB.Tables.users).set({
             password_hash: newPasswordHash
         }).where(
-            eq(DB.Schema.users.id, user.id)
+            eq(DB.Tables.users.id, user.id)
         ).run();
 
         await SessionHandler.inValidateAllSessionsForUser(user.id);
 
         // Delete used reset token
-        DB.instance().delete(DB.Schema.passwordResets).where(
-            eq(DB.Schema.passwordResets.token, resetData.reset_token)
+        DB.instance().delete(DB.Tables.passwordResets).where(
+            eq(DB.Tables.passwordResets.token, resetData.reset_token)
         ).run();
 
         return APIResponse.successNoData(c, "Password has been reset successfully");
@@ -101,20 +101,20 @@ router.post('/request',
 
         const requestData = c.req.valid("json");
 
-        const user = DB.instance().select().from(DB.Schema.users).where(
-            eq(DB.Schema.users.email, requestData.email)
+        const user = DB.instance().select().from(DB.Tables.users).where(
+            eq(DB.Tables.users.email, requestData.email)
         ).get();
 
         if (user) {
             const resetToken = crypto_randomBytes(64).toString('hex');
 
             // Delete any existing reset tokens for this user
-            DB.instance().delete(DB.Schema.passwordResets).where(
-                eq(DB.Schema.passwordResets.user_id, user.id)
+            DB.instance().delete(DB.Tables.passwordResets).where(
+                eq(DB.Tables.passwordResets.user_id, user.id)
             ).run();
 
             // Create new reset token
-            DB.instance().insert(DB.Schema.passwordResets).values({
+            DB.instance().insert(DB.Tables.passwordResets).values({
                 user_id: user.id,
                 token: resetToken,
                 // 7 Days

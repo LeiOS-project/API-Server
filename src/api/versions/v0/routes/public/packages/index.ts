@@ -26,7 +26,7 @@ router.get('/',
     }),
 
     async (c) => {
-        const packages = await DB.instance().select().from(DB.Schema.packages);
+        const packages = await DB.instance().select().from(DB.Tables.packages);
         return APIResponse.success(c, "Packages retrieved successfully", packages);
     }
 );
@@ -52,8 +52,8 @@ router.get('/:packageName',
         const { packageName } = c.req.valid("param") as z.infer<typeof PublicPackagesModel.PackageParams>;
         const { repo } = c.req.valid("query") as z.infer<typeof PublicPackagesModel.RepoQuery>;
 
-        const pkg = DB.instance().select().from(DB.Schema.packages).where(
-            eq(DB.Schema.packages.name, packageName)
+        const pkg = DB.instance().select().from(DB.Tables.packages).where(
+            eq(DB.Tables.packages.name, packageName)
         ).get();
 
         if (!pkg) {
@@ -104,8 +104,8 @@ router.get('/:packageName/releases',
         const { packageName } = c.req.valid("param") as z.infer<typeof PublicModel.PackageParams>;
         const { repo } = c.req.valid("query") as z.infer<typeof PublicPackagesModel.RepoQuery>;
 
-        const exists = DB.instance().select().from(DB.Schema.packages).where(
-            eq(DB.Schema.packages.name, packageName)
+        const exists = DB.instance().select().from(DB.Tables.packages).where(
+            eq(DB.Tables.packages.name, packageName)
         ).get();
 
         if (!exists) {

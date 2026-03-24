@@ -40,8 +40,8 @@ router.get('/',
         // Get publisher
         const publisher = await DB.instance()
             .select()
-            .from(DB.Schema.publishers)
-            .where(eq(DB.Schema.publishers.name, publisherName))
+            .from(DB.Tables.publishers)
+            .where(eq(DB.Tables.publishers.name, publisherName))
             .get();
 
         if (!publisher) {
@@ -83,8 +83,8 @@ router.post('/',
         // Get publisher
         const publisher = await DB.instance()
             .select()
-            .from(DB.Schema.publishers)
-            .where(eq(DB.Schema.publishers.name, publisherName))
+            .from(DB.Tables.publishers)
+            .where(eq(DB.Tables.publishers.name, publisherName))
             .get();
 
         if (!publisher) {
@@ -119,8 +119,8 @@ router.get('/:memberId',
 
         const member = await DB.instance()
             .select()
-            .from(DB.Schema.publisherMembers)
-            .where(eq(DB.Schema.publisherMembers.id, memberId))
+            .from(DB.Tables.publisherMembers)
+            .where(eq(DB.Tables.publisherMembers.id, memberId))
             .get();
 
         if (!member) {
@@ -161,8 +161,8 @@ router.put('/:memberId',
 
         const member = await DB.instance()
             .select()
-            .from(DB.Schema.publisherMembers)
-            .where(eq(DB.Schema.publisherMembers.id, memberId))
+            .from(DB.Tables.publisherMembers)
+            .where(eq(DB.Tables.publisherMembers.id, memberId))
             .get();
 
         if (!member) {
@@ -201,9 +201,9 @@ router.put('/:memberId',
         }
 
         await DB.instance()
-            .update(DB.Schema.publisherMembers)
+            .update(DB.Tables.publisherMembers)
             .set(updates)
-            .where(eq(DB.Schema.publisherMembers.id, memberId));
+            .where(eq(DB.Tables.publisherMembers.id, memberId));
 
         return APIResponse.successNoData(c, "Member updated successfully");
     }
@@ -237,8 +237,8 @@ router.delete('/:memberId',
 
         const member = await DB.instance()
             .select()
-            .from(DB.Schema.publisherMembers)
-            .where(eq(DB.Schema.publisherMembers.id, memberId))
+            .from(DB.Tables.publisherMembers)
+            .where(eq(DB.Tables.publisherMembers.id, memberId))
             .get();
 
         if (!member) {

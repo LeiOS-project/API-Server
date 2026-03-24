@@ -1,14 +1,14 @@
 import { Hono } from "hono";
 import { validator as zValidator } from "hono-openapi";
 import z from "zod";
-import { DB } from "../../../../../../db";
+import { DB } from "../../../../../db";
 import { eq } from "drizzle-orm";
-import { APIResponse } from "../../../../../utils/api-res";
-import { APIRouteSpec, APIResponseSpec } from "../../../../../utils/specHelpers";
-import { PublisherModel } from "../../../../../utils/shared-models/publisher";
-import { AuthHandler } from "../../../../../utils/authHandler";
-import { RolesService } from "../../../../../utils/services/roles";
-import { DOCS_TAGS } from "../../../docs";
+import { APIResponse } from "../../../../utils/api-res";
+import { APIRouteSpec, APIResponseSpec } from "../../../../utils/specHelpers";
+import { PublisherModel } from "../../../../utils/shared-models/publisher";
+import { AuthHandler } from "../../../../utils/authHandler";
+import { RolesService } from "../../../../utils/services/roles";
+import { DOCS_TAGS } from "../../docs";
 
 const router = new Hono().basePath('/roles');
 
@@ -42,8 +42,8 @@ router.get('/:scope/assignments',
         // Get publisher
         const publisher = await DB.instance()
             .select()
-            .from(DB.Schema.publishers)
-            .where(eq(DB.Schema.publishers.name, publisherName))
+            .from(DB.Tables.publishers)
+            .where(eq(DB.Tables.publishers.name, publisherName))
             .get();
 
         if (!publisher) {
@@ -81,8 +81,8 @@ router.post('/assignments',
         // Get publisher
         const publisher = await DB.instance()
             .select()
-            .from(DB.Schema.publishers)
-            .where(eq(DB.Schema.publishers.name, publisherName))
+            .from(DB.Tables.publishers)
+            .where(eq(DB.Tables.publishers.name, publisherName))
             .get();
 
         if (!publisher) {

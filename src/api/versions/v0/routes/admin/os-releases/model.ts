@@ -13,7 +13,7 @@ export namespace OSReleasesModel {
 
 export namespace OSReleasesModel.GetByVersion {
 
-    export const Response = createSelectSchema(DB.Schema.os_releases).extend({
+    export const Response = createSelectSchema(DB.Tables.os_releases).extend({
         published_at: z.number().nullable(),
         //@ts-ignore
         publishing_status: z.enum(["pending", "running", "paused", "failed", "completed"] satisfies TuplifyUnion<TaskHandler.BaseTaskData<{}>["status"]>)
@@ -35,7 +35,7 @@ export namespace OSReleasesModel.GetAll {
 
 export namespace OSReleasesModel.CreateRelease {
 
-    export const Body = createInsertSchema(DB.Schema.os_releases, {
+    export const Body = createInsertSchema(DB.Tables.os_releases, {
         changelog: z.string().min(1, "Changelog cannot be empty").max(10000, "Changelog cannot exceed 10,000 characters"),
     }).omit({
         id: true,

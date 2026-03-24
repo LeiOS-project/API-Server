@@ -4,7 +4,7 @@ import z from "zod";
 
 export namespace AdminStablePromotionRequestModel.GetById {
 
-    export const Response = createSelectSchema(DB.Schema.stablePromotionRequests).extend({
+    export const Response = createSelectSchema(DB.Tables.stablePromotionRequests).extend({
         package_name: z.string(),
         package_release_version: z.string()
     });
@@ -23,7 +23,7 @@ export namespace AdminStablePromotionRequestModel.GetAll {
 
 export namespace AdminStablePromotionRequestModel.Decide {
 
-    export const Body = createUpdateSchema(DB.Schema.stablePromotionRequests, {
+    export const Body = createUpdateSchema(DB.Tables.stablePromotionRequests, {
         status: z.enum(["approved", "denied"]),
         admin_note: z.string()
     }).omit({

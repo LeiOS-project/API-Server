@@ -43,8 +43,8 @@ OsReleaseTask.addStep("Move packages from archive to local stable repo", async (
 
             const result = await DB.instance().transaction(async (tx) => {
 
-                const release = tx.select().from(DB.Schema.packageReleases).where(
-                    eq(DB.Schema.packageReleases.id, pkgReleaseID)
+                const release = tx.select().from(DB.Tables.packageReleases).where(
+                    eq(DB.Tables.packageReleases.id, pkgReleaseID)
                 ).get();
 
                 if (!release) {
@@ -53,8 +53,8 @@ OsReleaseTask.addStep("Move packages from archive to local stable repo", async (
                     return false;
                 }
 
-                const packageData = tx.select().from(DB.Schema.packages).where(
-                    eq(DB.Schema.packages.id, release.package_id)
+                const packageData = tx.select().from(DB.Tables.packages).where(
+                    eq(DB.Tables.packages.id, release.package_id)
                 ).get();
 
                 if (!packageData?.name) {
@@ -107,10 +107,10 @@ OsReleaseTask.addStep("Move packages from archive to local stable repo", async (
 
                 }
 
-                await tx.update(DB.Schema.packages).set({
+                await tx.update(DB.Tables.packages).set({
                     latest_stable_release: packageData.latest_stable_release
                 }).where(
-                    eq(DB.Schema.packages.id, packageData.id)
+                    eq(DB.Tables.packages.id, packageData.id)
                 );
 
                 return true;
@@ -135,7 +135,7 @@ OsReleaseTask.addStep("Move packages from archive to local stable repo", async (
 
 //     try {
 
-//         await DB.instance().insert(DB.Schema.os_releases).values({
+//         await DB.instance().insert(DB.Tables.os_releases).values({
 //             version: payload.version,
 //             // @TODO: link task ID properly
 //         });

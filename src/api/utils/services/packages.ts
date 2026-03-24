@@ -21,16 +21,16 @@ export class PackagesService {
     } = {}) {
         const { publisherId, groupId, asAdmin = false } = options;
 
-        let query = DB.instance().select().from(DB.Schema.packages);
+        let query = DB.instance().select().from(DB.Tables.packages);
 
         if (publisherId !== undefined) {
             if (groupId !== undefined) {
                 query = query.where(and(
-                    eq(DB.Schema.packages.publisher_id, publisherId),
-                    eq(DB.Schema.packages.group_id, groupId)
+                    eq(DB.Tables.packages.publisher_id, publisherId),
+                    eq(DB.Tables.packages.group_id, groupId)
                 )) as any;
             } else {
-                query = query.where(eq(DB.Schema.packages.publisher_id, publisherId)) as any;
+                query = query.where(eq(DB.Tables.packages.publisher_id, publisherId)) as any;
             }
         }
 
@@ -55,8 +55,8 @@ export class PackagesService {
         // Resolve publisher
         const publisher = await DB.instance()
             .select()
-            .from(DB.Schema.publishers)
-            .where(eq(DB.Schema.publishers.name, publisherName))
+            .from(DB.Tables.publishers)
+            .where(eq(DB.Tables.publishers.name, publisherName))
             .get();
 
         if (!publisher) {
@@ -71,13 +71,13 @@ export class PackagesService {
             for (const groupName of groupPath) {
                 const group = await DB.instance()
                     .select()
-                    .from(DB.Schema.publisherGroups)
+                    .from(DB.Tables.publisherGroups)
                     .where(and(
-                        eq(DB.Schema.publisherGroups.publisher_id, publisher.id),
-                        eq(DB.Schema.publisherGroups.name, groupName),
+                        eq(DB.Tables.publisherGroups.publisher_id, publisher.id),
+                        eq(DB.Tables.publisherGroups.name, groupName),
                         currentParentId === null
-                            ? eq(DB.Schema.publisherGroups.parent_group_id, null as any)
-                            : eq(DB.Schema.publisherGroups.parent_group_id, currentParentId)
+                            ? eq(DB.Tables.publisherGroups.parent_group_id, null as any)
+                            : eq(DB.Tables.publisherGroups.parent_group_id, currentParentId)
                     ))
                     .get();
 
@@ -115,8 +115,8 @@ export class PackagesService {
         // Check if package already exists
         const existingPackage = await DB.instance()
             .select()
-            .from(DB.Schema.packages)
-            .where(eq(DB.Schema.packages.name, fullPackageName))
+            .from(DB.Tables.packages)
+            .where(eq(DB.Tables.packages.name, fullPackageName))
             .get();
 
         if (existingPackage) {
@@ -125,7 +125,7 @@ export class PackagesService {
 
         // Create package
         const result = await DB.instance()
-            .insert(DB.Schema.packages)
+            .insert(DB.Tables.packages)
             .values({
                 name: fullPackageName,
                 description: packageData.description,
@@ -154,8 +154,8 @@ export class PackagesService {
         // Load package
         const packageData = await DB.instance()
             .select()
-            .from(DB.Schema.packages)
-            .where(eq(DB.Schema.packages.name, packageName))
+            .from(DB.Tables.packages)
+            .where(eq(DB.Tables.packages.name, packageName))
             .get();
 
         if (!packageData) {
@@ -217,8 +217,8 @@ export class PackagesService {
             }
         }
 
-        await DB.instance().update(DB.Schema.packages).set(updateData).where(
-            eq(DB.Schema.packages.id, packageData.id)
+        await DB.instance().update(DB.Tables.packages).set(updateData).where(
+            eq(DB.Tables.packages.id, packageData.id)
         );
 
         return APIResponse.successNoData(c, "Package updated successfully");
@@ -251,25 +251,25 @@ export class PackagesService {
         }
 
         const packageReleaseIDs = await DB.instance().select({
-            id: DB.Schema.packageReleases.id
-        }).from(DB.Schema.packageReleases).where(
-            eq(DB.Schema.packageReleases.package_id, packageData.id)
+            id: DB.Tables.packageReleases.id
+        }).from(DB.Tables.packageReleases).where(
+            eq(DB.Tables.packageReleases.package_id, packageData.id)
         );
 
         for (const pkgRelease of packageReleaseIDs) {
             await RuntimeMetadata.removeOSReleasePendingPackageIfExists(pkgRelease.id);
         }
 
-        await DB.instance().delete(DB.Schema.packageReleases).where(
-            eq(DB.Schema.packageReleases.package_id, packageData.id)
+        await DB.instance().delete(DB.Tables.packageReleases).where(
+            eq(DB.Tables.packageReleases.package_id, packageData.id)
         );
 
-        await DB.instance().delete(DB.Schema.packages).where(
-            eq(DB.Schema.packages.id, packageData.id)
+        await DB.instance().delete(DB.Tables.packages).where(
+            eq(DB.Tables.packages.id, packageData.id)
         );
 
-        await DB.instance().delete(DB.Schema.stablePromotionRequests).where(
-            eq(DB.Schema.stablePromotionRequests.package_id, packageData.id)
+        await DB.instance().delete(DB.Tables.stablePromotionRequests).where(
+            eq(DB.Tables.stablePromotionRequests.package_id, packageData.id)
         );
 
         await AptlyAPI.Packages.deleteAllInAllRepos(packageData.name);

@@ -13,7 +13,7 @@ export namespace TaskStatusModel {
 
 export namespace TaskStatusModel.GetByID {
 
-    export const Response = createSelectSchema(DB.Schema.scheduled_tasks).omit({
+    export const Response = createSelectSchema(DB.Tables.scheduled_tasks).omit({
         function: true,
         created_by_user_id: true,
         args: true,

@@ -31,29 +31,29 @@ router.get('/',
         const { limit, offset, order } = c.req.valid("query");
         
         const results = await DB.instance().select({
-            id: DB.Schema.stablePromotionRequests.id,
-            package_id: DB.Schema.stablePromotionRequests.package_id,
-            package_release_id: DB.Schema.stablePromotionRequests.package_release_id,
-            created_at: DB.Schema.stablePromotionRequests.created_at,
-            status: DB.Schema.stablePromotionRequests.status,
-            admin_note: DB.Schema.stablePromotionRequests.admin_note,
+            id: DB.Tables.stablePromotionRequests.id,
+            package_id: DB.Tables.stablePromotionRequests.package_id,
+            package_release_id: DB.Tables.stablePromotionRequests.package_release_id,
+            created_at: DB.Tables.stablePromotionRequests.created_at,
+            status: DB.Tables.stablePromotionRequests.status,
+            admin_note: DB.Tables.stablePromotionRequests.admin_note,
 
-            package_name: DB.Schema.packages.name,
-            package_release_version: DB.Schema.packageReleases.versionWithLeiosPatch,
+            package_name: DB.Tables.packages.name,
+            package_release_version: DB.Tables.packageReleases.versionWithLeiosPatch,
         })
-        .from(DB.Schema.stablePromotionRequests)
+        .from(DB.Tables.stablePromotionRequests)
         .innerJoin(
-            DB.Schema.packages,
-            eq(DB.Schema.packages.id, DB.Schema.stablePromotionRequests.package_id),
+            DB.Tables.packages,
+            eq(DB.Tables.packages.id, DB.Tables.stablePromotionRequests.package_id),
         )
         .innerJoin(
-            DB.Schema.packageReleases,
-            eq(DB.Schema.packageReleases.id, DB.Schema.stablePromotionRequests.package_release_id),
+            DB.Tables.packageReleases,
+            eq(DB.Tables.packageReleases.id, DB.Tables.stablePromotionRequests.package_release_id),
         )
         .orderBy(
             order === "newest" ?
-                desc(DB.Schema.stablePromotionRequests.created_at) :
-                asc(DB.Schema.stablePromotionRequests.created_at)
+                desc(DB.Tables.stablePromotionRequests.created_at) :
+                asc(DB.Tables.stablePromotionRequests.created_at)
         )
         .limit(limit)
         .offset(offset);
@@ -72,8 +72,8 @@ router.use('/:stablePromotionRequestID/*',
         // @ts-ignore
         const { stablePromotionRequestID } = c.req.valid("param") as { stablePromotionRequestID: number };
 
-        const request = DB.instance().select().from(DB.Schema.stablePromotionRequests).where(
-            eq(DB.Schema.stablePromotionRequests.id, stablePromotionRequestID)
+        const request = DB.instance().select().from(DB.Tables.stablePromotionRequests).where(
+            eq(DB.Tables.stablePromotionRequests.id, stablePromotionRequestID)
         ).get();
 
         if (!request) {
@@ -105,18 +105,18 @@ router.get('/:stablePromotionRequestID',
         const request = c.get("stablePromotionRequest") as DB.Models.StablePromotionRequest;
 
         const pkg = DB.instance().select({
-            name: DB.Schema.packages.name
-        }).from(DB.Schema.packages).where(
-            eq(DB.Schema.packages.id, request.package_id)
+            name: DB.Tables.packages.name
+        }).from(DB.Tables.packages).where(
+            eq(DB.Tables.packages.id, request.package_id)
         ).get();
 
         if (!pkg) {
             throw new Error(`Package with ID ${request.package_id} not found for stable promotion request ID ${request.id}`);
         }
         const pkgRelease = DB.instance().select({
-            versionWithLeiosPatch: DB.Schema.packageReleases.versionWithLeiosPatch
-        }).from(DB.Schema.packageReleases).where(
-            eq(DB.Schema.packageReleases.id, request.package_release_id)
+            versionWithLeiosPatch: DB.Tables.packageReleases.versionWithLeiosPatch
+        }).from(DB.Tables.packageReleases).where(
+            eq(DB.Tables.packageReleases.id, request.package_release_id)
         ).get();
 
         if (!pkgRelease) {
@@ -159,11 +159,11 @@ router.post('/:stablePromotionRequestID/decide',
             return APIResponse.badRequest(c, "Stable promotion request has already been approved or denied");
         }
 
-        await DB.instance().update(DB.Schema.stablePromotionRequests).set({
+        await DB.instance().update(DB.Tables.stablePromotionRequests).set({
             status: decision.status,
             admin_note: decision.admin_note
         }).where(
-            eq(DB.Schema.stablePromotionRequests.id, request.id)
+            eq(DB.Tables.stablePromotionRequests.id, request.id)
         );
 
         if (decision.status === 'approved') {

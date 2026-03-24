@@ -23,7 +23,7 @@ type SeededUser = Omit<DB.Models.User, "password_hash"> & { password: string };
 type SeededSession = Awaited<ReturnType<typeof SessionHandler.createSession>>;
 
 async function seedUser(role: DB.Models.User["role"], overrides: Partial<DB.Models.User> = {}, password = "TestP@ssw0rd") {
-    const user = DB.instance().insert(DB.Schema.users).values({
+    const user = DB.instance().insert(DB.Tables.users).values({
         username: overrides.username ?? `user_${randomUUID().slice(0, 8)}`,
         display_name: overrides.display_name ?? "Test User",
         email: overrides.email ?? `${randomUUID()}@example.com`,
@@ -182,7 +182,7 @@ describe("Account routes", async () => {
         testUser.username = newUserData.username;
         testUser.email = newUserData.email;
 
-        const dbresult = DB.instance().select().from(DB.Schema.users).where(eq(DB.Schema.users.id, testUser.id)).get();
+        const dbresult = DB.instance().select().from(DB.Tables.users).where(eq(DB.Tables.users.id, testUser.id)).get();
 
         expect(dbresult?.display_name).toBe(newUserData.display_name);
         expect(dbresult?.username).toBe(newUserData.username);
@@ -197,7 +197,7 @@ describe("Account routes", async () => {
             body: { role: "admin" }
         }, 400);
         
-        const dbresult = DB.instance().select().from(DB.Schema.users).where(eq(DB.Schema.users.id, testUser.id)).get();
+        const dbresult = DB.instance().select().from(DB.Tables.users).where(eq(DB.Tables.users.id, testUser.id)).get();
         expect(dbresult?.role).toBe("user");
     });
 
@@ -242,7 +242,7 @@ describe("Account routes", async () => {
 
     test("DELETE /account prevents removal while packages exist", async () => {
         
-        const tempPkg = await DB.instance().insert(DB.Schema.packages).values({
+        const tempPkg = await DB.instance().insert(DB.Tables.packages).values({
             name: "temp-package",
             owner_user_id: testUser.id,
             description: "Temporary package",
@@ -255,11 +255,11 @@ describe("Account routes", async () => {
             authToken: session_token
         }, 400);
 
-        const dbresult = DB.instance().select().from(DB.Schema.users).where(eq(DB.Schema.users.id, testUser.id)).get();
+        const dbresult = DB.instance().select().from(DB.Tables.users).where(eq(DB.Tables.users.id, testUser.id)).get();
         expect(dbresult).toBeDefined();
 
         // Cleanup
-        await DB.instance().delete(DB.Schema.packages).where(eq(DB.Schema.packages.id, tempPkg.id));
+        await DB.instance().delete(DB.Tables.packages).where(eq(DB.Tables.packages.id, tempPkg.id));
     });
 
     test("DELETE /account removes user without packages", async () => {
@@ -269,7 +269,7 @@ describe("Account routes", async () => {
             authToken: session_token
         });
 
-        const dbresult = DB.instance().select().from(DB.Schema.users).where(eq(DB.Schema.users.id, testUser.id)).get();
+        const dbresult = DB.instance().select().from(DB.Tables.users).where(eq(DB.Tables.users.id, testUser.id)).get();
         expect(dbresult).toBeUndefined();
 
         // recreate test user for further tests
@@ -281,7 +281,7 @@ describe("Public package routes", () => {
 
     test("GET /public/packages lists public packages", async () => {
 
-        const tempPkg = await DB.instance().insert(DB.Schema.packages).values({
+        const tempPkg = await DB.instance().insert(DB.Tables.packages).values({
             name: "public-package",
             owner_user_id: testDeveloper.id,
             description: "Public package",
@@ -289,7 +289,7 @@ describe("Public package routes", () => {
             requires_patching: false
         }).returning().get();
 
-        const tempRelease = await DB.instance().insert(DB.Schema.packageReleases).values({
+        const tempRelease = await DB.instance().insert(DB.Tables.packageReleases).values({
             package_id: tempPkg.id,
             versionWithLeiosPatch: "1.0.0",
             changelog: "Initial release",
@@ -319,8 +319,8 @@ describe("Public package routes", () => {
         expect(pkg.name).toBe(tempPkg.name);
 
         // Cleanup
-        await DB.instance().delete(DB.Schema.packageReleases).where(eq(DB.Schema.packageReleases.id, tempRelease.id));
-        await DB.instance().delete(DB.Schema.packages).where(eq(DB.Schema.packages.id, tempPkg.id));
+        await DB.instance().delete(DB.Tables.packageReleases).where(eq(DB.Tables.packageReleases.id, tempRelease.id));
+        await DB.instance().delete(DB.Tables.packages).where(eq(DB.Tables.packages.id, tempPkg.id));
 
     });
 });
@@ -347,7 +347,7 @@ describe("Public package routes", () => {
 //         expect(createRes.status).toBe(201);
 //         const createdBody = await createRes.json();
 
-//         const pkg = DB.instance().select().from(DB.Schema.packages).where(eq(DB.Schema.packages.id, createdBody.data.id)).get();
+//         const pkg = DB.instance().select().from(DB.Tables.packages).where(eq(DB.Tables.packages.id, createdBody.data.id)).get();
 //         expect(pkg?.owner_user_id).toBe(user.id);
 
 //         const updateRes = await API.getApp().request(`/dev/packages/${createdBody.data.id}`, {
@@ -361,7 +361,7 @@ describe("Public package routes", () => {
 //         const updateBody = await updateRes.json();
 //         expect(updateRes.status).toBe(200);
 //         expect(updateBody.message).toBe("Package updated successfully");
-//         const updated = DB.instance().select().from(DB.Schema.packages).where(eq(DB.Schema.packages.id, createdBody.data.id)).get();
+//         const updated = DB.instance().select().from(DB.Tables.packages).where(eq(DB.Tables.packages.id, createdBody.data.id)).get();
 //         expect(updated?.description).toBe("Updated description");
 //     });
 
@@ -394,7 +394,7 @@ describe("Public package routes", () => {
 //         expect(createBody.message).toBe("Package release created successfully");
 
 
-//         const dbRelease = DB.instance().select().from(DB.Schema.packageReleases).where(eq(DB.Schema.packageReleases.package_id, pkg.id)).get();
+//         const dbRelease = DB.instance().select().from(DB.Tables.packageReleases).where(eq(DB.Tables.packageReleases.package_id, pkg.id)).get();
 //         expect(dbRelease?.version).toBe(PACKAGE_VERSION);
 
 //         const listAfter = await API.getApp().request(`/dev/packages/${pkg.id}/releases`, {
@@ -462,7 +462,7 @@ describe("Public package routes", () => {
 //         const deleteBody = await deleteRes.json();
 //         expect(deleteRes.status).toBe(200);
 //         expect(deleteBody.message).toBe("Package deleted successfully");
-//         const pkg = DB.instance().select().from(DB.Schema.packages).where(eq(DB.Schema.packages.id, createdBody.data.id)).get();
+//         const pkg = DB.instance().select().from(DB.Tables.packages).where(eq(DB.Tables.packages.id, createdBody.data.id)).get();
 //         expect(pkg).toBeUndefined();
 //     });
 
@@ -514,7 +514,7 @@ describe("Public package routes", () => {
 //             headers: authHeaders(adminSession.token)
 //         });
 //         expect(deleteRes.status).toBe(200);
-//         const deleted = DB.instance().select().from(DB.Schema.users).where(eq(DB.Schema.users.id, created.data.id)).get();
+//         const deleted = DB.instance().select().from(DB.Tables.users).where(eq(DB.Tables.users.id, created.data.id)).get();
 //         expect(deleted).toBeUndefined();
 //     });
 // });

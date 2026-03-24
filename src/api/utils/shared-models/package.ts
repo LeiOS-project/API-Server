@@ -115,7 +115,7 @@ export namespace PackageModel {
 
 export namespace PackageModel.GetPackageByName {
     
-    export const Response = createSelectSchema(DB.Schema.packages, {
+    export const Response = createSelectSchema(DB.Tables.packages, {
         latest_stable_release: z.object({
             amd64: z.string().nullable(),
             arm64: z.string().nullable(),
@@ -139,7 +139,7 @@ export namespace PackageModel.GetAll {
 
 export namespace PackageModel.CreatePackageAsAdmin {
 
-    export const Body = createInsertSchema(DB.Schema.packages, {
+    export const Body = createInsertSchema(DB.Tables.packages, {
         name: PackageModel.PackageNameSchema,
         homepage_url: z.string().url("Homepage URL must be a valid URL."),
         description: z.string().min(1, "Description is required").max(500, "Description cannot exceed 500 characters."),

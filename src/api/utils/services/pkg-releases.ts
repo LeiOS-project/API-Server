@@ -16,8 +16,8 @@ export class PkgReleasesService {
         // @ts-ignore
         const packageData = c.get("package") as DB.Models.Package;
 
-        const releases = await DB.instance().select().from(DB.Schema.packageReleases).where(
-            eq(DB.Schema.packageReleases.package_id, packageData.id)
+        const releases = await DB.instance().select().from(DB.Tables.packageReleases).where(
+            eq(DB.Tables.packageReleases.package_id, packageData.id)
         );
 
         return APIResponse.success(c, "Package releases retrieved successfully", releases satisfies PackageReleaseModel.GetAll.Response);
@@ -39,17 +39,17 @@ export class PkgReleasesService {
         }
 
         // Package is owned by publisher, created_by_user_id tracks who created it for audit purposes
-        const creator = DB.instance().select().from(DB.Schema.users).where(
-            eq(DB.Schema.users.id, packageData.created_by_user_id)
+        const creator = DB.instance().select().from(DB.Tables.users).where(
+            eq(DB.Tables.users.id, packageData.created_by_user_id)
         ).get();
         if (!creator) {
             throw new Error("Package creator not found in database");
         }
 
-        const existingRelease = DB.instance().select().from(DB.Schema.packageReleases).where(
+        const existingRelease = DB.instance().select().from(DB.Tables.packageReleases).where(
             and(
-                eq(DB.Schema.packageReleases.package_id, packageData.id),
-                eq(DB.Schema.packageReleases.versionWithLeiosPatch, releaseData.versionWithLeiosPatch),
+                eq(DB.Tables.packageReleases.package_id, packageData.id),
+                eq(DB.Tables.packageReleases.versionWithLeiosPatch, releaseData.versionWithLeiosPatch),
             )
         ).get();
 
@@ -57,7 +57,7 @@ export class PkgReleasesService {
             return APIResponse.conflict(c, "Package release with this version already exists");
         }
 
-        await DB.instance().insert(DB.Schema.packageReleases).values({
+        await DB.instance().insert(DB.Tables.packageReleases).values({
             package_id: packageData.id,
             ...releaseData,
         });
@@ -70,9 +70,9 @@ export class PkgReleasesService {
         // @ts-ignore
         const packageData = c.get("package") as DB.Models.Package;
         
-        const releaseData = DB.instance().select().from(DB.Schema.packageReleases).where(and(
-            eq(DB.Schema.packageReleases.package_id, packageData.id),
-            eq(DB.Schema.packageReleases.versionWithLeiosPatch, versionWithLeiosPatch)
+        const releaseData = DB.instance().select().from(DB.Tables.packageReleases).where(and(
+            eq(DB.Tables.packageReleases.package_id, packageData.id),
+            eq(DB.Tables.packageReleases.versionWithLeiosPatch, versionWithLeiosPatch)
         )).get();
 
         // @ts-ignore
@@ -101,8 +101,8 @@ export class PkgReleasesService {
         // @ts-ignore
         const releaseData = c.get("release") as DB.Models.PackageRelease;
 
-        await DB.instance().update(DB.Schema.packageReleases).set(updateData).where(
-            eq(DB.Schema.packageReleases.id, releaseData.id)
+        await DB.instance().update(DB.Tables.packageReleases).set(updateData).where(
+            eq(DB.Tables.packageReleases.id, releaseData.id)
         );
 
         return APIResponse.successNoData(c, "Package release updated successfully");
@@ -121,8 +121,8 @@ export class PkgReleasesService {
         }
 
         // Package is owned by publisher, created_by_user_id tracks who created it for audit purposes
-        const creator = DB.instance().select().from(DB.Schema.users).where(
-            eq(DB.Schema.users.id, packageData.created_by_user_id)
+        const creator = DB.instance().select().from(DB.Tables.users).where(
+            eq(DB.Tables.users.id, packageData.created_by_user_id)
         ).get();
         if (!creator) {
             throw new Error("Package creator not found in database");
@@ -181,7 +181,7 @@ export class PkgReleasesService {
                 releaseData.architectures[arch] = true;
             }
 
-            await DB.instance().update(DB.Schema.packageReleases).set({
+            await DB.instance().update(DB.Tables.packageReleases).set({
                 package_id: packageData.id,
                 architectures: releaseData.architectures
             });
@@ -204,10 +204,10 @@ export class PkgReleasesService {
                 throw new Error("Unrecognized architecture: " + arch);
             }
 
-            await DB.instance().update(DB.Schema.packages).set({
+            await DB.instance().update(DB.Tables.packages).set({
                 latest_testing_release: packageData.latest_testing_release
             }).where(
-                eq(DB.Schema.packages.id, packageData.id)
+                eq(DB.Tables.packages.id, packageData.id)
             );
 
         } catch (error) {
@@ -231,12 +231,12 @@ export class PkgReleasesService {
 
         await RuntimeMetadata.removeOSReleasePendingPackageIfExists(releaseData.id);
 
-        await DB.instance().delete(DB.Schema.packageReleases).where(
-            eq(DB.Schema.packageReleases.id, releaseData.id)
+        await DB.instance().delete(DB.Tables.packageReleases).where(
+            eq(DB.Tables.packageReleases.id, releaseData.id)
         );
 
-        await DB.instance().delete(DB.Schema.stablePromotionRequests).where(
-            eq(DB.Schema.stablePromotionRequests.package_release_id, releaseData.id)
+        await DB.instance().delete(DB.Tables.stablePromotionRequests).where(
+            eq(DB.Tables.stablePromotionRequests.package_release_id, releaseData.id)
         );
 
         await AptlyAPI.Packages.deleteAllInAllRepos(packageData.name, releaseData.versionWithLeiosPatch, undefined);

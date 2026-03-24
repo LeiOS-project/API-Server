@@ -21,7 +21,7 @@ export class PublishersService {
 
         if (includePrivate && userId) {
             // Include private publishers where user is a member
-            const allPublishers = await DB.instance().select().from(DB.Schema.publishers).all();
+            const allPublishers = await DB.instance().select().from(DB.Tables.publishers).all();
             
             const filtered = [];
             for (const pub of allPublishers) {
@@ -43,8 +43,8 @@ export class PublishersService {
             // Only public publishers
             publishers = await DB.instance()
                 .select()
-                .from(DB.Schema.publishers)
-                .where(eq(DB.Schema.publishers.visibility, 'public'))
+                .from(DB.Tables.publishers)
+                .where(eq(DB.Tables.publishers.visibility, 'public'))
                 .all();
         }
 
@@ -60,14 +60,14 @@ export class PublishersService {
         if (typeof identifier === 'number') {
             publisher = await DB.instance()
                 .select()
-                .from(DB.Schema.publishers)
-                .where(eq(DB.Schema.publishers.id, identifier))
+                .from(DB.Tables.publishers)
+                .where(eq(DB.Tables.publishers.id, identifier))
                 .get();
         } else {
             publisher = await DB.instance()
                 .select()
-                .from(DB.Schema.publishers)
-                .where(eq(DB.Schema.publishers.name, identifier))
+                .from(DB.Tables.publishers)
+                .where(eq(DB.Tables.publishers.name, identifier))
                 .get();
         }
 
@@ -102,8 +102,8 @@ export class PublishersService {
         // Check if publisher name already exists
         const existing = await DB.instance()
             .select()
-            .from(DB.Schema.publishers)
-            .where(eq(DB.Schema.publishers.name, publisherData.name))
+            .from(DB.Tables.publishers)
+            .where(eq(DB.Tables.publishers.name, publisherData.name))
             .get();
 
         if (existing) {
@@ -112,7 +112,7 @@ export class PublishersService {
 
         // Create publisher
         const publisher = await DB.instance()
-            .insert(DB.Schema.publishers)
+            .insert(DB.Tables.publishers)
             .values({
                 ...publisherData,
                 created_by_user_id: authContext.user_id
@@ -122,7 +122,7 @@ export class PublishersService {
 
         // Add creator as owner
         await DB.instance()
-            .insert(DB.Schema.publisherMembers)
+            .insert(DB.Tables.publisherMembers)
             .values({
                 publisher_id: publisher.id,
                 user_id: authContext.user_id,
@@ -156,9 +156,9 @@ export class PublishersService {
 
         // Update publisher
         await DB.instance()
-            .update(DB.Schema.publishers)
+            .update(DB.Tables.publishers)
             .set(updateData)
-            .where(eq(DB.Schema.publishers.id, publisherId));
+            .where(eq(DB.Tables.publishers.id, publisherId));
 
         return APIResponse.successNoData(c, "Publisher updated successfully");
     }
@@ -184,8 +184,8 @@ export class PublishersService {
         // Check if publisher has packages
         const packages = await DB.instance()
             .select()
-            .from(DB.Schema.packages)
-            .where(eq(DB.Schema.packages.publisher_id, publisherId))
+            .from(DB.Tables.packages)
+            .where(eq(DB.Tables.packages.publisher_id, publisherId))
             .limit(1)
             .all();
 
@@ -195,8 +195,8 @@ export class PublishersService {
 
         // Delete publisher (cascades to groups and members)
         await DB.instance()
-            .delete(DB.Schema.publishers)
-            .where(eq(DB.Schema.publishers.id, publisherId));
+            .delete(DB.Tables.publishers)
+            .where(eq(DB.Tables.publishers.id, publisherId));
 
         return APIResponse.successNoData(c, "Publisher deleted successfully");
     }
@@ -226,8 +226,8 @@ export class PublishersService {
         if (groupData.parent_group_id) {
             const parentGroup = await DB.instance()
                 .select()
-                .from(DB.Schema.publisherGroups)
-                .where(eq(DB.Schema.publisherGroups.id, groupData.parent_group_id))
+                .from(DB.Tables.publisherGroups)
+                .where(eq(DB.Tables.publisherGroups.id, groupData.parent_group_id))
                 .get();
 
             if (!parentGroup || parentGroup.publisher_id !== publisherId) {
@@ -238,13 +238,13 @@ export class PublishersService {
         // Check if group name already exists in this publisher/parent
         const existing = await DB.instance()
             .select()
-            .from(DB.Schema.publisherGroups)
+            .from(DB.Tables.publisherGroups)
             .where(and(
-                eq(DB.Schema.publisherGroups.publisher_id, publisherId),
-                eq(DB.Schema.publisherGroups.name, groupData.name),
+                eq(DB.Tables.publisherGroups.publisher_id, publisherId),
+                eq(DB.Tables.publisherGroups.name, groupData.name),
                 groupData.parent_group_id 
-                    ? eq(DB.Schema.publisherGroups.parent_group_id, groupData.parent_group_id)
-                    : eq(DB.Schema.publisherGroups.parent_group_id, null as any)
+                    ? eq(DB.Tables.publisherGroups.parent_group_id, groupData.parent_group_id)
+                    : eq(DB.Tables.publisherGroups.parent_group_id, null as any)
             ))
             .get();
 
@@ -254,7 +254,7 @@ export class PublishersService {
 
         // Create group
         const group = await DB.instance()
-            .insert(DB.Schema.publisherGroups)
+            .insert(DB.Tables.publisherGroups)
             .values({
                 ...groupData,
                 publisher_id: publisherId,
@@ -272,12 +272,12 @@ export class PublishersService {
     static async getGroups(c: Context, publisherId: number, parentGroupId?: number) {
         const groups = await DB.instance()
             .select()
-            .from(DB.Schema.publisherGroups)
+            .from(DB.Tables.publisherGroups)
             .where(and(
-                eq(DB.Schema.publisherGroups.publisher_id, publisherId),
+                eq(DB.Tables.publisherGroups.publisher_id, publisherId),
                 parentGroupId !== undefined
-                    ? eq(DB.Schema.publisherGroups.parent_group_id, parentGroupId)
-                    : eq(DB.Schema.publisherGroups.parent_group_id, null as any)
+                    ? eq(DB.Tables.publisherGroups.parent_group_id, parentGroupId)
+                    : eq(DB.Tables.publisherGroups.parent_group_id, null as any)
             ))
             .all();
 
@@ -308,8 +308,8 @@ export class PublishersService {
         // Verify user exists
         const user = await DB.instance()
             .select()
-            .from(DB.Schema.users)
-            .where(eq(DB.Schema.users.id, memberData.user_id))
+            .from(DB.Tables.users)
+            .where(eq(DB.Tables.users.id, memberData.user_id))
             .get();
 
         if (!user) {
@@ -319,13 +319,13 @@ export class PublishersService {
         // Check if already a member
         const existing = await DB.instance()
             .select()
-            .from(DB.Schema.publisherMembers)
+            .from(DB.Tables.publisherMembers)
             .where(and(
-                eq(DB.Schema.publisherMembers.publisher_id, publisherId),
-                eq(DB.Schema.publisherMembers.user_id, memberData.user_id),
+                eq(DB.Tables.publisherMembers.publisher_id, publisherId),
+                eq(DB.Tables.publisherMembers.user_id, memberData.user_id),
                 memberData.group_id
-                    ? eq(DB.Schema.publisherMembers.group_id, memberData.group_id)
-                    : eq(DB.Schema.publisherMembers.group_id, null as any)
+                    ? eq(DB.Tables.publisherMembers.group_id, memberData.group_id)
+                    : eq(DB.Tables.publisherMembers.group_id, null as any)
             ))
             .get();
 
@@ -340,7 +340,7 @@ export class PublishersService {
         );
 
         await DB.instance()
-            .insert(DB.Schema.publisherMembers)
+            .insert(DB.Tables.publisherMembers)
             .values({
                 publisher_id: publisherId,
                 group_id: memberData.group_id ?? null,
@@ -359,12 +359,12 @@ export class PublishersService {
     static async getMembers(c: Context, publisherId: number, groupId?: number) {
         const members = await DB.instance()
             .select()
-            .from(DB.Schema.publisherMembers)
+            .from(DB.Tables.publisherMembers)
             .where(and(
-                eq(DB.Schema.publisherMembers.publisher_id, publisherId),
+                eq(DB.Tables.publisherMembers.publisher_id, publisherId),
                 groupId !== undefined
-                    ? eq(DB.Schema.publisherMembers.group_id, groupId)
-                    : eq(DB.Schema.publisherMembers.group_id, null as any)
+                    ? eq(DB.Tables.publisherMembers.group_id, groupId)
+                    : eq(DB.Tables.publisherMembers.group_id, null as any)
             ))
             .all();
 
@@ -394,17 +394,17 @@ export class PublishersService {
         // Cannot remove yourself if you're the last owner
         const member = await DB.instance()
             .select()
-            .from(DB.Schema.publisherMembers)
-            .where(eq(DB.Schema.publisherMembers.id, memberId))
+            .from(DB.Tables.publisherMembers)
+            .where(eq(DB.Tables.publisherMembers.id, memberId))
             .get();
 
         if (member?.role === 'owner' && member.user_id === authContext.user_id) {
             const ownerCount = await DB.instance()
                 .select()
-                .from(DB.Schema.publisherMembers)
+                .from(DB.Tables.publisherMembers)
                 .where(and(
-                    eq(DB.Schema.publisherMembers.publisher_id, publisherId),
-                    eq(DB.Schema.publisherMembers.role, 'owner')
+                    eq(DB.Tables.publisherMembers.publisher_id, publisherId),
+                    eq(DB.Tables.publisherMembers.role, 'owner')
                 ))
                 .all();
 
@@ -415,8 +415,8 @@ export class PublishersService {
 
         // Remove member
         await DB.instance()
-            .delete(DB.Schema.publisherMembers)
-            .where(eq(DB.Schema.publisherMembers.id, memberId));
+            .delete(DB.Tables.publisherMembers)
+            .where(eq(DB.Tables.publisherMembers.id, memberId));
 
         return APIResponse.successNoData(c, "Member removed successfully");
     }

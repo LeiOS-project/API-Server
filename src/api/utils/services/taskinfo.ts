@@ -17,14 +17,14 @@ export class TaskInfoService {
             const authContext = c.get("authContext") as AuthHandler.AuthContext;
 
             const tasks = await DB.instance().select()
-            .from(DB.Schema.scheduled_tasks)
+            .from(DB.Tables.scheduled_tasks)
             .where(
-                eq(DB.Schema.scheduled_tasks.created_by_user_id, authContext.user_id),
+                eq(DB.Tables.scheduled_tasks.created_by_user_id, authContext.user_id),
             )
             .orderBy(
                 queryOpts.order === "newest" ?
-                    desc(DB.Schema.scheduled_tasks.created_at) :
-                    asc(DB.Schema.scheduled_tasks.created_at)
+                    desc(DB.Tables.scheduled_tasks.created_at) :
+                    asc(DB.Tables.scheduled_tasks.created_at)
             )
             .limit(queryOpts.limit)
             .offset(queryOpts.offset);
@@ -34,11 +34,11 @@ export class TaskInfoService {
         } else {
 
             const tasks = await DB.instance().select()
-            .from(DB.Schema.scheduled_tasks)
+            .from(DB.Tables.scheduled_tasks)
             .orderBy(
                 queryOpts.order === "newest" ?
-                    desc(DB.Schema.scheduled_tasks.created_at) :
-                    asc(DB.Schema.scheduled_tasks.created_at)
+                    desc(DB.Tables.scheduled_tasks.created_at) :
+                    asc(DB.Tables.scheduled_tasks.created_at)
             )
             .limit(queryOpts.limit)
             .offset(queryOpts.offset);
@@ -55,15 +55,15 @@ export class TaskInfoService {
             // @ts-ignore
             const authContext = c.get("authContext") as AuthHandler.AuthContext;
 
-            taskData = DB.instance().select().from(DB.Schema.scheduled_tasks).where(and(
-                eq(DB.Schema.scheduled_tasks.id, taskID),
-                eq(DB.Schema.scheduled_tasks.created_by_user_id, authContext.user_id)
+            taskData = DB.instance().select().from(DB.Tables.scheduled_tasks).where(and(
+                eq(DB.Tables.scheduled_tasks.id, taskID),
+                eq(DB.Tables.scheduled_tasks.created_by_user_id, authContext.user_id)
             )).get();
         } else {
             
 
-            taskData = DB.instance().select().from(DB.Schema.scheduled_tasks).where(
-                eq(DB.Schema.scheduled_tasks.id, taskID)
+            taskData = DB.instance().select().from(DB.Tables.scheduled_tasks).where(
+                eq(DB.Tables.scheduled_tasks.id, taskID)
             ).get();
         }
 

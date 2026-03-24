@@ -11,37 +11,40 @@ import { UserAccountSettings } from '../api/utils/shared-models/accountData';
 import { PermissionHelper } from '../utils/permission-helper';
 
 /**
- * @deprecated Use DB.Schema.users instead
+ * @deprecated Use DB.Tables.users to access this table.
  */
 export const users = sqliteTable('users', {
     id: integer().primaryKey({ autoIncrement: true }),
-    created_at: SQLUtils.getCreatedAtColumn(),
+
     username: text().notNull().unique(),
     display_name: text().notNull(),
     email: text().notNull().unique(),
     password_hash: text().notNull(),
+
     role: text({
         enum: UserAccountSettings.Roles
-    }).default("user").notNull()
+    }).default("user").notNull(),
+
+    created_at: SQLUtils.getCreatedAtColumn(),
 });
 
 /**
- * @deprecated Use DB.Schema.passwordResets instead
+ * @deprecated Use DB.Tables.passwordResets to access this table.
  */
 export const passwordResets = sqliteTable('password_resets', {
     token: text().primaryKey(),
-    user_id: integer().notNull().references(() => users.id),
+    user_id: integer().notNull().references(() => users.id, { onDelete: 'cascade' }),
     created_at: SQLUtils.getCreatedAtColumn(),
     expires_at: integer().notNull()
 });
 
 /**
- * @deprecated Use DB.Schema.sessions instead
+ * @deprecated Use DB.Tables.sessions to access this table.
  */
 export const sessions = sqliteTable('sessions', {
     id: text().primaryKey(),
     hashed_token: text().notNull(),
-    user_id: integer().notNull().references(() => users.id),
+    user_id: integer().notNull().references(() => users.id, { onDelete: 'cascade' }),
     user_role: text({
         enum: UserAccountSettings.Roles
     }).notNull().references(() => users.role),
@@ -50,12 +53,12 @@ export const sessions = sqliteTable('sessions', {
 });
 
 /**
- * @deprecated Use DB.Schema.apiKeys instead
+ * @deprecated Use DB.Tables.apiKeys to access this table.
  */
 export const apiKeys = sqliteTable('api_keys', {
     id: text().primaryKey(),
     hashed_token: text().notNull(),
-    user_id: integer().notNull().references(() => users.id),
+    user_id: integer().notNull().references(() => users.id, { onDelete: 'cascade' }),
     user_role: text({
         enum: UserAccountSettings.Roles
     }).notNull().references(() => users.role),
@@ -68,7 +71,7 @@ export const apiKeys = sqliteTable('api_keys', {
 
 /**
  * Publishers (Organizations/Groups) that own and manage packages
- * @deprecated Use DB.Schema.publishers instead
+ * @deprecated Use DB.Tables.publishers to access this table.
  */
 export const publishers = sqliteTable('publishers', {
     id: integer().primaryKey({ autoIncrement: true }),
@@ -77,68 +80,69 @@ export const publishers = sqliteTable('publishers', {
     display_name: text().notNull(),
     description: text().notNull(),
     homepage_url: text(),
-    avatar_url: text(),
 
-    owner_user_id: integer().notNull().references(() => users.id),
+    // db query to delete user while owning should fail
+    // user has to transfer ownership first or delete before deleting their account
+    owner_user_id: integer().notNull().references(() => users.id, { onDelete: 'restrict' }),
     created_at: SQLUtils.getCreatedAtColumn()
 });
 
 /**
  * Hierarchical subgroups within publishers
- * @deprecated Use DB.Schema.publisherGroups instead
+ * @deprecated Use DB.Tables.publisherGroups to access this table.
  */
 export const publisherGroups = sqliteTable('publisher_groups', {
     id: integer().primaryKey({ autoIncrement: true }),
     publisher_id: integer().notNull().references(() => publishers.id, { onDelete: 'cascade' }),
     parent_group_id: integer().references((): any => publisherGroups.id, { onDelete: 'cascade' }), // NULL for top-level groups
+
     name: text().notNull(), // URL-safe name like "vscode", "firefox"
     display_name: text().notNull(),
     description: text().notNull(),
-    visibility: text({ enum: ['public', 'private'] }).default('public').notNull(),
+    homepage_url: text(),
+
     created_at: SQLUtils.getCreatedAtColumn(),
-    created_by_user_id: integer().notNull().references(() => users.id),
 });
 
 /**
  * Members and their roles within publishers and groups
- * @deprecated Use DB.Schema.publisherMembers instead
+ * @deprecated Use DB.Tables.publisherMembers to access this table.
  */
 export const publisherMembers = sqliteTable('publisher_members', {
     id: integer().primaryKey({ autoIncrement: true }),
     publisher_id: integer().notNull().references(() => publishers.id, { onDelete: 'cascade' }),
     group_id: integer().references(() => publisherGroups.id, { onDelete: 'cascade' }), // NULL = publisher-level member
+
     user_id: integer().notNull().references(() => users.id, { onDelete: 'cascade' }),
     
-
+    // sets base permissions for the member, can be overridden by more specific package-level role assignments
     role: text({ 
         enum: PermissionHelper.OrgRolesAsTuple
     }).notNull().default(PermissionHelper.OrgRoles.VIEWER),
-    
 
     created_at: SQLUtils.getCreatedAtColumn(),
-    invited_by_user_id: integer().references(() => users.id),
 });
 
 
 /**
  * Role assignments link users to roles at different scopes
  * Scope can be publisher-level, group-level, or package-level
- * @deprecated Use DB.Schema.roleAssignments instead
+ * the specified role of the assignment have to be higher than the role in the parent scope (or publisher base role if no parent group)
+ * @deprecated Use DB.Tables.roleAssignments to access this table.
  */
 export const roleAssignments = sqliteTable('role_assignments', {
     id: integer().primaryKey({ autoIncrement: true }),
-    role: text({
-        enum: PermissionHelper.OrgRolesAsTuple
-    }).notNull(),
-    user_id: integer().notNull().references(() => users.id, { onDelete: 'cascade' }),
-    
-    // Scope: publisher_id is always required, group_id and package_id are optional
-    // - Only publisher_id: role applies to entire publisher
-    // - publisher_id + group_id: role applies to specific group
-    // - publisher_id + package_id: role applies to specific package
+
+    // Either group_id or package_id must be specified to indicate the scope of the role assignment
     publisher_id: integer().notNull().references(() => publishers.id, { onDelete: 'cascade' }),
     group_id: integer().references(() => publisherGroups.id, { onDelete: 'cascade' }),
     package_id: integer().references(() => packages.id, { onDelete: 'cascade' }),
+
+    user_id: integer().notNull().references(() => users.id, { onDelete: 'cascade' }),
+
+    role: text({
+        enum: PermissionHelper.OrgRolesAsTuple
+    }).notNull(),
     
     created_at: SQLUtils.getCreatedAtColumn(),
     assigned_by_user_id: integer().references(() => users.id),
@@ -147,7 +151,7 @@ export const roleAssignments = sqliteTable('role_assignments', {
 
 
 /**
- * @deprecated Use DB.Schema.packages instead
+ * @deprecated Use DB.Tables.packages to access this table.
  */
 export const packages = sqliteTable('packages', {
     id: integer().primaryKey({ autoIncrement: true }),
@@ -176,7 +180,7 @@ export const packages = sqliteTable('packages', {
 });
 
 /**
- * @deprecated Use DB.Schema.packageReleases instead
+ * @deprecated Use DB.Tables.packageReleases to access this table.
  */
 export const packageReleases = sqliteTable('package_releases', {
     id: integer().primaryKey({ autoIncrement: true }),
@@ -198,7 +202,7 @@ export const packageReleases = sqliteTable('package_releases', {
 /**
  * Top-level package aliases (meta packages)
  * e.g., "vscode" -> "microsoft.vscode"
- * @deprecated Use DB.Schema.packageAliases instead
+ * @deprecated Use DB.Tables.packageAliases to access this table.
  */
 export const packageAliases = sqliteTable('package_aliases', {
     id: integer().primaryKey({ autoIncrement: true }),
@@ -216,7 +220,7 @@ export const packageAliases = sqliteTable('package_aliases', {
 
 
 /**
- * @deprecated Use DB.Schema.stablePromotionRequests instead
+ * @deprecated Use DB.Tables.stablePromotionRequests to access this table.
  */
 export const stablePromotionRequests = sqliteTable('stable_promotion_requests', {
     id: integer().primaryKey({ autoIncrement: true }),
@@ -230,7 +234,7 @@ export const stablePromotionRequests = sqliteTable('stable_promotion_requests', 
 
 
 /**
- * @deprecated Use DB.Models.os_releases instead
+ * @deprecated Use DB.Models.os_releases to access this table.
  */
 export const os_releases = sqliteTable('os_releases', {
     id: integer().primaryKey({ autoIncrement: true }),
@@ -246,7 +250,7 @@ export const os_releases = sqliteTable('os_releases', {
 
 
 /**
- * @deprecated Use DB.Schema.scheduled_tasks instead
+ * @deprecated Use DB.Tables.scheduled_tasks to access this table.
  */
 export const scheduled_tasks = sqliteTable('scheduled_tasks', {
     id: integer().primaryKey({ autoIncrement: true }),
@@ -263,7 +267,7 @@ export const scheduled_tasks = sqliteTable('scheduled_tasks', {
 });
 
 /**
- * @deprecated Use DB.Models.scheduled_tasks_paused_state instead
+ * @deprecated Use DB.Models.scheduled_tasks_paused_state to access this table.
  */
 export const scheduled_tasks_paused_state = sqliteTable('scheduled_tasks_paused_state', {
     task_id: integer().primaryKey().references(() => scheduled_tasks.id),
@@ -272,7 +276,7 @@ export const scheduled_tasks_paused_state = sqliteTable('scheduled_tasks_paused_
 });
 
 /**
- * @deprecated Use DB.Schema.tmp_data instead
+ * @deprecated Use DB.Tables.tmp_data to access this table.
  */
 export const metadata = sqliteTable('metadata', {
     key: text().primaryKey(),

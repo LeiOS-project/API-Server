@@ -34,10 +34,10 @@ export class RolesService {
         // Check if role name already exists in this publisher
         const existing = await DB.instance()
             .select()
-            .from(DB.Schema.roles)
+            .from(DB.Tables.roles)
             .where(and(
-                eq(DB.Schema.roles.name, roleData.name),
-                eq(DB.Schema.roles.publisher_id, publisherId)
+                eq(DB.Tables.roles.name, roleData.name),
+                eq(DB.Tables.roles.publisher_id, publisherId)
             ))
             .get();
 
@@ -47,7 +47,7 @@ export class RolesService {
 
         // Create role
         const role = await DB.instance()
-            .insert(DB.Schema.roles)
+            .insert(DB.Tables.roles)
             .values({
                 name: roleData.name,
                 display_name: roleData.display_name,
@@ -70,18 +70,18 @@ export class RolesService {
         // Get system roles
         const systemRoles = await DB.instance()
             .select()
-            .from(DB.Schema.roles)
+            .from(DB.Tables.roles)
             .where(and(
-                eq(DB.Schema.roles.is_system, true),
-                eq(DB.Schema.roles.publisher_id, null as any)
+                eq(DB.Tables.roles.is_system, true),
+                eq(DB.Tables.roles.publisher_id, null as any)
             ))
             .all();
 
         // Get publisher-specific roles
         const publisherRoles = await DB.instance()
             .select()
-            .from(DB.Schema.roles)
-            .where(eq(DB.Schema.roles.publisher_id, publisherId))
+            .from(DB.Tables.roles)
+            .where(eq(DB.Tables.roles.publisher_id, publisherId))
             .all();
 
         const allRoles = [...systemRoles, ...publisherRoles];
@@ -95,8 +95,8 @@ export class RolesService {
     static async getRole(c: Context, roleId: number) {
         const role = await DB.instance()
             .select()
-            .from(DB.Schema.roles)
-            .where(eq(DB.Schema.roles.id, roleId))
+            .from(DB.Tables.roles)
+            .where(eq(DB.Tables.roles.id, roleId))
             .get();
 
         if (!role) {
@@ -117,8 +117,8 @@ export class RolesService {
     ) {
         const role = await DB.instance()
             .select()
-            .from(DB.Schema.roles)
-            .where(eq(DB.Schema.roles.id, roleId))
+            .from(DB.Tables.roles)
+            .where(eq(DB.Tables.roles.id, roleId))
             .get();
 
         if (!role) {
@@ -143,9 +143,9 @@ export class RolesService {
 
         // Update role
         await DB.instance()
-            .update(DB.Schema.roles)
+            .update(DB.Tables.roles)
             .set(updateData)
-            .where(eq(DB.Schema.roles.id, roleId));
+            .where(eq(DB.Tables.roles.id, roleId));
 
         return APIResponse.successNoData(c, "Role updated successfully");
     }
@@ -160,8 +160,8 @@ export class RolesService {
     ) {
         const role = await DB.instance()
             .select()
-            .from(DB.Schema.roles)
-            .where(eq(DB.Schema.roles.id, roleId))
+            .from(DB.Tables.roles)
+            .where(eq(DB.Tables.roles.id, roleId))
             .get();
 
         if (!role) {
@@ -187,8 +187,8 @@ export class RolesService {
         // Check if role is assigned to any users
         const assignments = await DB.instance()
             .select()
-            .from(DB.Schema.roleAssignments)
-            .where(eq(DB.Schema.roleAssignments.role_id, roleId))
+            .from(DB.Tables.roleAssignments)
+            .where(eq(DB.Tables.roleAssignments.role_id, roleId))
             .limit(1)
             .all();
 
@@ -198,8 +198,8 @@ export class RolesService {
 
         // Delete role
         await DB.instance()
-            .delete(DB.Schema.roles)
-            .where(eq(DB.Schema.roles.id, roleId));
+            .delete(DB.Tables.roles)
+            .where(eq(DB.Tables.roles.id, roleId));
 
         return APIResponse.successNoData(c, "Role deleted successfully");
     }
@@ -229,8 +229,8 @@ export class RolesService {
         // Verify role exists and is accessible
         const role = await DB.instance()
             .select()
-            .from(DB.Schema.roles)
-            .where(eq(DB.Schema.roles.id, assignmentData.role_id))
+            .from(DB.Tables.roles)
+            .where(eq(DB.Tables.roles.id, assignmentData.role_id))
             .get();
 
         if (!role) {
@@ -245,8 +245,8 @@ export class RolesService {
         // Verify user exists
         const user = await DB.instance()
             .select()
-            .from(DB.Schema.users)
-            .where(eq(DB.Schema.users.id, assignmentData.user_id))
+            .from(DB.Tables.users)
+            .where(eq(DB.Tables.users.id, assignmentData.user_id))
             .get();
 
         if (!user) {
@@ -257,8 +257,8 @@ export class RolesService {
         if (assignmentData.group_id) {
             const group = await DB.instance()
                 .select()
-                .from(DB.Schema.publisherGroups)
-                .where(eq(DB.Schema.publisherGroups.id, assignmentData.group_id))
+                .from(DB.Tables.publisherGroups)
+                .where(eq(DB.Tables.publisherGroups.id, assignmentData.group_id))
                 .get();
 
             if (!group || group.publisher_id !== publisherId) {
@@ -270,8 +270,8 @@ export class RolesService {
         if (assignmentData.package_id) {
             const pkg = await DB.instance()
                 .select()
-                .from(DB.Schema.packages)
-                .where(eq(DB.Schema.packages.id, assignmentData.package_id))
+                .from(DB.Tables.packages)
+                .where(eq(DB.Tables.packages.id, assignmentData.package_id))
                 .get();
 
             if (!pkg || pkg.publisher_id !== publisherId) {
@@ -282,35 +282,35 @@ export class RolesService {
         // Check if user already has a role assignment at this exact scope
         const existing = await DB.instance()
             .select()
-            .from(DB.Schema.roleAssignments)
+            .from(DB.Tables.roleAssignments)
             .where(and(
-                eq(DB.Schema.roleAssignments.user_id, assignmentData.user_id),
-                eq(DB.Schema.roleAssignments.publisher_id, publisherId),
+                eq(DB.Tables.roleAssignments.user_id, assignmentData.user_id),
+                eq(DB.Tables.roleAssignments.publisher_id, publisherId),
                 assignmentData.group_id
-                    ? eq(DB.Schema.roleAssignments.group_id, assignmentData.group_id)
-                    : eq(DB.Schema.roleAssignments.group_id, null as any),
+                    ? eq(DB.Tables.roleAssignments.group_id, assignmentData.group_id)
+                    : eq(DB.Tables.roleAssignments.group_id, null as any),
                 assignmentData.package_id
-                    ? eq(DB.Schema.roleAssignments.package_id, assignmentData.package_id)
-                    : eq(DB.Schema.roleAssignments.package_id, null as any)
+                    ? eq(DB.Tables.roleAssignments.package_id, assignmentData.package_id)
+                    : eq(DB.Tables.roleAssignments.package_id, null as any)
             ))
             .get();
 
         if (existing) {
             // Update existing assignment
             await DB.instance()
-                .update(DB.Schema.roleAssignments)
+                .update(DB.Tables.roleAssignments)
                 .set({
                     role_id: assignmentData.role_id,
                     assigned_by_user_id: authContext.user_id
                 })
-                .where(eq(DB.Schema.roleAssignments.id, existing.id));
+                .where(eq(DB.Tables.roleAssignments.id, existing.id));
 
             return APIResponse.successNoData(c, "Role assignment updated successfully");
         }
 
         // Create new assignment
         await DB.instance()
-            .insert(DB.Schema.roleAssignments)
+            .insert(DB.Tables.roleAssignments)
             .values({
                 role_id: assignmentData.role_id,
                 user_id: assignmentData.user_id,
@@ -334,17 +334,17 @@ export class RolesService {
     ) {
         const assignments = await DB.instance()
             .select()
-            .from(DB.Schema.roleAssignments)
-            .innerJoin(DB.Schema.roles, eq(DB.Schema.roleAssignments.role_id, DB.Schema.roles.id))
-            .innerJoin(DB.Schema.users, eq(DB.Schema.roleAssignments.user_id, DB.Schema.users.id))
+            .from(DB.Tables.roleAssignments)
+            .innerJoin(DB.Tables.roles, eq(DB.Tables.roleAssignments.role_id, DB.Tables.roles.id))
+            .innerJoin(DB.Tables.users, eq(DB.Tables.roleAssignments.user_id, DB.Tables.users.id))
             .where(and(
-                eq(DB.Schema.roleAssignments.publisher_id, publisherId),
+                eq(DB.Tables.roleAssignments.publisher_id, publisherId),
                 groupId !== undefined
-                    ? eq(DB.Schema.roleAssignments.group_id, groupId)
-                    : eq(DB.Schema.roleAssignments.group_id, null as any),
+                    ? eq(DB.Tables.roleAssignments.group_id, groupId)
+                    : eq(DB.Tables.roleAssignments.group_id, null as any),
                 packageId !== undefined
-                    ? eq(DB.Schema.roleAssignments.package_id, packageId)
-                    : eq(DB.Schema.roleAssignments.package_id, null as any)
+                    ? eq(DB.Tables.roleAssignments.package_id, packageId)
+                    : eq(DB.Tables.roleAssignments.package_id, null as any)
             ))
             .all();
 
@@ -372,8 +372,8 @@ export class RolesService {
     ) {
         const assignment = await DB.instance()
             .select()
-            .from(DB.Schema.roleAssignments)
-            .where(eq(DB.Schema.roleAssignments.id, assignmentId))
+            .from(DB.Tables.roleAssignments)
+            .where(eq(DB.Tables.roleAssignments.id, assignmentId))
             .get();
 
         if (!assignment) {
@@ -397,20 +397,20 @@ export class RolesService {
         if (assignment.group_id === null && assignment.package_id === null) {
             const role = await DB.instance()
                 .select()
-                .from(DB.Schema.roles)
-                .where(eq(DB.Schema.roles.id, assignment.role_id))
+                .from(DB.Tables.roles)
+                .where(eq(DB.Tables.roles.id, assignment.role_id))
                 .get();
 
             if (role?.name === 'owner') {
                 const ownerCount = await DB.instance()
                     .select()
-                    .from(DB.Schema.roleAssignments)
-                    .innerJoin(DB.Schema.roles, eq(DB.Schema.roleAssignments.role_id, DB.Schema.roles.id))
+                    .from(DB.Tables.roleAssignments)
+                    .innerJoin(DB.Tables.roles, eq(DB.Tables.roleAssignments.role_id, DB.Tables.roles.id))
                     .where(and(
-                        eq(DB.Schema.roleAssignments.publisher_id, assignment.publisher_id),
-                        eq(DB.Schema.roleAssignments.group_id, null as any),
-                        eq(DB.Schema.roleAssignments.package_id, null as any),
-                        eq(DB.Schema.roles.name, 'owner')
+                        eq(DB.Tables.roleAssignments.publisher_id, assignment.publisher_id),
+                        eq(DB.Tables.roleAssignments.group_id, null as any),
+                        eq(DB.Tables.roleAssignments.package_id, null as any),
+                        eq(DB.Tables.roles.name, 'owner')
                     ))
                     .all();
 
@@ -422,8 +422,8 @@ export class RolesService {
 
         // Remove assignment
         await DB.instance()
-            .delete(DB.Schema.roleAssignments)
-            .where(eq(DB.Schema.roleAssignments.id, assignmentId));
+            .delete(DB.Tables.roleAssignments)
+            .where(eq(DB.Tables.roleAssignments.id, assignmentId));
 
         return APIResponse.successNoData(c, "Role assignment removed successfully");
     }
@@ -436,17 +436,17 @@ export class RolesService {
         userId: number,
         publisherId?: number
     ) {
-        const conditions = [eq(DB.Schema.roleAssignments.user_id, userId)];
+        const conditions = [eq(DB.Tables.roleAssignments.user_id, userId)];
         
         if (publisherId !== undefined) {
-            conditions.push(eq(DB.Schema.roleAssignments.publisher_id, publisherId));
+            conditions.push(eq(DB.Tables.roleAssignments.publisher_id, publisherId));
         }
 
         const assignments = await DB.instance()
             .select()
-            .from(DB.Schema.roleAssignments)
-            .innerJoin(DB.Schema.roles, eq(DB.Schema.roleAssignments.role_id, DB.Schema.roles.id))
-            .innerJoin(DB.Schema.publishers, eq(DB.Schema.roleAssignments.publisher_id, DB.Schema.publishers.id))
+            .from(DB.Tables.roleAssignments)
+            .innerJoin(DB.Tables.roles, eq(DB.Tables.roleAssignments.role_id, DB.Tables.roles.id))
+            .innerJoin(DB.Tables.publishers, eq(DB.Tables.roleAssignments.publisher_id, DB.Tables.publishers.id))
             .where(and(...conditions))
             .all();
 
