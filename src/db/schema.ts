@@ -100,6 +100,8 @@ export const publishers = sqliteTable('publishers', {
 export const publisherGroups = sqliteTable('publisher_groups', {
     id: integer().primaryKey({ autoIncrement: true }),
     publisher_id: integer().notNull().references(() => publishers.id, { onDelete: 'cascade' }),
+
+    // self-referencing / loops should not happen because we cant rename or move groups after creation.
     parent_group_id: integer().references((): any => publisherGroups.id, { onDelete: 'cascade' }), // NULL for top-level groups
 
     name: text().notNull(), // URL-safe name like "vscode", "firefox"
@@ -108,7 +110,10 @@ export const publisherGroups = sqliteTable('publisher_groups', {
     homepage_url: text(),
 
     created_at: SQLUtils.getCreatedAtColumn(),
-});
+}, (table) => ([
+    unique().on(table.publisher_id, table.name),
+    check('no_self_referencing', sql`${table.parent_group_id} <> ${table.id}`)
+]));
 
 /**
  * Members and their roles within publishers and groups
