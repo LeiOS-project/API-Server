@@ -126,14 +126,13 @@ export namespace DB.Tables {
     export const apiKeys = TableSchema.apiKeys;
 
     export const publishers = TableSchema.publishers;
-    export const publisherGroups = TableSchema.publisherGroups;
     export const publisherMembers = TableSchema.publisherMembers;
 
     export const roleAssignments = TableSchema.roleAssignments;
 
     export const packages = TableSchema.packages;
     export const packageReleases = TableSchema.packageReleases;
-    export const packageAliases = TableSchema.packageAliases;
+    export const packageFullView = TableSchema.packageFullView;
 
     export const stablePromotionRequests = TableSchema.stablePromotionRequests;
 
@@ -152,14 +151,13 @@ export namespace DB.Models {
     export type ApiKey = typeof DB.Tables.apiKeys.$inferSelect;
 
     export type Publisher = typeof DB.Tables.publishers.$inferSelect;
-    export type PublisherGroup = typeof DB.Tables.publisherGroups.$inferSelect;
     export type PublisherMember = typeof DB.Tables.publisherMembers.$inferSelect;
 
     export type RoleAssignment = typeof DB.Tables.roleAssignments.$inferSelect;
 
     export type Package = typeof DB.Tables.packages.$inferSelect;
     export type PackageRelease = typeof DB.Tables.packageReleases.$inferSelect;
-    export type PackageAlias = typeof DB.Tables.packageAliases.$inferSelect;
+    export type PackageFullView = typeof DB.Tables.packageFullView.$inferSelect;
 
     export type StablePromotionRequest = typeof DB.Tables.stablePromotionRequests.$inferSelect;
 

@@ -96,9 +96,9 @@ export const publishers = sqliteTable('publishers', {
 
 
 /**
- * @deprecated Use DB.Tables.publishersMembers to access this table.
+ * @deprecated Use DB.Tables.publisherMembers to access this table.
  */
-export const publishersMembers = sqliteTable('publishers_members', {
+export const publisherMembers = sqliteTable('publisher_members', {
     id: integer().primaryKey({ autoIncrement: true }),
 
     // Publisher id 
