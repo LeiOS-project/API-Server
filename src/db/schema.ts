@@ -93,49 +93,6 @@ export const publishers = sqliteTable('publishers', {
     created_at: SQLUtils.getCreatedAtColumn()
 });
 
-/**
- * Hierarchical subgroups within publishers
- * @deprecated Use DB.Tables.publisherGroups to access this table.
- */
-export const publisherGroups = sqliteTable('publisher_groups', {
-    id: integer().primaryKey({ autoIncrement: true }),
-    publisher_id: integer().notNull().references(() => publishers.id, { onDelete: 'cascade' }),
-
-    // self-referencing / loops should not happen because we cant rename or move groups after creation.
-    parent_group_id: integer().references((): any => publisherGroups.id, { onDelete: 'cascade' }), // NULL for top-level groups
-
-    name: text().notNull(), // URL-safe name like "vscode", "firefox"
-    display_name: text().notNull(),
-    description: text().notNull(),
-    homepage_url: text(),
-
-    created_at: SQLUtils.getCreatedAtColumn(),
-}, (table) => ([
-    unique().on(table.publisher_id, table.name),
-    check('no_self_referencing', sql`${table.parent_group_id} <> ${table.id}`)
-]));
-
-/**
- * Members and their roles within publishers and groups
- * @deprecated Use DB.Tables.publisherMembers to access this table.
- */
-export const publisherMembers = sqliteTable('publisher_members', {
-    id: integer().primaryKey({ autoIncrement: true }),
-    publisher_id: integer().notNull().references(() => publishers.id, { onDelete: 'cascade' }),
-    group_id: integer().references(() => publisherGroups.id, { onDelete: 'cascade' }), // NULL = publisher-level member
-
-    user_id: integer().notNull().references(() => users.id, { onDelete: 'cascade' }),
-    
-    // sets base permissions for the member, can be overridden by more specific package-level role assignments
-    role: text({ 
-        enum: PermissionHelper.OrgRolesAsTuple
-    }).notNull().default(PermissionHelper.OrgRoles.VIEWER),
-
-    created_at: SQLUtils.getCreatedAtColumn(),
-}, (table) => ([
-    unique().on(table.publisher_id, table.group_id, table.user_id)
-]));
-
 
 /**
  * Role assignments link users to roles at different scopes
@@ -146,9 +103,9 @@ export const publisherMembers = sqliteTable('publisher_members', {
 export const roleAssignments = sqliteTable('role_assignments', {
     id: integer().primaryKey({ autoIncrement: true }),
 
+    // Publisher id 
     // Either group_id or package_id must be specified to indicate the scope of the role assignment
     publisher_id: integer().notNull().references(() => publishers.id, { onDelete: 'cascade' }),
-    group_id: integer().references(() => publisherGroups.id, { onDelete: 'cascade' }),
     package_id: integer().references(() => packages.id, { onDelete: 'cascade' }),
 
     user_id: integer().notNull().references(() => users.id, { onDelete: 'cascade' }),
@@ -158,22 +115,25 @@ export const roleAssignments = sqliteTable('role_assignments', {
     }).notNull(),
     
     created_at: SQLUtils.getCreatedAtColumn(),
-    assigned_by_user_id: integer().references(() => users.id)
+
 }, (table) => ([
-    unique().on(table.user_id, table.publisher_id, table.group_id, table.package_id)
+    unique().on(table.user_id, table.publisher_id, table.package_id)
 ]));
 
 
 
 /**
+ * For now package names are allowed to include dots for logical namspacing: name: [...groups.]pkgname, fullname: publisher.[...groups.]pkgname
+ * but we will add real grouping later.
  * @deprecated Use DB.Tables.packages to access this table.
  */
 export const packages = sqliteTable('packages', {
     id: integer().primaryKey({ autoIncrement: true }),
+
     name: text().notNull(), // URL-safe name like "vscode" (not unique, only unique within publisher/group)
     fullname: text().notNull().unique(), // Full hierarchical name: publisher.[...groups].pkgname or publisher.pkgname
+
     publisher_id: integer().notNull().references(() => publishers.id, { onDelete: 'cascade' }),
-    group_id: integer().references(() => publisherGroups.id, { onDelete: 'cascade' }), // NULL for publisher-level packages
 
     flags: text({ mode: 'json' }).$type<PackageModel.PackageFlags>().notNull().default(sql`'[]'`),
     requires_patching: integer({ mode: 'boolean' }).notNull().default(sql`0`),
