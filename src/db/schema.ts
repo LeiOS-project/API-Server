@@ -125,7 +125,7 @@ export const publisherMembers = sqliteTable('publisher_members', {
 export const roleAssignments = sqliteTable('role_assignments', {
     id: integer().primaryKey({ autoIncrement: true }),
 
-    package_id: integer().references(() => packages.id, { onDelete: 'cascade' }),
+    package_id: integer().notNull().references(() => packages.id, { onDelete: 'cascade' }),
 
     user_id: integer().notNull().references(() => users.id, { onDelete: 'cascade' }),
 
@@ -205,7 +205,9 @@ export const packageReleases = sqliteTable('package_releases', {
 
     created_at: SQLUtils.getCreatedAtColumn(),
     changelog: text().notNull(),
-});
+}, (table) => [
+    unique("package_releases_pkg_version_unique").on(table.package_id, table.versionWithLeiosPatch)
+]);
 
 
 export const packageFullView = sqliteView('package_full_view').as((db) => {
@@ -262,7 +264,7 @@ export const os_releases = sqliteTable('os_releases', {
     changelog: text().notNull(),
     created_at: SQLUtils.getCreatedAtColumn(),
     taskID: integer().notNull().references(() => scheduled_tasks.id),
-    // published_at: int().references(() => scheduled_tasks.finished_at),
+    // published_at: integer().references(() => scheduled_tasks.finished_at),
 });
 
 
