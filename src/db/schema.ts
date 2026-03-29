@@ -1,5 +1,5 @@
 import type { TaskHandler } from '@cleverjs/utils';
-import { desc, sql, Table } from 'drizzle-orm';
+import { desc, sql, eq } from 'drizzle-orm';
 import {
     sqliteTable,
     integer,
@@ -9,7 +9,8 @@ import {
     uniqueIndex,
     foreignKey,
     primaryKey,
-    check
+    check,
+    sqliteView
 } from 'drizzle-orm/sqlite-core';
 import { SQLUtils } from './utils';
 import type { PackageModel } from '../api/utils/shared-models/package';
@@ -95,6 +96,27 @@ export const publishers = sqliteTable('publishers', {
 
 
 /**
+ * @deprecated Use DB.Tables.publishersMembers to access this table.
+ */
+export const publishersMembers = sqliteTable('publishers_members', {
+    id: integer().primaryKey({ autoIncrement: true }),
+
+    // Publisher id 
+    publisher_id: integer().notNull().references(() => publishers.id, { onDelete: 'cascade' }),
+
+    user_id: integer().notNull().references(() => users.id, { onDelete: 'cascade' }),
+
+    role: text({
+        enum: PermissionHelper.OrgRolesAsTuple
+    }).notNull(),
+    
+    added_at: SQLUtils.getCreatedAtColumn(),
+
+}, (table) => ([
+    unique().on(table.user_id, table.publisher_id)
+]));
+
+/**
  * Role assignments link users to roles at different scopes
  * Scope can be publisher-level, group-level, or package-level
  * the specified role of the assignment have to be higher than the role in the parent scope (or publisher base role if no parent group)
@@ -103,9 +125,6 @@ export const publishers = sqliteTable('publishers', {
 export const roleAssignments = sqliteTable('role_assignments', {
     id: integer().primaryKey({ autoIncrement: true }),
 
-    // Publisher id 
-    // Either group_id or package_id must be specified to indicate the scope of the role assignment
-    publisher_id: integer().notNull().references(() => publishers.id, { onDelete: 'cascade' }),
     package_id: integer().references(() => packages.id, { onDelete: 'cascade' }),
 
     user_id: integer().notNull().references(() => users.id, { onDelete: 'cascade' }),
@@ -117,8 +136,9 @@ export const roleAssignments = sqliteTable('role_assignments', {
     created_at: SQLUtils.getCreatedAtColumn(),
 
 }, (table) => ([
-    unique().on(table.user_id, table.publisher_id, table.package_id)
+    unique().on(table.user_id, table.package_id)
 ]));
+
 
 
 
@@ -130,16 +150,25 @@ export const roleAssignments = sqliteTable('role_assignments', {
 export const packages = sqliteTable('packages', {
     id: integer().primaryKey({ autoIncrement: true }),
 
-    name: text().notNull(), // URL-safe name like "vscode" (not unique, only unique within publisher/group)
-    fullname: text().notNull().unique(), // Full hierarchical name: publisher.[...groups].pkgname or publisher.pkgname
-
     publisher_id: integer().notNull().references(() => publishers.id, { onDelete: 'cascade' }),
 
-    flags: text({ mode: 'json' }).$type<PackageModel.PackageFlags>().notNull().default(sql`'[]'`),
-    requires_patching: integer({ mode: 'boolean' }).notNull().default(sql`0`),
+    name: text().notNull(), // URL-safe name like "vscode" (not unique, only unique within publisher/group)
+    // fullname: text().notNull().unique(), // Full hierarchical name: publisher.[...groups].pkgname or publisher.pkgname
+
+    // optional top level alias like vscode -> microsoft.vscode
+    // alias works by using meta packages that point to the real package
+    // for now a package can only have one alias, but in the future we might want to support multiple aliases for the same package
+    topLevelAlias: text().unique(),
 
     description: text().notNull(),
     homepage_url: text().notNull(),
+    
+
+    flags: text({ mode: 'json' }).$type<PackageModel.PackageFlags>().notNull().default(sql`'[]'`),
+
+    // Requires patching may be controlled by a flag in the flags array in the future.
+    requires_patching: integer({ mode: 'boolean' }).notNull().default(sql`0`),
+
     created_at: SQLUtils.getCreatedAtColumn(),
 
     // version strings of version + leios patch if exists
@@ -152,7 +181,11 @@ export const packages = sqliteTable('packages', {
         amd64: string | null;
         arm64: string | null;
     }>().default(sql`'{"amd64": null, "arm64": null}'`),
-});
+
+}, (table) => [
+    unique().on(table.publisher_id, table.name),
+    index("packages_publisher_id_idx").on(table.publisher_id)
+]);
 
 /**
  * @deprecated Use DB.Tables.packageReleases to access this table.
@@ -174,23 +207,34 @@ export const packageReleases = sqliteTable('package_releases', {
     changelog: text().notNull(),
 });
 
-/**
- * Top-level package aliases (meta packages)
- * e.g., "vscode" -> "microsoft.vscode"
- * @deprecated Use DB.Tables.packageAliases to access this table.
- */
-export const packageAliases = sqliteTable('package_aliases', {
-    id: integer().primaryKey({ autoIncrement: true }),
-    alias_name: text().notNull().unique(), // The short name like "vscode"
-    target_package_id: integer().notNull().references(() => packages.id, { onDelete: 'cascade' }),
-    status: text({ 
-        enum: ['pending', 'approved', 'rejected'] 
-    }).default('pending').notNull(),
-    requested_by_user_id: integer().notNull().references(() => users.id),
-    reviewed_by_user_id: integer().references(() => users.id),
-    created_at: SQLUtils.getCreatedAtColumn(),
-    reviewed_at: integer(),
-    admin_note: text(),
+
+export const packageFullView = sqliteView('package_full_view').as((db) => {
+
+    return db.select({
+
+        id: packages.id,
+
+        publisher_id: packages.publisher_id,
+
+        name: packages.name,
+        fullname: sql<string>`${publishers.name} || '.' || ${packages.name}`.as('fullname'),
+
+        topLevelAlias: packages.topLevelAlias,
+
+        description: packages.description,
+        homepage_url: packages.homepage_url,
+
+        flags: packages.flags,
+        requires_patching: packages.requires_patching,
+
+        created_at: packages.created_at,
+
+        latest_stable_release: packages.latest_stable_release,
+        latest_testing_release: packages.latest_testing_release,
+
+    }).from(packages)
+    .leftJoin(publishers, eq(packages.publisher_id, publishers.id));
+
 });
 
 
