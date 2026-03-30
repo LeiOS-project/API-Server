@@ -1,10 +1,10 @@
 import { Hono } from "hono";
 import { APIVersionRouter } from "../../utils/apiVersionRouter";
 import type { GenerateSpecOptions } from "hono-openapi";
-import { router as publicRouter } from "./routes/public";
 import { router as authRouter } from "./routes/auth";
 import { router as accountRouter } from "./routes/account";
-import { router as developerRouter } from "./routes/developer";
+import { router as publishersRouter } from "./routes/publishers";
+import { router as packagesRouter } from "./routes/packages";
 import { router as adminRouter } from "./routes/admin";
 import { authMiddlewareV1 } from "./middleware/auth";
 
@@ -280,10 +280,10 @@ const router = new Hono();
 
 router.use(authMiddlewareV1);
 
-router.route("/", publicRouter);
 router.route("/", authRouter);
 router.route("/", accountRouter);
-router.route("/", developerRouter);
+router.route("/", publishersRouter);
+router.route("/", packagesRouter);
 router.route("/", adminRouter);
 
 export class APIv1Router extends APIVersionRouter {
