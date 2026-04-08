@@ -4,47 +4,6 @@ import z from "zod";
 
 export namespace PackageModel {
 
-    export const ForbiddenPackageNames = [
-        "admin",
-        "user",
-        "users",
-        "package",
-        "packages",
-        "release",
-        "releases",
-        "os",
-        "api",
-        "dashboard",
-        "home",
-        "settings",
-        "login",
-        "logout",
-        "register",
-        "auth",
-        "static",
-        "public",
-        "new",
-        "edit",
-        "delete",
-        "update",
-        "create",
-        "list",
-        "all",
-        "latest",
-        "stable",
-        "testing",
-        "beta",
-        "alpha",
-        "dev",
-        "development",
-        "prod",
-        "production",
-
-        // Forbidden LeiCraft_MC related names
-        "leicraft",
-        "leios"
-    ] as const;
-
     /**
      * Package naming convention:
      * - publisher.pkgname (for publisher-level packages)
@@ -57,46 +16,13 @@ export namespace PackageModel {
      * - Package short name cannot be a forbidden name
      */
     export const PackageNameSchema = z.string()
-        .min(3, "Package names must be at least 3 characters long (publisher.pkg).")
+        .min(3, "Package names must be at least 3 characters long.")
         .max(200, "Package names cannot exceed 200 characters.")
         .regex(
             /^[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)+$/,
-            "Package name must follow pattern: publisher.pkgname or publisher.group.pkgname"
-        )
-        .refine((name) => {
-            // Extract final component (package short name)
-            const parts = name.split('.');
-            const pkgShortName = parts[parts.length - 1];
-            return !ForbiddenPackageNames.includes(pkgShortName as any);
-        }, {
-            message: "The package short name is reserved and cannot be used."
-        });
+            "Package name must follow pattern: pkgname or group.pkgname"
+        );
 
-    /**
-     * Helper to construct package name from publisher, groups, and package short name
-     */
-    export function constructPackageName(publisher: string, groups: string[], packageShortName: string): string {
-        return [publisher, ...groups, packageShortName].join('.');
-    }
-
-    /**
-     * Helper to parse package name into components
-     */
-    export function parsePackageName(packageName: string): {
-        publisher: string;
-        groups: string[];
-        packageShortName: string;
-    } {
-        const parts = packageName.split('.');
-        if (parts.length < 2) {
-            throw new Error("Invalid package name format");
-        }
-        return {
-            publisher: parts[0],
-            groups: parts.slice(1, -1),
-            packageShortName: parts[parts.length - 1],
-        };
-    }
 
     export const PackageFlags = z.array(z.enum([
 
@@ -113,9 +39,12 @@ export namespace PackageModel {
     
 }
 
-export namespace PackageModel.GetPackageByName {
+export namespace PackageModel.GetPackageByFullName {
     
-    export const Response = createSelectSchema(DB.Tables.packages, {
+    export const Response = createSelectSchema(DB.Tables.packagesFullView, {
+
+        fullname: z.string(),
+
         latest_stable_release: z.object({
             amd64: z.string().nullable(),
             arm64: z.string().nullable(),
@@ -124,6 +53,10 @@ export namespace PackageModel.GetPackageByName {
             amd64: z.string().nullable(),
             arm64: z.string().nullable(),
         })
+
+    }).extend({
+        // somehow zod didn't infer the type of fullname correctly, so we need to add it manually
+        fullname: z.string()
     });
 
     export type Response = z.infer<typeof Response>;
@@ -132,37 +65,27 @@ export namespace PackageModel.GetPackageByName {
 
 export namespace PackageModel.GetAll {
 
-    export const Response = z.array(PackageModel.GetPackageByName.Response);
+    export const Response = z.array(PackageModel.GetPackageByFullName.Response);
     export type Response = z.infer<typeof Response>;
-
-}
-
-export namespace PackageModel.CreatePackageAsAdmin {
-
-    export const Body = createInsertSchema(DB.Tables.packages, {
-        name: PackageModel.PackageNameSchema,
-        homepage_url: z.string().url("Homepage URL must be a valid URL."),
-        description: z.string().min(1, "Description is required").max(500, "Description cannot exceed 500 characters."),
-    }).omit({
-        id: true,
-        created_at: true,
-        flags: true,
-        latest_stable_release: true,
-        latest_testing_release: true
-    });
-
-    export type Body = z.infer<typeof Body>;
 
 }
 
 export namespace PackageModel.CreatePackage {
 
-    export const Body = z.object({
+    export const Body = createInsertSchema(DB.Tables.packages, {
         name: PackageModel.PackageNameSchema,
         description: z.string().min(1, "Description is required").max(500, "Description cannot exceed 500 characters."),
-        homepage_url: z.string().url("Homepage URL must be a valid URL."),
+        homepage_url: z.url("Homepage URL must be a valid URL."),
         requires_patching: z.boolean().default(false),
+    }).omit({
+        id: true,
+        created_at: true,
+        flags: true,
+        topLevelAlias: true,
+        latest_stable_release: true,
+        latest_testing_release: true
     });
+
 
     export type Body = z.infer<typeof Body>;
 }

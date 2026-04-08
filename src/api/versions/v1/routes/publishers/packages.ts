@@ -138,7 +138,7 @@ router.get('/:packageName',
         description: "Retrieve details of a specific package in the publisher.",
         tags: [DOCS_TAGS.DEV_API.PUBLISHERS_PACKAGES],
         responses: APIResponseSpec.describeBasic(
-            APIResponseSpec.success("Package retrieved successfully", PackageModel.GetPackageByName.Response),
+            APIResponseSpec.success("Package retrieved successfully", PackageModel.GetPackageByFullName.Response),
             APIResponseSpec.notFound("Package not found"),
             APIResponseSpec.forbidden("You do not have permission to access this package")
         )

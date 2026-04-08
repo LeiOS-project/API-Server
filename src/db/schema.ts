@@ -160,6 +160,7 @@ export const packages = sqliteTable('packages', {
     // for now a package can only have one alias, but in the future we might want to support multiple aliases for the same package
     topLevelAlias: text().unique(),
 
+    display_name: text().notNull(),
     description: text().notNull(),
     homepage_url: text().notNull(),
     
@@ -183,7 +184,7 @@ export const packages = sqliteTable('packages', {
     }>().default(sql`'{"amd64": null, "arm64": null}'`),
 
 }, (table) => [
-    unique().on(table.publisher_id, table.name),
+    unique("packages_publisher_id_name_unique").on(table.publisher_id, table.name),
     index("packages_publisher_id_idx").on(table.publisher_id)
 ]);
 
@@ -210,7 +211,7 @@ export const packageReleases = sqliteTable('package_releases', {
 ]);
 
 
-export const packageFullView = sqliteView('package_full_view').as((db) => {
+export const packagesFullView = sqliteView('packages_full_view').as((db) => {
 
     return db.select({
 
@@ -223,6 +224,7 @@ export const packageFullView = sqliteView('package_full_view').as((db) => {
 
         topLevelAlias: packages.topLevelAlias,
 
+        display_name: packages.display_name,
         description: packages.description,
         homepage_url: packages.homepage_url,
 
@@ -235,7 +237,7 @@ export const packageFullView = sqliteView('package_full_view').as((db) => {
         latest_testing_release: packages.latest_testing_release,
 
     }).from(packages)
-    .leftJoin(publishers, eq(packages.publisher_id, publishers.id));
+      .leftJoin(publishers, eq(packages.publisher_id, publishers.id));
 
 });
 

@@ -74,7 +74,7 @@ router.get('/:packageName',
         tags: [DOCS_TAGS.DEV_API.PACKAGES],
 
         responses: APIResponseSpec.describeBasic(
-            APIResponseSpec.success("Package retrieved successfully", PackageModel.GetPackageByName.Response),
+            APIResponseSpec.success("Package retrieved successfully", PackageModel.GetPackageByFullName.Response),
             APIResponseSpec.notFound("Package with specified Name not found")
         )
     }),

@@ -51,22 +51,22 @@ router.post('/',
 
 
 
-router.use('/:packageName/*',
+router.use('/:packageFullName/*',
 
     zValidator("param", z.object({
-        packageName: z.string()
+        packageFullName: z.string()
     })),
 
     async (c, next) => {
         // @ts-ignore
-        const { packageName } = c.req.valid("param") as { packageName: string };
+        const { packageFullName } = c.req.valid("param") as { packageFullName: string };
 
-        return await PackagesService.packageMiddleware(c, next, packageName, false);
+        return await PackagesService.packageMiddleware(c, next, packageFullName, false);
     }
 );
 
 
-router.get('/:packageName',
+router.get('/:packageFullName',
 
     APIRouteSpec.authenticated({
         summary: "Get package details",
@@ -74,7 +74,7 @@ router.get('/:packageName',
         tags: [DOCS_TAGS.DEV_API.PACKAGES],
 
         responses: APIResponseSpec.describeBasic(
-            APIResponseSpec.success("Package retrieved successfully", PackageModel.GetPackageByName.Response),
+            APIResponseSpec.success("Package retrieved successfully", PackageModel.GetPackageByFullName.Response),
             APIResponseSpec.notFound("Package with specified Name not found")
         )
     }),
@@ -84,7 +84,7 @@ router.get('/:packageName',
     }
 );
 
-router.put('/:packageName',
+router.put('/:packageFullName',
 
     APIRouteSpec.authenticated({
         summary: "Update package details",
@@ -107,5 +107,5 @@ router.put('/:packageName',
     }
 );
 
-router.route('/:packageName', releasesRouter);
-router.route('/:packageName', stableRequestsRouter);
+router.route('/:packageFullName', releasesRouter);
+router.route('/:packageFullName', stableRequestsRouter);

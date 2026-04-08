@@ -132,7 +132,7 @@ export namespace DB.Tables {
 
     export const packages = TableSchema.packages;
     export const packageReleases = TableSchema.packageReleases;
-    export const packageFullView = TableSchema.packageFullView;
+    export const packagesFullView = TableSchema.packagesFullView;
 
     export const stablePromotionRequests = TableSchema.stablePromotionRequests;
 
@@ -157,7 +157,7 @@ export namespace DB.Models {
 
     export type Package = typeof DB.Tables.packages.$inferSelect;
     export type PackageRelease = typeof DB.Tables.packageReleases.$inferSelect;
-    export type PackageFullView = typeof DB.Tables.packageFullView.$inferSelect;
+    export type PackageFullView = typeof DB.Tables.packagesFullView.$inferSelect;
 
     export type StablePromotionRequest = typeof DB.Tables.stablePromotionRequests.$inferSelect;
 
