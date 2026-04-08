@@ -86,9 +86,9 @@ export namespace PublisherModel.CreatePublisher {
     export const Body = createInsertSchema(DB.Tables.publishers, {
 
         name: PublisherModel.PublisherNameSchema,
-        display_name: z.string().min(1).max(100),
-        description: z.string().min(1).max(500),
-        homepage_url: z.string().url().optional(),
+        display_name: z.string().min(1, "Display name is required").max(200, "Display name cannot exceed 200 characters."),
+        description: z.string().min(1, "Description is required").max(500, "Description cannot exceed 500 characters."),
+        homepage_url: z.url("Homepage URL must be a valid URL.").max(500, "Homepage URL cannot exceed 500 characters."),
 
     }).omit({
         id: true,
