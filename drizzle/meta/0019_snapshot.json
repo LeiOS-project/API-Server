@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "0e5276af-75ed-4027-a896-afe0154677cd",
+  "id": "6de3b633-02ec-48f6-999a-7635f9495f6f",
   "prevId": "c84e2f25-ca3d-4c58-93b0-b715094eec91",
   "tables": {
     "api_keys": {
@@ -296,7 +296,8 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
+          "autoincrement": false,
+          "default": "''"
         },
         "description": {
           "name": "description",
@@ -1121,6 +1122,14 @@
           "notNull": false,
           "autoincrement": false
         },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
         "description": {
           "name": "description",
           "type": "text",
@@ -1178,7 +1187,7 @@
       },
       "name": "packages_full_view",
       "isExisting": false,
-      "definition": "select \"packages\".\"id\", \"packages\".\"publisher_id\", \"packages\".\"name\", \"publishers\".\"name\" || '.' || \"packages\".\"name\" as \"fullname\", \"packages\".\"topLevelAlias\", \"packages\".\"description\", \"packages\".\"homepage_url\", \"packages\".\"flags\", \"packages\".\"requires_patching\", \"packages\".\"created_at\", \"packages\".\"latest_stable_release\", \"packages\".\"latest_testing_release\" from \"packages\" left join \"publishers\" on \"packages\".\"publisher_id\" = \"publishers\".\"id\""
+      "definition": "select \"packages\".\"id\", \"packages\".\"publisher_id\", \"packages\".\"name\", \"publishers\".\"name\" || '.' || \"packages\".\"name\" as \"fullname\", \"packages\".\"topLevelAlias\", \"packages\".\"display_name\", \"packages\".\"description\", \"packages\".\"homepage_url\", \"packages\".\"flags\", \"packages\".\"requires_patching\", \"packages\".\"created_at\", \"packages\".\"latest_stable_release\", \"packages\".\"latest_testing_release\" from \"packages\" left join \"publishers\" on \"packages\".\"publisher_id\" = \"publishers\".\"id\""
     }
   },
   "enums": {},
