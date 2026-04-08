@@ -86,7 +86,7 @@ export const publishers = sqliteTable('publishers', {
     name: text().notNull().unique(), // URL-safe name like "microsoft", "mozilla-foundation"
     display_name: text().notNull(),
     description: text().notNull(),
-    homepage_url: text(),
+    homepage_url: text().notNull(),
 
     // db query to delete user while owning should fail
     // user has to transfer ownership first or delete before deleting their account

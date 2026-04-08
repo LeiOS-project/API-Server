@@ -74,8 +74,10 @@ export namespace PublisherModel.GetPublisherByName {
 
 
 export namespace PublisherModel.GetAll {
+
     export const Response = z.array(PublisherModel.GetPublisherByName.Response);
     export type Response = z.infer<typeof Response>;
+
 }
 
 
@@ -87,12 +89,11 @@ export namespace PublisherModel.CreatePublisher {
         display_name: z.string().min(1).max(100),
         description: z.string().min(1).max(500),
         homepage_url: z.string().url().optional(),
-        avatar_url: z.string().url().optional(),
 
     }).omit({
         id: true,
         created_at: true,
-        created_by_user_id: true,
+        owner_user_id: true,
     });
 
     export type Body = z.infer<typeof Body>;

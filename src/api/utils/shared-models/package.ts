@@ -73,15 +73,18 @@ export namespace PackageModel.GetAll {
 export namespace PackageModel.CreatePackage {
 
     export const Body = createInsertSchema(DB.Tables.packages, {
+
         name: PackageModel.PackageNameSchema,
+        display_name: z.string().min(1, "Display name is required").max(200, "Display name cannot exceed 200 characters."),
         description: z.string().min(1, "Description is required").max(500, "Description cannot exceed 500 characters."),
-        homepage_url: z.url("Homepage URL must be a valid URL."),
+        homepage_url: z.url("Homepage URL must be a valid URL.").max(500, "Homepage URL cannot exceed 500 characters."),
         requires_patching: z.boolean().default(false),
+        
     }).omit({
         id: true,
         created_at: true,
         flags: true,
-        topLevelAlias: true,
+        top_level_alias: true,
         latest_stable_release: true,
         latest_testing_release: true
     });
@@ -93,7 +96,8 @@ export namespace PackageModel.CreatePackage {
 export namespace PackageModel.UpdatePackage {
 
     export const Body = PackageModel.CreatePackage.Body.omit({
-        name: true
+        name: true,
+        publisher_id: true,
     }).partial().refine(
         (data) => Object.values(data).some((value) => value !== undefined),
         { message: "At least one field must be provided" }
