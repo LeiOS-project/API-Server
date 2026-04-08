@@ -158,7 +158,7 @@ export const packages = sqliteTable('packages', {
     // optional top level alias like vscode -> microsoft.vscode
     // alias works by using meta packages that point to the real package
     // for now a package can only have one alias, but in the future we might want to support multiple aliases for the same package
-    topLevelAlias: text().unique(),
+    top_level_alias: text().unique(),
 
     display_name: text().notNull(),
     description: text().notNull(),
@@ -194,7 +194,7 @@ export const packages = sqliteTable('packages', {
 export const packageReleases = sqliteTable('package_releases', {
     id: integer().primaryKey({ autoIncrement: true }),
     package_id: integer().notNull().references(() => packages.id),
-    versionWithLeiosPatch: text().notNull(),
+    version_with_leios_patch: text().notNull(),
     
     // architecture: text({ enum: ['amd64', 'arm64'] }).notNull(),
     //architectures: text({ mode: "json" }).$type<("amd64" | "arm64")[]>().notNull(),
@@ -207,7 +207,7 @@ export const packageReleases = sqliteTable('package_releases', {
     created_at: SQLUtils.getCreatedAtColumn(),
     changelog: text().notNull(),
 }, (table) => [
-    unique("package_releases_pkg_version_unique").on(table.package_id, table.versionWithLeiosPatch)
+    unique("package_releases_pkg_version_unique").on(table.package_id, table.version_with_leios_patch)
 ]);
 
 
@@ -222,7 +222,7 @@ export const packagesFullView = sqliteView('packages_full_view').as((db) => {
         name: packages.name,
         fullname: sql<string>`${publishers.name} || '.' || ${packages.name}`.as('fullname'),
 
-        topLevelAlias: packages.topLevelAlias,
+        top_level_alias: packages.top_level_alias,
 
         display_name: packages.display_name,
         description: packages.description,
