@@ -12,7 +12,7 @@ export namespace ApiHelperModels.ListAll {
     
 
     export const QueryWithSearch = Query.extend({
-        searchString: z.string().optional(),
+        searchString: z.string().min(3).optional(),
     });
 
     export type QueryWithSearch = z.infer<typeof QueryWithSearch>;

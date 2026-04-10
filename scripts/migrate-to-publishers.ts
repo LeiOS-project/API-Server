@@ -17,7 +17,7 @@
 
 import { DB } from '../src/db';
 import { eq, sql } from 'drizzle-orm';
-import { PublisherModel } from '../src/api/utils/shared-models/publisher';
+import { PublisherModel } from '../src/api/versions/v1/routes/publishers/model';
 
 const DRY_RUN = process.argv.includes('--dry-run');
 

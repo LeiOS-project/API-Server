@@ -1,6 +1,7 @@
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "drizzle-zod";
 import { DB } from "../../../db";
 import z from "zod";
+import { ApiHelperModels } from "./api-helper-models";
 
 export namespace PackageModel {
 
@@ -36,11 +37,11 @@ export namespace PackageModel {
     }, { message: "Duplicate flags are not allowed." });
 
     export type PackageFlags = z.infer<typeof PackageFlags>;
-    
+
 }
 
 export namespace PackageModel.GetPackageByFullName {
-    
+
     export const Response = createSelectSchema(DB.Tables.packagesFullView, {
 
         fullname: z.string(),
@@ -65,6 +66,26 @@ export namespace PackageModel.GetPackageByFullName {
 
 export namespace PackageModel.GetAll {
 
+    export const Query = ApiHelperModels.ListAll.QueryWithSearch.omit({
+        order: true
+    }).extend({
+
+        publisherID: z.coerce.number().int().min(1).optional(),
+        publisherName: z.string().min(1).optional(),
+
+        onlyMembershipByMe: z.coerce.boolean().default(false)
+
+    }).refine(
+        (data) => !(data.publisherID !== undefined && data.publisherName !== undefined),
+        {
+            message: "You can provide either 'publisherID' or 'publisherName', but not both.",
+            // Optional: attach the error specifically to these fields so frontend forms can display it easily
+            path: ["publisherName"], 
+        }
+    );
+
+    export type Query = z.infer<typeof Query>;
+
     export const Response = z.array(PackageModel.GetPackageByFullName.Response);
     export type Response = z.infer<typeof Response>;
 
@@ -79,7 +100,7 @@ export namespace PackageModel.CreatePackage {
         description: z.string().min(1, "Description is required").max(500, "Description cannot exceed 500 characters."),
         homepage_url: z.url("Homepage URL must be a valid URL.").max(500, "Homepage URL cannot exceed 500 characters."),
         requires_patching: z.boolean().default(false),
-        
+
     }).omit({
         id: true,
         created_at: true,

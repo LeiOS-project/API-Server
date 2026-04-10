@@ -4,7 +4,7 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { DB } from "../../../../../../db";
 import { APIResponse } from "../../../../../utils/api-res";
-import { PublisherModel } from "../../../../../utils/shared-models/publisher";
+import { PublisherModel } from "../../../../v1/routes/publishers/model";
 import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers";
 import { PublishersService } from "../../../../../utils/services/publishers";
 import { DOCS_TAGS } from "../../../docs";

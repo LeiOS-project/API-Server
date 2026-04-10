@@ -39,7 +39,7 @@ router.get('/',
             admin_note: DB.Tables.stablePromotionRequests.admin_note,
 
             package_name: DB.Tables.packages.name,
-            package_release_version: DB.Tables.packageReleases.versionWithLeiosPatch,
+            package_release_version: DB.Tables.packageReleases.version_with_leios_patch,
         })
         .from(DB.Tables.stablePromotionRequests)
         .innerJoin(
@@ -114,7 +114,7 @@ router.get('/:stablePromotionRequestID',
             throw new Error(`Package with ID ${request.package_id} not found for stable promotion request ID ${request.id}`);
         }
         const pkgRelease = DB.instance().select({
-            versionWithLeiosPatch: DB.Tables.packageReleases.versionWithLeiosPatch
+            versionWithLeiosPatch: DB.Tables.packageReleases.version_with_leios_patch
         }).from(DB.Tables.packageReleases).where(
             eq(DB.Tables.packageReleases.id, request.package_release_id)
         ).get();

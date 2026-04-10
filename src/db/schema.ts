@@ -109,6 +109,9 @@ export const publisherMembers = sqliteTable('publisher_members', {
     role: text({
         enum: PermissionHelper.OrgRolesAsTuple
     }).notNull(),
+
+    // is this membership hidden publicly
+    is_publicly_hidden: integer({ mode: 'boolean' }).notNull().default(sql`0`),
     
     added_at: SQLUtils.getCreatedAtColumn(),
 

@@ -5,7 +5,7 @@ import { DB } from "../../../../../../db";
 import { eq } from "drizzle-orm";
 import { APIResponse } from "../../../../../utils/api-res";
 import { APIRouteSpec, APIResponseSpec } from "../../../../../utils/specHelpers";
-import { PublisherModel } from "../../../../../utils/shared-models/publisher";
+import { PublisherModel } from "../../../../v1/routes/publishers/model";
 import { AuthHandler } from "../../../../../utils/authHandler";
 import { RolesService } from "../../../../../utils/services/roles";
 import { DOCS_TAGS } from "../../../docs";

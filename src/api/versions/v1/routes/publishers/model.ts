@@ -1,6 +1,7 @@
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
-import { DB } from "../../../db";
+import { DB } from "../../../../../db";
 import z from "zod";
+import { ApiHelperModels } from "../../../../utils/shared-models/api-helper-models";
 
 export namespace PublisherModel {
 
@@ -66,7 +67,9 @@ export namespace PublisherModel {
 
 export namespace PublisherModel.GetPublisherByName {
 
-    export const Response = createSelectSchema(DB.Tables.publishers);
+    export const Response = createSelectSchema(DB.Tables.publishers).omit({
+        owner_user_id: true,
+    });
 
     export type Response = z.infer<typeof Response>;
 
@@ -75,7 +78,17 @@ export namespace PublisherModel.GetPublisherByName {
 
 export namespace PublisherModel.GetAll {
 
+    export const Query = ApiHelperModels.ListAll.QueryWithSearch.omit({
+        order: true
+    }).extend({
+        onlyMembershipByMe: z.coerce.boolean().default(false)
+    });
+
+    export type Query = z.infer<typeof Query>;
+
+
     export const Response = z.array(PublisherModel.GetPublisherByName.Response);
+
     export type Response = z.infer<typeof Response>;
 
 }
@@ -100,8 +113,11 @@ export namespace PublisherModel.CreatePublisher {
 }
 
 export namespace PublisherModel.UpdatePublisher {
+
     export const Body = PublisherModel.CreatePublisher.Body.omit({
+
         name: true,
+
     }).partial().refine(
         (data) => Object.values(data).some((value) => value !== undefined),
         { message: "At least one field must be provided" }
@@ -110,3 +126,12 @@ export namespace PublisherModel.UpdatePublisher {
     export type Body = z.infer<typeof Body>;
 }
 
+export namespace PublisherModel.TransferOwnership {
+
+    export const Body = z.object({
+        new_owner_user_id: z.number()
+    });
+
+    export type Body = z.infer<typeof Body>;
+
+}

@@ -1,9 +1,8 @@
 import { Hono } from "hono";
 import { validator as zValidator } from "hono-openapi";
 import { z } from "zod";
-import { PublisherModel } from "../../../../utils/shared-models/publisher";
+import { PublisherModel } from "./model";
 import { APIResponseSpec, APIRouteSpec } from "../../../../utils/specHelpers";
-import { PublishersService } from "../../../../utils/services/publishers";
 import { DOCS_TAGS } from "../../docs";
 import { AuthHandler } from "../../../../utils/authHandler";
 import { APIResponse } from "../../../../utils/api-res";

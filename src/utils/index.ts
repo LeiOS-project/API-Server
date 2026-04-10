@@ -44,6 +44,10 @@ export class Utils {
         }
     }
 
+    static asExact<Shape>() {
+        return <T extends Shape>(obj: T & Utils.DeepExact<Shape, T>): T => obj;
+    }
+
 }
 
 export namespace Utils {
@@ -53,4 +57,15 @@ export namespace Utils {
             ? First & MergeArray<Rest extends object[] ? Rest : []>
             : {};
 
+    export type DeepExact<Shape, T> = {
+        [K in keyof T]: K extends keyof Shape
+            ? Shape[K] extends object
+                ? Shape[K] extends readonly unknown[] | ((...args: any[]) => any)
+                    ? T[K]
+                    : DeepExact<Shape[K], T[K]>
+                : T[K]
+            : never;
+    };
+
 }
+

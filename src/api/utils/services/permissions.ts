@@ -1,6 +1,6 @@
 import { DB } from "../../../db";
 import { eq, and, or } from "drizzle-orm";
-import { PublisherModel } from "../shared-models/publisher";
+import { PublisherModel } from "../../versions/v1/routes/publishers/model";
 import { AuthHandler } from "../authHandler";
 
 /**
