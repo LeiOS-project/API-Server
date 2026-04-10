@@ -11,7 +11,6 @@ import { AuthHandler } from "../../../../utils/authHandler";
 import { router as membersRouter } from "./members";
 import rolesRouter from "./roles";
 import { Utils } from "../../../../../utils";
-import { de, id } from "zod/locales";
 
 export const router = new Hono().basePath('/publishers');
 

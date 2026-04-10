@@ -120,7 +120,8 @@ export const publisherMembers = sqliteTable('publisher_members', {
 ]));
 
 /**
- * Role assignments link users to roles at different scopes
+ * Role assignments link users to roles at different scopes. currently only package-level roles are supported, but in the future we will add support for group-level and publisher-level roles as well.
+ * if no role assignment exists for a user at the package level, we will check for a role assignment at publisher level
  * Scope can be publisher-level, group-level, or package-level
  * the specified role of the assignment have to be higher than the role in the parent scope (or publisher base role if no parent group)
  * @deprecated Use DB.Tables.roleAssignments to access this table.
