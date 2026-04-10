@@ -162,6 +162,13 @@
       "when": 1775647733373,
       "tag": "0022_rich_dracula",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1775843279764,
+      "tag": "0023_silent_tattoo",
+      "breakpoints": true
     }
   ]
 }
