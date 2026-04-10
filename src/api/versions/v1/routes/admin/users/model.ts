@@ -3,7 +3,7 @@ import { DB } from "../../../../../../db";
 import z from "zod";
 import { UserDataPolicys } from "../../../../../utils/shared-models/accountData";
 
-export namespace AdminUsersModel {
+export namespace UsersModel {
 
     const BaseUser = createSelectSchema(DB.Tables.users);
 

@@ -17,7 +17,7 @@ router.get('/',
     APIRouteSpec.authenticated({
         summary: "List stable promotion requests",
         description: "Retrieve a list of all stable promotion requests for packages.",
-        tags: [DOCS_TAGS.ADMIN_API.STABLE_PROMOTION_REQUESTS],
+        tags: [DOCS_TAGS.ADMIN_STABLE_PROMOTION_REQUESTS],
 
         responses: APIResponseSpec.describeBasic(
             APIResponseSpec.success("Stable promotion requests retrieved successfully", AdminStablePromotionRequestModel.GetAll.Response)
@@ -29,7 +29,7 @@ router.get('/',
     async (c) => {
 
         const { limit, offset, order } = c.req.valid("query");
-        
+
         const results = await DB.instance().select({
             id: DB.Tables.stablePromotionRequests.id,
             package_id: DB.Tables.stablePromotionRequests.package_id,
@@ -72,7 +72,7 @@ router.use('/:stablePromotionRequestID/*',
         // @ts-ignore
         const { stablePromotionRequestID } = c.req.valid("param") as { stablePromotionRequestID: number };
 
-        const request = DB.instance().select().from(DB.Tables.stablePromotionRequests).where(
+        const request = await DB.instance().select().from(DB.Tables.stablePromotionRequests).where(
             eq(DB.Tables.stablePromotionRequests.id, stablePromotionRequestID)
         ).get();
 
@@ -92,7 +92,7 @@ router.get('/:stablePromotionRequestID',
     APIRouteSpec.authenticated({
         summary: "Get stable promotion request details",
         description: "Retrieve details of a specific stable promotion request.",
-        tags: [DOCS_TAGS.ADMIN_API.STABLE_PROMOTION_REQUESTS],
+        tags: [DOCS_TAGS.ADMIN_STABLE_PROMOTION_REQUESTS],
 
         responses: APIResponseSpec.describeBasic(
             APIResponseSpec.success("Stable promotion request retrieved successfully", AdminStablePromotionRequestModel.GetById.Response),
@@ -104,7 +104,7 @@ router.get('/:stablePromotionRequestID',
         // @ts-ignore
         const request = c.get("stablePromotionRequest") as DB.Models.StablePromotionRequest;
 
-        const pkg = DB.instance().select({
+        const pkg = await DB.instance().select({
             name: DB.Tables.packages.name
         }).from(DB.Tables.packages).where(
             eq(DB.Tables.packages.id, request.package_id)
@@ -113,8 +113,8 @@ router.get('/:stablePromotionRequestID',
         if (!pkg) {
             throw new Error(`Package with ID ${request.package_id} not found for stable promotion request ID ${request.id}`);
         }
-        const pkgRelease = DB.instance().select({
-            versionWithLeiosPatch: DB.Tables.packageReleases.version_with_leios_patch
+        const pkgRelease = await DB.instance().select({
+            version_with_leios_patch: DB.Tables.packageReleases.version_with_leios_patch
         }).from(DB.Tables.packageReleases).where(
             eq(DB.Tables.packageReleases.id, request.package_release_id)
         ).get();
@@ -126,7 +126,7 @@ router.get('/:stablePromotionRequestID',
         const result = {
             ...request,
             package_name: pkg.name,
-            package_release_version: pkgRelease.versionWithLeiosPatch
+            package_release_version: pkgRelease.version_with_leios_patch
         };
 
         return APIResponse.success(c, "Stable promotion request retrieved successfully", result satisfies AdminStablePromotionRequestModel.GetById.Response);
@@ -138,7 +138,7 @@ router.post('/:stablePromotionRequestID/decide',
     APIRouteSpec.authenticated({
         summary: "Decide on a stable promotion request",
         description: "Approve or reject a stable promotion request for a package.",
-        tags: [DOCS_TAGS.ADMIN_API.STABLE_PROMOTION_REQUESTS],
+        tags: [DOCS_TAGS.ADMIN_STABLE_PROMOTION_REQUESTS],
 
         responses: APIResponseSpec.describeWithWrongInputs(
             APIResponseSpec.successNoData("Decided on stable promotion request successfully"),
@@ -152,7 +152,6 @@ router.post('/:stablePromotionRequestID/decide',
     async (c) => {
         // @ts-ignore
         const request = c.get("stablePromotionRequest") as DB.Models.StablePromotionRequest;
-
         const decision = c.req.valid("json");
 
         if (request.status !== 'pending') {
@@ -170,6 +169,6 @@ router.post('/:stablePromotionRequestID/decide',
             await RuntimeMetadata.addOSReleasePendingPackage(request.package_release_id);
         }
 
-        return APIResponse.successNoData(c, "Stable promotion request approved successfully");
+        return APIResponse.successNoData(c, "Decided on stable promotion request successfully");
     }
 );

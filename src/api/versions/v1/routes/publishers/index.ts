@@ -8,8 +8,8 @@ import { PublisherModel } from "./model";
 import { APIResponseSpec, APIRouteSpec } from "../../../../utils/specHelpers";
 import { DOCS_TAGS } from "../../docs";
 import { AuthHandler } from "../../../../utils/authHandler";
+import { PermissionHelper } from "../../../../../utils/permission-helper";
 import { router as membersRouter } from "./members";
-import rolesRouter from "./roles";
 import { Utils } from "../../../../../utils";
 
 export const router = new Hono().basePath('/publishers');
@@ -21,7 +21,7 @@ router.get('/',
 
         summary: "List publishers",
         description: "Retrieve a list of all publishers matching the search criteria.",
-        tags: [DOCS_TAGS.DEV_API.PUBLISHERS],
+        tags: [DOCS_TAGS.PUBLISHERS],
 
         responses: APIResponseSpec.describeWithWrongInputs(
             APIResponseSpec.success("Publishers retrieved successfully", PublisherModel.GetAll.Response)
@@ -37,7 +37,7 @@ router.get('/',
         const { limit, offset, searchString, onlyMembershipByMe } = c.req.valid("query");
 
         if (onlyMembershipByMe && authContext.type === "unauthenticated") {
-            return APIResponse.success(c, "No publishers found", []);
+            return APIResponse.success(c, "Publishers retrieved successfully", []);
         }
 
         let query = DB.instance()
@@ -48,7 +48,7 @@ router.get('/',
                 display_name: DB.Tables.publishers.display_name,
                 description: DB.Tables.publishers.description,
                 homepage_url: DB.Tables.publishers.homepage_url,
-                
+
                 created_at: DB.Tables.publishers.created_at,
             })
             .from(DB.Tables.publishers)
@@ -90,7 +90,7 @@ router.post('/',
     APIRouteSpec.authenticated({
         summary: "Create publisher",
         description: "Create a new publisher. Creator becomes the owner.",
-        tags: [DOCS_TAGS.DEV_API.PUBLISHERS],
+        tags: [DOCS_TAGS.PUBLISHERS],
 
         responses: APIResponseSpec.describeWithWrongInputs(
             APIResponseSpec.createdNoData("Publisher created successfully"),
@@ -111,7 +111,6 @@ router.post('/',
 
         const publisherData = c.req.valid("json");
 
-        // Check if publisher name already exists
         const existing = await DB.instance()
             .select()
             .from(DB.Tables.publishers)
@@ -126,7 +125,7 @@ router.post('/',
 
             const publisher = await tx.insert(DB.Tables.publishers).values({
                 name: publisherData.name,
-                
+
                 display_name: publisherData.display_name,
                 description: publisherData.description,
                 homepage_url: publisherData.homepage_url,
@@ -137,7 +136,7 @@ router.post('/',
             await tx.insert(DB.Tables.publisherMembers).values({
                 publisher_id: publisher.id,
                 user_id: authContext.user_id,
-                role: 'owner',
+                role: PermissionHelper.OrgRoles.ADMIN,
                 is_publicly_hidden: false
             });
 
@@ -149,6 +148,8 @@ router.post('/',
 );
 
 
+// Loads the publisher by :publisherName into c.set("publisher", ...) for all sub-routes.
+// Permission checks happen per-route, not here — a GET needs no membership while a DELETE requires ownership.
 router.use('/:publisherName/*',
 
     zValidator("param", z.object({
@@ -159,7 +160,6 @@ router.use('/:publisherName/*',
         // @ts-ignore
         const { publisherName } = c.req.valid("param") as { publisherName: string };
 
-        // Get publisher
         const publisher = await DB.instance()
             .select()
             .from(DB.Tables.publishers)
@@ -182,7 +182,7 @@ router.get('/:publisherName',
     APIRouteSpec.unauthenticated({
         summary: "Get publisher",
         description: "Retrieve details of a specific publisher.",
-        tags: [DOCS_TAGS.DEV_API.PUBLISHERS],
+        tags: [DOCS_TAGS.PUBLISHERS],
 
         responses: APIResponseSpec.describeBasic(
             APIResponseSpec.success("Publisher retrieved successfully", PublisherModel.GetPublisherByName.Response),
@@ -203,7 +203,7 @@ router.get('/:publisherName',
             homepage_url: publisher.homepage_url,
 
             created_at: publisher.created_at,
-        }
+        };
 
         return APIResponse.success(c, "Publisher retrieved successfully", Utils.asExact<PublisherModel.GetPublisherByName.Response>()(returnPublisher));
     }
@@ -214,8 +214,8 @@ router.put('/:publisherName',
 
     APIRouteSpec.authenticated({
         summary: "Update publisher",
-        description: "Update publisher details. Requires owner or maintainer role.",
-        tags: [DOCS_TAGS.DEV_API.PUBLISHERS],
+        description: "Update publisher details. Requires publisher.update permission.",
+        tags: [DOCS_TAGS.PUBLISHERS],
         responses: APIResponseSpec.describeWithWrongInputs(
             APIResponseSpec.successNoData("Publisher updated successfully"),
             APIResponseSpec.notFound("Publisher not found"),
@@ -223,99 +223,168 @@ router.put('/:publisherName',
         )
     }),
 
-    zValidator("param", z.object({
-        publisherName: z.string()
-    })),
-
     zValidator("json", PublisherModel.UpdatePublisher.Body),
 
     async (c) => {
         // @ts-ignore
-        const { publisherName } = c.req.valid("param") as { publisherName: string };
-        const updateData = c.req.valid("json");
+        const publisher = c.get("publisher") as DB.Models.Publisher;
         // @ts-ignore
         const authContext = c.get("authContext") as AuthHandler.AuthContext;
+        const updateData = c.req.valid("json");
 
-        // Get publisher
-        const publisher = await DB.instance()
-            .select()
-            .from(DB.Tables.publishers)
-            .where(eq(DB.Tables.publishers.name, publisherName))
-            .get();
+        const allowed = await PermissionHelper.can({
+            authContext,
+            publisherId: publisher.id,
+            permission: (p) => p.publisher.update
+        });
 
-        if (!publisher) {
-            return APIResponse.notFound(c, "Publisher not found");
+        if (!allowed) {
+            return APIResponse.forbidden(c, "You do not have permission to update this publisher");
         }
 
-        // Check visibility
-        if (publisher.visibility === 'private') {
-            const { PermissionsService } = await import("../../../../utils/services/permissions");
-            const isMember = await PermissionsService.isMember({
-                userId: authContext.user_id,
-                publisherId: publisher.id
-            });
-            if (!isMember && authContext.user_role !== 'admin') {
-                return APIResponse.forbidden(c, "You do not have access to this publisher");
-            }
-        }
+        await DB.instance()
+            .update(DB.Tables.publishers)
+            .set(updateData)
+            .where(eq(DB.Tables.publishers.id, publisher.id));
 
-        return await PublishersService.updatePublisher(c, publisher.id, updateData, authContext);
+        return APIResponse.successNoData(c, "Publisher updated successfully");
     }
 );
 
-// Delete publisher
+// Delete publisher — owner-only
 router.delete('/:publisherName',
 
     APIRouteSpec.authenticated({
         summary: "Delete publisher",
-        description: "Delete a publisher. Only owners can delete. Publisher must have no packages.",
-        tags: [DOCS_TAGS.DEV_API.PUBLISHERS],
+        description: "Delete a publisher. Only the publisher owner (or site admin) can delete, and the publisher must have no packages.",
+        tags: [DOCS_TAGS.PUBLISHERS],
         responses: APIResponseSpec.describeBasic(
             APIResponseSpec.successNoData("Publisher deleted successfully"),
             APIResponseSpec.notFound("Publisher not found"),
-            APIResponseSpec.forbidden("Only owners can delete publishers"),
+            APIResponseSpec.forbidden("Only the publisher owner can delete this publisher"),
             APIResponseSpec.badRequest("Cannot delete publisher with existing packages")
         )
     }),
 
-    zValidator("param", z.object({
-        publisherName: z.string()
-    })),
-
     async (c) => {
         // @ts-ignore
-        const { publisherName } = c.req.valid("param") as { publisherName: string };
+        const publisher = c.get("publisher") as DB.Models.Publisher;
         // @ts-ignore
         const authContext = c.get("authContext") as AuthHandler.AuthContext;
 
-        // Get publisher
-        const publisher = await DB.instance()
-            .select()
-            .from(DB.Tables.publishers)
-            .where(eq(DB.Tables.publishers.name, publisherName))
-            .get();
-
-        if (!publisher) {
-            return APIResponse.notFound(c, "Publisher not found");
+        if (authContext.type === "unauthenticated") {
+            return APIResponse.unauthorized(c, "Authentication required");
         }
 
-        // Check visibility
-        if (publisher.visibility === 'private') {
-            const { PermissionsService } = await import("../../../../utils/services/permissions");
-            const isMember = await PermissionsService.isMember({
-                userId: authContext.user_id,
-                publisherId: publisher.id
-            });
-            if (!isMember && authContext.user_role !== 'admin') {
-                return APIResponse.forbidden(c, "You do not have access to this publisher");
-            }
+        const isOwner = await PermissionHelper.isPublisherOwner({
+            userId: authContext.user_id,
+            publisherId: publisher.id
+        });
+
+        if (!isOwner && authContext.user_role !== 'admin') {
+            return APIResponse.forbidden(c, "Only the publisher owner can delete this publisher");
         }
 
-        return await PublishersService.deletePublisher(c, publisher.id, authContext);
+        const packageCount = await DB.instance()
+            .select({ id: DB.Tables.packages.id })
+            .from(DB.Tables.packages)
+            .where(eq(DB.Tables.packages.publisher_id, publisher.id))
+            .limit(1);
+
+        if (packageCount.length > 0) {
+            return APIResponse.badRequest(c, "Cannot delete publisher with existing packages");
+        }
+
+        await DB.instance().transaction(async (tx) => {
+            await tx.delete(DB.Tables.publisherMembers).where(
+                eq(DB.Tables.publisherMembers.publisher_id, publisher.id)
+            );
+            await tx.delete(DB.Tables.publishers).where(
+                eq(DB.Tables.publishers.id, publisher.id)
+            );
+        });
+
+        return APIResponse.successNoData(c, "Publisher deleted successfully");
     }
 );
 
-// Mount sub-routes
-router.route('/:publisherName/roles', rolesRouter);
-router.route('/:publisherName', groupsRouter);
+// Transfer ownership of a publisher to another user.
+router.post('/:publisherName/transfer-ownership',
+
+    APIRouteSpec.authenticated({
+        summary: "Transfer publisher ownership",
+        description: "Transfer ownership of a publisher to another user. Only the current owner (or site admin) can perform this action.",
+        tags: [DOCS_TAGS.PUBLISHERS],
+        responses: APIResponseSpec.describeWithWrongInputs(
+            APIResponseSpec.successNoData("Publisher ownership transferred successfully"),
+            APIResponseSpec.notFound("Publisher not found"),
+            APIResponseSpec.forbidden("Only the current owner can transfer ownership")
+        )
+    }),
+
+    zValidator("json", PublisherModel.TransferOwnership.Body),
+
+    async (c) => {
+        // @ts-ignore
+        const publisher = c.get("publisher") as DB.Models.Publisher;
+        // @ts-ignore
+        const authContext = c.get("authContext") as AuthHandler.AuthContext;
+        const { new_owner_user_id } = c.req.valid("json");
+
+        if (authContext.type === "unauthenticated") {
+            return APIResponse.unauthorized(c, "Authentication required");
+        }
+
+        const isOwner = await PermissionHelper.isPublisherOwner({
+            userId: authContext.user_id,
+            publisherId: publisher.id
+        });
+
+        if (!isOwner && authContext.user_role !== 'admin') {
+            return APIResponse.forbidden(c, "Only the current owner can transfer ownership");
+        }
+
+        const newOwner = await DB.instance()
+            .select({ id: DB.Tables.users.id })
+            .from(DB.Tables.users)
+            .where(eq(DB.Tables.users.id, new_owner_user_id))
+            .get();
+
+        if (!newOwner) {
+            return APIResponse.notFound(c, "New owner user not found");
+        }
+
+        await DB.instance().transaction(async (tx) => {
+            await tx.update(DB.Tables.publishers).set({
+                owner_user_id: new_owner_user_id
+            }).where(eq(DB.Tables.publishers.id, publisher.id));
+
+            const existingMembership = await tx.select()
+                .from(DB.Tables.publisherMembers)
+                .where(and(
+                    eq(DB.Tables.publisherMembers.publisher_id, publisher.id),
+                    eq(DB.Tables.publisherMembers.user_id, new_owner_user_id)
+                ))
+                .get();
+
+            if (existingMembership) {
+                await tx.update(DB.Tables.publisherMembers).set({
+                    role: PermissionHelper.OrgRoles.ADMIN,
+                    is_publicly_hidden: false
+                }).where(eq(DB.Tables.publisherMembers.id, existingMembership.id));
+            } else {
+                await tx.insert(DB.Tables.publisherMembers).values({
+                    publisher_id: publisher.id,
+                    user_id: new_owner_user_id,
+                    role: PermissionHelper.OrgRoles.ADMIN,
+                    is_publicly_hidden: false
+                });
+            }
+        });
+
+        return APIResponse.successNoData(c, "Publisher ownership transferred successfully");
+    }
+);
+
+// Mount members router
 router.route('/:publisherName', membersRouter);

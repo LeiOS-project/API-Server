@@ -1,27 +1,17 @@
-import { createInsertSchema, createSelectSchema, createUpdateSchema } from "drizzle-zod";
+import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { DB } from "../../../db";
 import z from "zod";
 import { ApiHelperModels } from "./api-helper-models";
+import { PermissionHelper } from "../../../utils/permission-helper";
 
 export namespace PackageModel {
 
-    /**
-     * Package naming convention:
-     * - publisher.pkgname (for publisher-level packages)
-     * - publisher.group.pkgname (for group packages)
-     * - publisher.subgroup1.subgroup2.pkgname (for nested groups)
-     * 
-     * Validation rules:
-     * - Must follow the hierarchical pattern
-     * - Each component must be lowercase alphanumeric with hyphens
-     * - Package short name cannot be a forbidden name
-     */
     export const PackageNameSchema = z.string()
-        .min(3, "Package names must be at least 3 characters long.")
-        .max(200, "Package names cannot exceed 200 characters.")
+        .min(2, "Package short names must be at least 2 characters long.")
+        .max(200, "Package short names cannot exceed 200 characters.")
         .regex(
-            /^[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)+$/,
-            "Package name must follow pattern: pkgname or group.pkgname"
+            /^[a-z0-9][a-z0-9.-]*[a-z0-9]$/,
+            "Package name must be lowercase alphanumeric (hyphens and dots allowed) and start/end with a letter or number."
         );
 
 
@@ -37,6 +27,11 @@ export namespace PackageModel {
     }, { message: "Duplicate flags are not allowed." });
 
     export type PackageFlags = z.infer<typeof PackageFlags>;
+
+    export const Param = z.object({
+        publisherName: z.string(),
+        packageName: z.string()
+    });
 
 }
 
@@ -56,7 +51,6 @@ export namespace PackageModel.GetPackageByFullName {
         })
 
     }).extend({
-        // somehow zod didn't infer the type of fullname correctly, so we need to add it manually
         fullname: z.string()
     });
 
@@ -79,8 +73,7 @@ export namespace PackageModel.GetAll {
         (data) => !(data.publisherID !== undefined && data.publisherName !== undefined),
         {
             message: "You can provide either 'publisherID' or 'publisherName', but not both.",
-            // Optional: attach the error specifically to these fields so frontend forms can display it easily
-            path: ["publisherName"], 
+            path: ["publisherName"],
         }
     );
 
@@ -123,6 +116,41 @@ export namespace PackageModel.UpdatePackage {
         (data) => Object.values(data).some((value) => value !== undefined),
         { message: "At least one field must be provided" }
     );
+
+    export type Body = z.infer<typeof Body>;
+
+}
+
+export namespace PackageModel.RoleAssignment {
+
+    export const Entity = createSelectSchema(DB.Tables.roleAssignments);
+    export type Entity = z.infer<typeof Entity>;
+
+}
+
+export namespace PackageModel.ListRoleAssignments {
+
+    export const Response = z.array(PackageModel.RoleAssignment.Entity);
+    export type Response = z.infer<typeof Response>;
+
+}
+
+export namespace PackageModel.CreateRoleAssignment {
+
+    export const Body = z.object({
+        user_id: z.number().int().positive(),
+        role: z.enum(PermissionHelper.OrgRolesAsTuple)
+    });
+
+    export type Body = z.infer<typeof Body>;
+
+}
+
+export namespace PackageModel.UpdateRoleAssignment {
+
+    export const Body = z.object({
+        role: z.enum(PermissionHelper.OrgRolesAsTuple)
+    });
 
     export type Body = z.infer<typeof Body>;
 

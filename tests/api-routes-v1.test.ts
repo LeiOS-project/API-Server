@@ -8,7 +8,7 @@ import { eq } from "drizzle-orm";
 import { AuthModel } from "../src/api/versions/v1/routes/auth/model";
 import { makeAPIRequest } from "./helpers/api";
 import { AccountModel } from "../src/api/versions/v1/routes/account/model";
-import { PublicPackagesModel } from "../src/api/versions/v1/routes/public/packages/model";
+import { PackageModel } from "../src/api/utils/shared-models/package";
 
 // type Arch = AptlyAPI.Utils.Architectures;
 
@@ -113,19 +113,11 @@ describe("Auth routes and access checks", async () => {
 
     });
     
-    test("GET /dev as admin succeeds", async () => {
+    test("GET /admin/users as non-admin fails", async () => {
 
-        await makeAPIRequest("/v1/dev", {
+        await makeAPIRequest("/v1/admin/users", {
             authToken: session_token,
-        }, 401);
-
-    });
-
-    test("GET /admin as non-admin fails", async () => {
-
-        await makeAPIRequest("/v1/admin", {
-            authToken: session_token,
-        }, 401);
+        }, 403);
 
     });
 
@@ -240,14 +232,14 @@ describe("Account routes", async () => {
         session_token = data.token;
     });
 
-    test("DELETE /account prevents removal while packages exist", async () => {
-        
-        const tempPkg = await DB.instance().insert(DB.Tables.packages).values({
-            name: "temp-package",
-            owner_user_id: testUser.id,
-            description: "Temporary package",
+    test("DELETE /account prevents removal while publishers are owned", async () => {
+
+        const tempPublisher = await DB.instance().insert(DB.Tables.publishers).values({
+            name: "temp-account-pub",
+            display_name: "Temp Publisher",
+            description: "Temporary publisher",
             homepage_url: "https://temp.example.com",
-            requires_patching: false
+            owner_user_id: testUser.id
         }).returning().get();
 
         await makeAPIRequest("/v1/account", {
@@ -258,8 +250,8 @@ describe("Account routes", async () => {
         const dbresult = DB.instance().select().from(DB.Tables.users).where(eq(DB.Tables.users.id, testUser.id)).get();
         expect(dbresult).toBeDefined();
 
-        // Cleanup
-        await DB.instance().delete(DB.Tables.packages).where(eq(DB.Tables.packages.id, tempPkg.id));
+        // Cleanup — blow away the publisher so the next test can delete the user.
+        await DB.instance().delete(DB.Tables.publishers).where(eq(DB.Tables.publishers.id, tempPublisher.id));
     });
 
     test("DELETE /account removes user without packages", async () => {
@@ -277,13 +269,22 @@ describe("Account routes", async () => {
     });
 });
 
-describe("Public package routes", () => {
+describe("Package list route", () => {
 
-    test("GET /public/packages lists public packages", async () => {
+    test("GET /packages lists packages", async () => {
+
+        const tempPublisher = await DB.instance().insert(DB.Tables.publishers).values({
+            name: "public-pub",
+            display_name: "Public Publisher",
+            description: "Publisher for public package test",
+            homepage_url: "https://public.example.com",
+            owner_user_id: testDeveloper.id
+        }).returning().get();
 
         const tempPkg = await DB.instance().insert(DB.Tables.packages).values({
+            publisher_id: tempPublisher.id,
             name: "public-package",
-            owner_user_id: testDeveloper.id,
+            display_name: "Public Package",
             description: "Public package",
             homepage_url: "https://public.example.com",
             requires_patching: false
@@ -291,7 +292,7 @@ describe("Public package routes", () => {
 
         const tempRelease = await DB.instance().insert(DB.Tables.packageReleases).values({
             package_id: tempPkg.id,
-            versionWithLeiosPatch: "1.0.0",
+            version_with_leios_patch: "1.0.0",
             changelog: "Initial release",
             architectures: {
                 amd64: true,
@@ -300,28 +301,21 @@ describe("Public package routes", () => {
             }
         }).returning().get();
 
-        // const listRes = await API.getApp().request("/public/packages");
-        // expect(listRes.status).toBe(200);
-        // const listBody = await listRes.json();
-        // expect(listBody.data.some((pkg: any) => pkg.id === tempPkg.id)).toBe(true);
-
-        const data = await makeAPIRequest("/v1/public/packages", {
-            expectedBodySchema: PublicPackagesModel.GetAll.Response
+        const data = await makeAPIRequest(`/v1/packages?publisherID=${tempPublisher.id}`, {
+            expectedBodySchema: PackageModel.GetAll.Response
         });
 
         expect(data.length).toBe(1);
 
-        const pkg = data[0];
-        expect(pkg).toBeDefined();
-        if (!pkg) return;
-
+        const pkg = data[0]!;
         expect(pkg.id).toBe(tempPkg.id);
         expect(pkg.name).toBe(tempPkg.name);
+        expect(pkg.fullname).toBe(`${tempPublisher.name}.${tempPkg.name}`);
 
         // Cleanup
         await DB.instance().delete(DB.Tables.packageReleases).where(eq(DB.Tables.packageReleases.id, tempRelease.id));
         await DB.instance().delete(DB.Tables.packages).where(eq(DB.Tables.packages.id, tempPkg.id));
-
+        await DB.instance().delete(DB.Tables.publishers).where(eq(DB.Tables.publishers.id, tempPublisher.id));
     });
 });
 

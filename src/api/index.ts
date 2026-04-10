@@ -4,7 +4,6 @@ import { prettyJSON } from "hono/pretty-json";
 import { cors } from "hono/cors";
 import { HTTPException } from 'hono/http-exception'
 import type { APIVersionRouter } from "./utils/apiVersionRouter";
-import { APIv0Router } from "./versions/v0";
 import { APIv1Router } from "./versions/v1";
 import { openAPIRouteHandler } from "hono-openapi";
 import { Scalar } from "@scalar/hono-api-reference";
@@ -81,7 +80,6 @@ export class API {
 		});
 
 
-		this.registerVersion(new APIv0Router, disableDocs);
 		this.registerVersion(new APIv1Router, disableDocs);
 
 

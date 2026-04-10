@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { AccountModel } from './model'
 import { validator } from "hono-openapi";
 import { DB } from "../../../../../db";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { APIResponse } from "../../../../utils/api-res";
 import { APIResponseSpec, APIRouteSpec } from "../../../../utils/specHelpers";
 import { AuthHandler, SessionHandler } from "../../../../utils/authHandler";
@@ -153,26 +153,15 @@ router.delete('/',
         // @ts-ignore
         const authContext = c.get("authContext") as AuthHandler.SessionAuthContext;
 
-        // Check if user is the only owner of any publishers
-        const ownerships = await DB.instance().select().from(DB.Tables.publisherMembers).where(
-            and(
-                eq(DB.Tables.publisherMembers.user_id, authContext.user_id),
-                eq(DB.Tables.publisherMembers.role, 'owner')
-            )
-        );
+        // Block deletion while the user owns any publishers — they must transfer or delete them first.
+        const ownedPublishers = await DB.instance()
+            .select({ id: DB.Tables.publishers.id })
+            .from(DB.Tables.publishers)
+            .where(eq(DB.Tables.publishers.owner_user_id, authContext.user_id))
+            .limit(1);
 
-        for (const ownership of ownerships) {
-            // Count other owners in this publisher
-            const ownerCount = await DB.instance().select().from(DB.Tables.publisherMembers).where(
-                and(
-                    eq(DB.Tables.publisherMembers.publisher_id, ownership.publisher_id),
-                    eq(DB.Tables.publisherMembers.role, 'owner')
-                )
-            ).all();
-
-            if (ownerCount.length <= 1) {
-                return APIResponse.badRequest(c, "You are the sole owner of one or more publishers. Transfer ownership or delete them before deleting your account.");
-            }
+        if (ownedPublishers.length > 0) {
+            return APIResponse.badRequest(c, "You are the owner of one or more publishers. Transfer ownership or delete them before deleting your account.");
         }
 
         // invalidate all sessions for the user

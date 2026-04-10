@@ -1,4 +1,4 @@
-import { createInsertSchema, createSelectSchema, createUpdateSchema } from "drizzle-zod";
+import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { DB } from "../../../../../../db";
 import { z } from "zod";
 import { type TuplifyUnion, TaskHandler } from "@cleverjs/utils";

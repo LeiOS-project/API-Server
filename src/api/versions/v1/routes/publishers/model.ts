@@ -2,6 +2,7 @@ import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { DB } from "../../../../../db";
 import z from "zod";
 import { ApiHelperModels } from "../../../../utils/shared-models/api-helper-models";
+import { PermissionHelper } from "../../../../../utils/permission-helper";
 
 export namespace PublisherModel {
 
@@ -62,6 +63,8 @@ export namespace PublisherModel {
         .refine((name) => !ForbiddenPublisherNames.includes(name), {
             message: "This publisher name is reserved and cannot be used."
         });
+
+    export const OrgRoleSchema = z.enum(PermissionHelper.OrgRolesAsTuple);
 }
 
 
@@ -129,8 +132,48 @@ export namespace PublisherModel.UpdatePublisher {
 export namespace PublisherModel.TransferOwnership {
 
     export const Body = z.object({
-        new_owner_user_id: z.number()
+        new_owner_user_id: z.number().int().positive()
     });
+
+    export type Body = z.infer<typeof Body>;
+
+}
+
+export namespace PublisherModel.Member {
+
+    export const Entity = createSelectSchema(DB.Tables.publisherMembers);
+    export type Entity = z.infer<typeof Entity>;
+
+}
+
+export namespace PublisherModel.ListMembers {
+
+    export const Response = z.array(PublisherModel.Member.Entity);
+    export type Response = z.infer<typeof Response>;
+
+}
+
+export namespace PublisherModel.AddMember {
+
+    export const Body = z.object({
+        user_id: z.number().int().positive(),
+        role: PublisherModel.OrgRoleSchema,
+        is_publicly_hidden: z.boolean().optional().default(false)
+    });
+
+    export type Body = z.infer<typeof Body>;
+
+}
+
+export namespace PublisherModel.UpdateMember {
+
+    export const Body = z.object({
+        role: PublisherModel.OrgRoleSchema.optional(),
+        is_publicly_hidden: z.boolean().optional()
+    }).refine(
+        (data) => Object.values(data).some((value) => value !== undefined),
+        { message: "At least one field must be provided" }
+    );
 
     export type Body = z.infer<typeof Body>;
 

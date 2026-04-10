@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import { validator as zValidator } from "hono-openapi";
-import { z } from "zod";
 import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers";
 import { DOCS_TAGS } from "../../../docs";
 import { OSReleasesModel } from "./model";
@@ -11,7 +10,6 @@ import { TaskScheduler } from "../../../../../../tasks";
 import { RuntimeMetadata } from "../../../../../utils/metadata";
 import { OSReleaseUtils } from "../../../../../utils/os-release-utils";
 import { ApiHelperModels } from "../../../../../utils/shared-models/api-helper-models";
-import { TaskHandler } from "@cleverjs/utils";
 import { TaskUtils } from "../../../../../../tasks/utils";
 
 export const router = new Hono().basePath('/os-releases');
@@ -21,7 +19,7 @@ router.get('/',
 	APIRouteSpec.authenticated({
 		summary: "List OS releases",
 		description: "Retrieve all OS releases.",
-		tags: [DOCS_TAGS.ADMIN_API.OS_RELEASES],
+		tags: [DOCS_TAGS.ADMIN_OS_RELEASES],
 
 		responses: APIResponseSpec.describeBasic(
 			APIResponseSpec.success("OS releases retrieved", OSReleasesModel.GetAll.Response)
@@ -64,7 +62,7 @@ router.post('/',
 	APIRouteSpec.authenticated({
 		summary: "Create OS release (async)",
 		description: "Enqueue creation of an OS release and publishing to the live repo.",
-		tags: [DOCS_TAGS.ADMIN_API.OS_RELEASES],
+		tags: [DOCS_TAGS.ADMIN_OS_RELEASES],
 
 		responses: APIResponseSpec.describeBasic(
 			APIResponseSpec.accepted("OS release creation task enqueued", OSReleasesModel.CreateRelease.Response)
@@ -76,10 +74,9 @@ router.post('/',
 	async (c) => {
 
 		const newReleaseData = c.req.valid('json');
-		
+
 		let lastReleaseVersion = DB.instance().select().from(DB.Tables.os_releases).orderBy(desc(DB.Tables.os_releases.created_at)).limit(1).get()?.version;
 		if (!lastReleaseVersion) {
-			// check if any releases exist at all
 			const anyRelease = DB.instance().select().from(DB.Tables.os_releases).limit(1).get();
 			if (!anyRelease) {
 				lastReleaseVersion = "0000.00.000";
@@ -115,9 +112,9 @@ router.post('/',
 );
 
 router.use('/:version/*',
-	
+
 	zValidator('param', OSReleasesModel.Param),
-	
+
 	async (c, next) => {
 		// @ts-ignore
 		const { version } = c.req.valid("param") as { version: string };
@@ -142,7 +139,7 @@ router.get('/:version',
 	APIRouteSpec.authenticated({
 		summary: "Get OS release",
 		description: "Retrieve a specific OS release by version.",
-		tags: [DOCS_TAGS.ADMIN_API.OS_RELEASES],
+		tags: [DOCS_TAGS.ADMIN_OS_RELEASES],
 
 		responses: APIResponseSpec.describeBasic(
 			APIResponseSpec.success("OS release retrieved", OSReleasesModel.GetByVersion.Response),
@@ -177,7 +174,7 @@ router.get('/:version/publishing-logs',
 	APIRouteSpec.authenticated({
 		summary: "Get OS release publishing logs",
 		description: "Retrieve publishing logs of a specific OS release by version.",
-		tags: [DOCS_TAGS.ADMIN_API.OS_RELEASES],
+		tags: [DOCS_TAGS.ADMIN_OS_RELEASES],
 
 		responses: APIResponseSpec.describeBasic(
 			APIResponseSpec.success("Publishing logs retrieved", OSReleasesModel.GetPublishingLogs.Response),
@@ -204,7 +201,7 @@ router.put('/:version',
 	APIRouteSpec.authenticated({
 		summary: "Update OS release",
 		description: "Update details of a specific OS release by version.",
-		tags: [DOCS_TAGS.ADMIN_API.OS_RELEASES],
+		tags: [DOCS_TAGS.ADMIN_OS_RELEASES],
 
 		responses: APIResponseSpec.describeWithWrongInputs(
 			APIResponseSpec.successNoData("OS release updated successfully"),

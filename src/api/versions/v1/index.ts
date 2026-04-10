@@ -14,7 +14,7 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
         info: {
             title: "LeiOS API",
             version: "1.1.0",
-            description: "API for LeiOS Developers and Admins",
+            description: "Unified LeiOS API. Endpoints are scoped by resource and gated by per-route permission checks.",
         },
         components: {
             securitySchemes: {
@@ -32,7 +32,6 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
             },
         },
 
-        // Disable global security because Scalar could not handle multiple security schemes properly
         security: [{
             bearerAuth: []
         }],
@@ -50,42 +49,24 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
 
         "x-tagGroups": [
             {
-                name: "Public API",
+                name: "Resources",
                 tags: [
-                    "Public API / Packages",
-                    // "Public API / Packages / Releases",
-                ]
-            },
-            {
-                name: "Developer API",
-                tags: [
-                    "Developer API / Publishers",
-                    "Developer API / Publishers / Groups",
-                    "Developer API / Publishers / Members",
-                    "Developer API / Publishers / Packages",
-
-                    "Developer API / Packages",
-                    "Developer API / Packages / Releases",
-                    "Developer API / Packages / Stable Promotion Requests",
-
-                    "Developer API / Tasks",
+                    "Publishers",
+                    "Publishers / Members",
+                    "Packages",
+                    "Packages / Releases",
+                    "Packages / Stable Promotion Requests",
+                    "Packages / Role Assignments",
                 ],
             },
             {
-                name: "Admin API",
+                name: "Admin",
                 tags: [
-                    "Admin API / Users",
-
-                    "Admin API / Packages",
-                    "Admin API / Packages / Releases",
-                    "Admin API / Packages / Stable Promotion Requests",
-
-                    "Admin API / Stable Promotion Requests",
-
-                    "Admin API / OS Releases",
-
-                    "Admin API / Tasks",
-                ]
+                    "Admin / Users",
+                    "Admin / OS Releases",
+                    "Admin / Tasks",
+                    "Admin / Stable Promotion Requests",
+                ],
             },
             {
                 name: "Account & Authentication",
@@ -93,168 +74,83 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
                     "Account",
                     "Account / API Keys",
                     "Authentication",
-                ]
-            }
+                ],
+            },
         ],
 
         tags: [
-            // {
-            //     name: "Public API",
-            //     description: "Endpoints that do not require authentication",
-            // },
             {
-                name: "Public API / Packages",
-                // @ts-ignore
-                "x-displayName": "Packages",
-                summary: "Packages",
-                parent: "Public API",
-                description: "Endpoints for public package access",
-            },
-            // {
-            //     name: "Public API / Packages / Releases",
-            //     // @ts-ignore
-            //     "x-displayName": "Package Releases",
-            //     summary: "Packages Releases",
-            //     parent: "Public API / Packages",
-            //     description: "Endpoints for public package releases",
-            // },
-
-            // {
-            //     name: "Developer API",
-            //     description: "Endpoints for authenticated developers",
-            // },
-            {
-                name: "Developer API / Publishers",
-                // @ts-ignore
-                "x-displayName": "Publishers",
-                summary: "Publishers",
-                parent: "Developer API",
-                description: "Endpoints for managing publishers (organizations/groups)",
+                name: "Publishers",
+                description: "Manage publishers (organizations) and their members.",
             },
             {
-                name: "Developer API / Publishers / Groups",
-                // @ts-ignore
-                "x-displayName": "Groups",
-                summary: "Groups",
-                parent: "Developer API / Publishers",
-                description: "Endpoints for managing publisher subgroups",
-            },
-            {
-                name: "Developer API / Publishers / Members",
+                name: "Publishers / Members",
                 // @ts-ignore
                 "x-displayName": "Members",
                 summary: "Members",
-                parent: "Developer API / Publishers",
-                description: "Endpoints for managing publisher members and permissions",
+                parent: "Publishers",
+                description: "Manage members of a publisher.",
             },
             {
-                name: "Developer API / Publishers / Packages",
-                // @ts-ignore
-                "x-displayName": "Packages",
-                summary: "Packages",
-                parent: "Developer API / Publishers",
-                description: "Endpoints for managing packages within publishers",
-            },
-
-            {
-                name: "Developer API / Packages",
-                // @ts-ignore
-                "x-displayName": "Packages",
-                summary: "Packages",
-                parent: "Developer API",
-                description: "Endpoints for developer package management",
+                name: "Packages",
+                description: "Manage packages owned by publishers.",
             },
             {
-                name: "Developer API / Packages / Releases",
+                name: "Packages / Releases",
                 // @ts-ignore
-                "x-displayName": "Package Releases",
+                "x-displayName": "Releases",
                 summary: "Releases",
-                parent: "Developer API / Packages",
-                description: "Endpoints for developer package releases",
+                parent: "Packages",
+                description: "Manage package releases.",
             },
             {
-                name: "Developer API / Packages / Stable Promotion Requests",
-                // @ts-ignore
-                "x-displayName": "Package Stable Promotion Requests",
-                summary: "Stable Promotion Requests",
-                parent: "Developer API / Packages",
-                description: "Endpoints for managing stable promotion requests",
-            },
-
-            {
-                name: "Developer API / Tasks",
-                // @ts-ignore
-                "x-displayName": "Tasks",
-                summary: "Tasks",
-                parent: "Developer API",
-                description: "Endpoints for managing scheduled tasks",
-            },
-
-            // {
-            //     name: "Admin API",
-            //     description: "Endpoints for administrators",
-            // },
-            {
-                name: "Admin API / Users",
-                // @ts-ignore
-                "x-displayName": "Users",
-                summary: "Users",
-                parent: "Admin API",
-                description: "Endpoints for user management",
-            },
-
-            {
-                name: "Admin API / Packages",
-                // @ts-ignore
-                "x-displayName": "Packages",
-                summary: "Packages",
-                parent: "Admin API",
-                description: "Endpoints for admin package management",
-            },
-            {
-                name: "Admin API / Packages / Releases",
-                // @ts-ignore
-                "x-displayName": "Package Releases",
-                summary: "Releases",
-                parent: "Admin API / Packages",
-                description: "Endpoints for admin package releases",
-            },
-            {
-                name: "Admin API / Packages / Stable Promotion Requests",
-                // @ts-ignore
-                "x-displayName": "Package Stable Promotion Requests",
-                summary: "Stable Promotion Requests",
-                parent: "Admin API / Packages",
-                description: "Endpoints for managing stable promotion requests",
-            },
-
-            {
-                name: "Admin API / Stable Promotion Requests",
+                name: "Packages / Stable Promotion Requests",
                 // @ts-ignore
                 "x-displayName": "Stable Promotion Requests",
                 summary: "Stable Promotion Requests",
-                parent: "Admin API",
-                description: "Endpoints for managing stable promotion requests",
+                parent: "Packages",
+                description: "Request promotion of package releases to stable.",
             },
-
             {
-                name: "Admin API / OS Releases",
+                name: "Packages / Role Assignments",
+                // @ts-ignore
+                "x-displayName": "Role Assignments",
+                summary: "Role Assignments",
+                parent: "Packages",
+                description: "Per-package role overrides that elevate a user above their publisher-level role.",
+            },
+            {
+                name: "Admin / Users",
+                // @ts-ignore
+                "x-displayName": "Users",
+                summary: "Users",
+                parent: "Admin",
+                description: "Site-admin user management.",
+            },
+            {
+                name: "Admin / OS Releases",
                 // @ts-ignore
                 "x-displayName": "OS Releases",
                 summary: "OS Releases",
-                parent: "Admin API",
-                description: "Endpoints for managing OS releases",
+                parent: "Admin",
+                description: "Site-admin OS release management.",
             },
-            
             {
-                name: "Admin API / Tasks",
+                name: "Admin / Tasks",
                 // @ts-ignore
                 "x-displayName": "Tasks",
                 summary: "Tasks",
-                parent: "Admin API",
-                description: "Endpoints for managing scheduled tasks",
+                parent: "Admin",
+                description: "Site-admin scheduled task management.",
             },
-
+            {
+                name: "Admin / Stable Promotion Requests",
+                // @ts-ignore
+                "x-displayName": "Stable Promotion Requests",
+                summary: "Stable Promotion Requests",
+                parent: "Admin",
+                description: "Site-admin global stable promotion request decisions.",
+            },
             {
                 name: "Account",
                 description: "Endpoints for user account management",
@@ -267,14 +163,13 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
                 parent: "Account",
                 description: "Endpoints for managing account API keys",
             },
-
             {
                 name: "Authentication",
                 description: "Endpoints for authentication and authorization",
             }
         ]
     }
-}
+};
 
 const router = new Hono();
 

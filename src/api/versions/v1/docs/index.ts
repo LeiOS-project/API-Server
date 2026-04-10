@@ -1,42 +1,21 @@
 
 export const DOCS_TAGS = {
-    PUBLIC_API: {
-        BASE: "Public API",
-        PACKAGES: "Public API / Packages",
-        PACKAGES_RELEASES: "Public API / Packages / Releases",
-    },
-    DEV_API: {
-        BASE: "Developer API",
-        PUBLISHERS: "Developer API / Publishers",
-        PUBLISHERS_GROUPS: "Developer API / Publishers / Groups",
-        PUBLISHERS_MEMBERS: "Developer API / Publishers / Members",
-        PUBLISHERS_ROLES: "Developer API / Publishers / Roles",
-        PUBLISHERS_PACKAGES: "Developer API / Publishers / Packages",
 
-        PACKAGES: "Developer API / Packages",
-        PACKAGES_RELEASES: "Developer API / Packages / Releases",
-        PACKAGES_STABLE_REQUESTS: "Developer API / Packages / Stable Promotion Requests",
+    PUBLISHERS: "Publishers",
+    PUBLISHERS_MEMBERS: "Publishers / Members",
 
-        TASKS: "Developer API / Tasks",
-    },
-    ADMIN_API: {
-        BASE: "Admin API",
-        PUBLISHERS: "Admin API / Publishers",
+    PACKAGES: "Packages",
+    PACKAGES_RELEASES: "Packages / Releases",
+    PACKAGES_STABLE_REQUESTS: "Packages / Stable Promotion Requests",
+    PACKAGES_ROLE_ASSIGNMENTS: "Packages / Role Assignments",
 
-        PACKAGES: "Admin API / Packages",
-        PACKAGES_RELEASES: "Admin API / Packages / Releases",
-        PACKAGES_STABLE_REQUESTS: "Admin API / Packages / Stable Promotion Requests",
-
-        USERS: "Admin API / Users",
-        STABLE_PROMOTION_REQUESTS: "Admin API / Stable Promotion Requests",
-
-        OS_RELEASES: "Admin API / OS Releases",
-
-        TASKS: "Admin API / Tasks",
-    },
+    ADMIN_USERS: "Admin / Users",
+    ADMIN_OS_RELEASES: "Admin / OS Releases",
+    ADMIN_TASKS: "Admin / Tasks",
+    ADMIN_STABLE_PROMOTION_REQUESTS: "Admin / Stable Promotion Requests",
 
     ACCOUNT: "Account",
     ACCOUNT_API_KEYS: "Account / API Keys",
 
     AUTHENTICATION: "Authentication",
-}
+};

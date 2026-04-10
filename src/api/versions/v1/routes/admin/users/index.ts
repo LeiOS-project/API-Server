@@ -4,13 +4,13 @@ import { and, eq, like, or } from "drizzle-orm";
 import { DB } from "../../../../../../db";
 import { APIResponse } from "../../../../../utils/api-res";
 import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers";
-import { AdminUsersModel } from "./model";
+import { UsersModel } from "./model";
 import { AuthHandler, SessionHandler } from "../../../../../utils/authHandler";
 import { DOCS_TAGS } from "../../../docs";
 
-const TARGET_USER_KEY = "adminTargetUser";
+const TARGET_USER_KEY = "targetUser";
 
-const sanitizeUser = (user: DB.Models.User) => AdminUsersModel.SafeUser.parse(user);
+const sanitizeUser = (user: DB.Models.User) => UsersModel.SafeUser.parse(user);
 
 export const router = new Hono().basePath('/users');
 
@@ -19,17 +19,17 @@ router.get('/',
     APIRouteSpec.authenticated({
         summary: "List users",
         description: "Retrieve LeiOS accounts with optional role and search filters.",
-        tags: [DOCS_TAGS.ADMIN_API.USERS],
+        tags: [DOCS_TAGS.ADMIN_USERS],
 
         responses: APIResponseSpec.describeBasic(
-            APIResponseSpec.success("Users retrieved successfully", AdminUsersModel.GetAll.Response)
+            APIResponseSpec.success("Users retrieved successfully", UsersModel.GetAll.Response)
         )
     }),
 
-    zValidator("query", AdminUsersModel.GetAll.Query),
+    zValidator("query", UsersModel.GetAll.Query),
 
     async (c) => {
-        const filters = c.req.valid("query") as AdminUsersModel.GetAll.Query;
+        const filters = c.req.valid("query") as UsersModel.GetAll.Query;
 
         let predicate: ReturnType<typeof eq> | undefined;
 
@@ -73,20 +73,20 @@ router.post('/',
     APIRouteSpec.authenticated({
         summary: "Create user",
         description: "Provision a new LeiOS account with the desired role.",
-        tags: [DOCS_TAGS.ADMIN_API.USERS],
+        tags: [DOCS_TAGS.ADMIN_USERS],
 
         responses: APIResponseSpec.describeWithWrongInputs(
-            APIResponseSpec.created("User created successfully", AdminUsersModel.Create.Response),
+            APIResponseSpec.created("User created successfully", UsersModel.Create.Response),
             APIResponseSpec.conflict("Conflict: Username or email already exists")
         )
     }),
 
-    zValidator("json", AdminUsersModel.Create.Body),
+    zValidator("json", UsersModel.Create.Body),
 
     async (c) => {
-        const body = c.req.valid("json") as AdminUsersModel.Create.Body;
+        const body = c.req.valid("json") as UsersModel.Create.Body;
 
-        const duplicate = DB.instance().select().from(DB.Tables.users).where(
+        const duplicate = await DB.instance().select().from(DB.Tables.users).where(
             or(
                 eq(DB.Tables.users.username, body.username),
                 eq(DB.Tables.users.email, body.email)
@@ -99,7 +99,7 @@ router.post('/',
 
         const { password, ...userData } = body;
 
-        const createdUser = DB.instance().insert(DB.Tables.users).values({
+        const createdUser = await DB.instance().insert(DB.Tables.users).values({
             ...userData,
             password_hash: await Bun.password.hash(password)
         }).returning().get();
@@ -110,13 +110,13 @@ router.post('/',
 
 router.use('/:userId/*',
 
-    zValidator("param", AdminUsersModel.UserId.Params),
+    zValidator("param", UsersModel.UserId.Params),
 
     async (c, next) => {
-        // @ts-ignore - hono-openapi does not type "param" yet
-        const { userId } = c.req.valid("param") as AdminUsersModel.UserId.Params;
+        // @ts-ignore
+        const { userId } = c.req.valid("param") as UsersModel.UserId.Params;
 
-        const user = DB.instance().select().from(DB.Tables.users).where(
+        const user = await DB.instance().select().from(DB.Tables.users).where(
             eq(DB.Tables.users.id, userId)
         ).get();
 
@@ -136,10 +136,10 @@ router.get('/:userId',
     APIRouteSpec.authenticated({
         summary: "Get user",
         description: "Retrieve details for a specific LeiOS account.",
-        tags: [DOCS_TAGS.ADMIN_API.USERS],
+        tags: [DOCS_TAGS.ADMIN_USERS],
 
         responses: APIResponseSpec.describeBasic(
-            APIResponseSpec.success("User retrieved successfully", AdminUsersModel.Create.Response),
+            APIResponseSpec.success("User retrieved successfully", UsersModel.Create.Response),
             APIResponseSpec.notFound("User not found")
         )
     }),
@@ -156,32 +156,32 @@ router.put('/:userId',
     APIRouteSpec.authenticated({
         summary: "Update user",
         description: "Modify profile fields or role for a LeiOS account.",
-        tags: [DOCS_TAGS.ADMIN_API.USERS],
+        tags: [DOCS_TAGS.ADMIN_USERS],
 
         responses: APIResponseSpec.describeWithWrongInputs(
-            APIResponseSpec.success("User updated successfully", AdminUsersModel.Create.Response),
+            APIResponseSpec.success("User updated successfully", UsersModel.Create.Response),
             APIResponseSpec.notFound("User not found"),
             APIResponseSpec.conflict("Conflict: Username or email already exists")
         )
     }),
 
-    zValidator("json", AdminUsersModel.Update.Body),
+    zValidator("json", UsersModel.Update.Body),
 
     async (c) => {
         // @ts-ignore
         const user = c.get(TARGET_USER_KEY) as DB.Models.User;
-        const updateBody = c.req.valid("json") as AdminUsersModel.Update.Body;
+        const updateBody = c.req.valid("json") as UsersModel.Update.Body;
 
         const updates = Object.fromEntries(
             Object.entries(updateBody).filter(([, value]) => value !== undefined)
-        ) as Partial<AdminUsersModel.Update.Body>;
+        ) as Partial<UsersModel.Update.Body>;
 
         if (Object.keys(updates).length === 0) {
             return APIResponse.badRequest(c, "Provide at least one field to update");
         }
 
         if (updates.username && updates.username !== user.username) {
-            const usernameConflict = DB.instance().select().from(DB.Tables.users).where(
+            const usernameConflict = await DB.instance().select().from(DB.Tables.users).where(
                 eq(DB.Tables.users.username, updates.username)
             ).get();
 
@@ -191,7 +191,7 @@ router.put('/:userId',
         }
 
         if (updates.email && updates.email !== user.email) {
-            const emailConflict = DB.instance().select().from(DB.Tables.users).where(
+            const emailConflict = await DB.instance().select().from(DB.Tables.users).where(
                 eq(DB.Tables.users.email, updates.email)
             ).get();
 
@@ -210,7 +210,7 @@ router.put('/:userId',
             await AuthHandler.changeUserRoleInAuthContexts(user.id, updates.role);
         }
 
-        const refreshed = DB.instance().select().from(DB.Tables.users).where(
+        const refreshed = await DB.instance().select().from(DB.Tables.users).where(
             eq(DB.Tables.users.id, user.id)
         ).get();
 
@@ -227,7 +227,7 @@ router.put('/:userId/password',
     APIRouteSpec.authenticated({
         summary: "Reset user password",
         description: "Set a new password for a LeiOS account and revoke active sessions.",
-        tags: [DOCS_TAGS.ADMIN_API.USERS],
+        tags: [DOCS_TAGS.ADMIN_USERS],
 
         responses: APIResponseSpec.describeWithWrongInputs(
             APIResponseSpec.successNoData("Password reset successfully"),
@@ -235,12 +235,12 @@ router.put('/:userId/password',
         )
     }),
 
-    zValidator("json", AdminUsersModel.UpdatePassword.Body),
+    zValidator("json", UsersModel.UpdatePassword.Body),
 
     async (c) => {
         // @ts-ignore
         const user = c.get(TARGET_USER_KEY) as DB.Models.User;
-        const { password } = c.req.valid("json") as AdminUsersModel.UpdatePassword.Body;
+        const { password } = c.req.valid("json") as UsersModel.UpdatePassword.Body;
 
         const passwordHash = await Bun.password.hash(password);
 
@@ -260,13 +260,13 @@ router.delete('/:userId',
 
     APIRouteSpec.authenticated({
         summary: "Delete user",
-        description: "Permanently remove a LeiOS account after verifying it has no owned packages.",
-        tags: [DOCS_TAGS.ADMIN_API.USERS],
+        description: "Permanently remove a LeiOS account after verifying the user does not own any publishers.",
+        tags: [DOCS_TAGS.ADMIN_USERS],
 
         responses: APIResponseSpec.describeBasic(
             APIResponseSpec.successNoData("User deleted successfully"),
             APIResponseSpec.notFound("User not found"),
-            APIResponseSpec.badRequest("Cannot delete user while packages are assigned")
+            APIResponseSpec.badRequest("Cannot delete user while they own publishers")
         )
     }),
 
@@ -274,31 +274,16 @@ router.delete('/:userId',
         // @ts-ignore
         const user = c.get(TARGET_USER_KEY) as DB.Models.User;
 
-        // Check if user is the only owner of any publishers
-        const ownerships = await DB.instance().select().from(DB.Tables.publisherMembers).where(
-            and(
-                eq(DB.Tables.publisherMembers.user_id, user.id),
-                eq(DB.Tables.publisherMembers.role, 'owner')
-            )
-        );
+        const ownedPublishers = await DB.instance()
+            .select({ id: DB.Tables.publishers.id, name: DB.Tables.publishers.name })
+            .from(DB.Tables.publishers)
+            .where(eq(DB.Tables.publishers.owner_user_id, user.id));
 
-        for (const ownership of ownerships) {
-            // Count other owners in this publisher
-            const ownerCount = await DB.instance().select().from(DB.Tables.publisherMembers).where(
-                and(
-                    eq(DB.Tables.publisherMembers.publisher_id, ownership.publisher_id),
-                    eq(DB.Tables.publisherMembers.role, 'owner')
-                )
-            ).all();
-
-            if (ownerCount.length <= 1) {
-                // Get publisher name for better error message
-                const publisher = await DB.instance().select().from(DB.Tables.publishers).where(
-                    eq(DB.Tables.publishers.id, ownership.publisher_id)
-                ).get();
-                
-                return APIResponse.badRequest(c, `User is the sole owner of publisher '${publisher?.name}'. Transfer ownership or delete the publisher first.`);
-            }
+        if (ownedPublishers.length > 0) {
+            return APIResponse.badRequest(
+                c,
+                `User owns ${ownedPublishers.length} publisher(s) (e.g. '${ownedPublishers[0]!.name}'). Transfer ownership or delete them first.`
+            );
         }
 
         await AuthHandler.invalidateAllAuthContextsForUser(user.id);

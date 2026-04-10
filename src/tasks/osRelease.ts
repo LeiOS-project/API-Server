@@ -64,7 +64,7 @@ OsReleaseTask.addStep("Move packages from archive to local stable repo", async (
                 }
 
                 pkgName = packageData.name;
-                pkgReleaseVersion = release.versionWithLeiosPatch;
+                pkgReleaseVersion = release.version_with_leios_patch;
 
                 if (release.architectures.is_all) {
 
@@ -77,11 +77,11 @@ OsReleaseTask.addStep("Move packages from archive to local stable repo", async (
                     // delete in stable for this package first
                     await AptlyAPI.Packages.deleteInRepo("leios-stable", packageData.name);
 
-                    await AptlyAPI.Packages.copyIntoRepo("leios-stable", packageData.name, release.versionWithLeiosPatch, "all");
+                    await AptlyAPI.Packages.copyIntoRepo("leios-stable", packageData.name, release.version_with_leios_patch, "all");
 
                     packageData.latest_stable_release = {
-                        amd64: release.versionWithLeiosPatch,
-                        arm64: release.versionWithLeiosPatch
+                        amd64: release.version_with_leios_patch,
+                        arm64: release.version_with_leios_patch
                     };
 
                 } else {
@@ -91,18 +91,18 @@ OsReleaseTask.addStep("Move packages from archive to local stable repo", async (
                         // delete in stable for this package first but ensure we only delete for this architecture
                         await AptlyAPI.Packages.deleteInRepo("leios-stable", packageData.name, undefined, "amd64");
 
-                        await AptlyAPI.Packages.copyIntoRepo("leios-stable", packageData.name, release.versionWithLeiosPatch, "amd64");
+                        await AptlyAPI.Packages.copyIntoRepo("leios-stable", packageData.name, release.version_with_leios_patch, "amd64");
 
-                        packageData.latest_stable_release.amd64 = release.versionWithLeiosPatch;
+                        packageData.latest_stable_release.amd64 = release.version_with_leios_patch;
                     }
                     if (release.architectures.arm64) {
 
                         // delete in stable for this package first but ensure we only delete for this architecture
                         await AptlyAPI.Packages.deleteInRepo("leios-stable", packageData.name, undefined, "arm64");
 
-                        await AptlyAPI.Packages.copyIntoRepo("leios-stable", packageData.name, release.versionWithLeiosPatch, "arm64");
+                        await AptlyAPI.Packages.copyIntoRepo("leios-stable", packageData.name, release.version_with_leios_patch, "arm64");
 
-                        packageData.latest_stable_release.arm64 = release.versionWithLeiosPatch;
+                        packageData.latest_stable_release.arm64 = release.version_with_leios_patch;
                     }
 
                 }
