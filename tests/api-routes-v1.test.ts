@@ -52,6 +52,74 @@ async function seedPublisherWithOwner(ownerUserId: number, overrides: Partial<DB
     }).returning().get();
 }
 
+async function upsertPublisherMember(
+    publisher_id: number,
+    user_id: number,
+    role: PermissionHelper.OrgRoles,
+    is_publicly_hidden = false
+) {
+    const existing = DB.instance().select().from(DB.Tables.publisherMembers).where(and(
+        eq(DB.Tables.publisherMembers.publisher_id, publisher_id),
+        eq(DB.Tables.publisherMembers.user_id, user_id)
+    )).get();
+
+    if (existing) {
+        await DB.instance().update(DB.Tables.publisherMembers).set({
+            role,
+            is_publicly_hidden
+        }).where(eq(DB.Tables.publisherMembers.id, existing.id));
+
+        return DB.instance().select().from(DB.Tables.publisherMembers).where(eq(DB.Tables.publisherMembers.id, existing.id)).get()!;
+    }
+
+    return DB.instance().insert(DB.Tables.publisherMembers).values({
+        publisher_id,
+        user_id,
+        role,
+        is_publicly_hidden
+    }).returning().get();
+}
+
+async function seedPackageForPublisher(publisher_id: number, overrides: Partial<DB.Models.Package> = {}) {
+    const name = overrides.name ?? `pkg-${randomUUID().slice(0, 8)}`;
+
+    return DB.instance().insert(DB.Tables.packages).values({
+        publisher_id,
+        name,
+        display_name: overrides.display_name ?? `Package ${name}`,
+        description: overrides.description ?? "Seeded package",
+        homepage_url: overrides.homepage_url ?? `https://${name}.example.com`,
+        requires_patching: overrides.requires_patching ?? false,
+        flags: overrides.flags,
+    }).returning().get();
+}
+
+async function seedPackageRelease(package_id: number, overrides: Partial<DB.Models.PackageRelease> = {}) {
+    return DB.instance().insert(DB.Tables.packageReleases).values({
+        package_id,
+        version_with_leios_patch: overrides.version_with_leios_patch ?? `1.0.${Math.floor(Math.random() * 9000) + 1000}`,
+        changelog: overrides.changelog ?? "Seeded release",
+        architectures: overrides.architectures ?? {
+            amd64: false,
+            arm64: false,
+            is_all: false
+        }
+    }).returning().get();
+}
+
+async function seedStablePromotionRequest(
+    package_id: number,
+    package_release_id: number,
+    overrides: Partial<DB.Models.StablePromotionRequest> = {}
+) {
+    return DB.instance().insert(DB.Tables.stablePromotionRequests).values({
+        package_id,
+        package_release_id,
+        status: overrides.status ?? "pending",
+        admin_note: overrides.admin_note
+    }).returning().get();
+}
+
 async function seedTask(overrides: Partial<DB.Models.ScheduledTask> = {}) {
     return DB.instance().insert(DB.Tables.scheduled_tasks).values({
         function: overrides.function ?? "test:task",
@@ -346,200 +414,6 @@ describe("Package list route", () => {
         await DB.instance().delete(DB.Tables.publishers).where(eq(DB.Tables.publishers.id, tempPublisher.id));
     });
 });
-
-// describe("Developer package routes", () => {
-//     test("Developer can create and update own package", async () => {
-//         const { user } = await seedUser("developer");
-//         const session = await SessionHandler.createSession(user.id);
-
-//         const createRes = await API.getApp().request("/dev/packages", {
-//             method: "POST",
-//             headers: {
-//                 ...authHeaders(session.token),
-//                 "Content-Type": "application/json"
-//             },
-//             body: JSON.stringify({
-//                 name: "devpkg",
-//                 description: "Dev package",
-//                 homepage_url: "https://devpkg.example.com",
-//                 requires_patching: false
-//             })
-//         });
-
-//         expect(createRes.status).toBe(201);
-//         const createdBody = await createRes.json();
-
-//         const pkg = DB.instance().select().from(DB.Tables.packages).where(eq(DB.Tables.packages.id, createdBody.data.id)).get();
-//         expect(pkg?.owner_user_id).toBe(user.id);
-
-//         const updateRes = await API.getApp().request(`/dev/packages/${createdBody.data.id}`, {
-//             method: "PUT",
-//             headers: {
-//                 ...authHeaders(session.token),
-//                 "Content-Type": "application/json"
-//             },
-//             body: JSON.stringify({ description: "Updated description" })
-//         });
-//         const updateBody = await updateRes.json();
-//         expect(updateRes.status).toBe(200);
-//         expect(updateBody.message).toBe("Package updated successfully");
-//         const updated = DB.instance().select().from(DB.Tables.packages).where(eq(DB.Tables.packages.id, createdBody.data.id)).get();
-//         expect(updated?.description).toBe("Updated description");
-//     });
-
-//     test("Developer release lifecycle stores data", async () => {
-//         const { user } = await seedUser("developer", {
-//             display_name: PACKAGE_MAINTAINER_NAME,
-//             email: PACKAGE_MAINTAINER_EMAIL
-//         });
-//         const session = await SessionHandler.createSession(user.id);
-//         const pkg = await seedPackage(user.id, { name: PACKAGE_NAME });
-
-//         const listBefore = await API.getApp().request(`/dev/packages/${pkg.id}/releases`, {
-//             headers: authHeaders(session.token)
-//         });
-//         const emptyBody = await listBefore.json();
-//         expect(listBefore.status).toBe(200);
-//         expect(emptyBody.data).toEqual([]);
-
-//         const file = new File([await Bun.file(PACKAGE_FILE_PATH).arrayBuffer()], "package.deb");
-//         const form = new FormData();
-//         form.set("file", file);
-
-//         const createRes = await API.getApp().request(`/dev/packages/${pkg.id}/releases/${PACKAGE_VERSION}/${PACKAGE_ARCH}`, {
-//             method: "POST",
-//             headers: authHeaders(session.token),
-//             body: form
-//         });
-//         const createBody = await createRes.json();
-//         expect(createRes.status).toBe(201);
-//         expect(createBody.message).toBe("Package release created successfully");
-
-
-//         const dbRelease = DB.instance().select().from(DB.Tables.packageReleases).where(eq(DB.Tables.packageReleases.package_id, pkg.id)).get();
-//         expect(dbRelease?.version).toBe(PACKAGE_VERSION);
-
-//         const listAfter = await API.getApp().request(`/dev/packages/${pkg.id}/releases`, {
-//             headers: authHeaders(session.token)
-//         });
-//         expect(listAfter.status).toBe(200);
-//         const afterBody = await listAfter.json();
-//         expect(afterBody.data.length).toBe(1);
-//     });
-
-//     test("Developer can request stable promotion", async () => {
-//         const { user } = await seedUser("developer");
-//         const session = await SessionHandler.createSession(user.id);
-//         const pkg = await seedPackage(user.id, { name: "stable-pkg" });
-//         const release = await seedRelease(pkg.id, "2.0.0", "arm64");
-
-//         const createRes = await API.getApp().request(`/dev/packages/${pkg.id}/stable-promotion-requests`, {
-//             method: "POST",
-//             headers: {
-//                 ...authHeaders(session.token),
-//                 "Content-Type": "application/json"
-//             },
-//             body: JSON.stringify({ package_release_id: release.id })
-//         });
-//         const createBody = await createRes.json();
-//         expect(createRes.status).toBe(201);
-//         expect(createBody.message).toBe("Stable promotion request submitted");
-
-//         const listRes = await API.getApp().request(`/dev/packages/${pkg.id}/stable-promotion-requests`, {
-//             headers: authHeaders(session.token)
-//         });
-//         expect(listRes.status).toBe(200);
-//         const body = await listRes.json();
-//         expect(body.data[0].package_release_id).toBe(release.id);
-//     });
-// });
-
-// describe("Admin routes", () => {
-//     test("Admin can create and delete packages", async () => {
-//         const { user: admin } = await seedUser("admin");
-//         const { user: developer } = await seedUser("developer");
-//         const adminSession = await SessionHandler.createSession(admin.id);
-
-//         const createRes = await API.getApp().request("/admin/packages", {
-//             method: "POST",
-//             headers: {
-//                 ...authHeaders(adminSession.token),
-//                 "Content-Type": "application/json"
-//             },
-//             body: JSON.stringify({
-//                 name: "admin-pkg",
-//                 owner_user_id: developer.id,
-//                 description: "Admin created",
-//                 homepage_url: "https://adminpkg.example.com",
-//                 requires_patching: false
-//             })
-//         });
-//         expect(createRes.status).toBe(201);
-//         const createdBody = await createRes.json();
-
-//         const deleteRes = await API.getApp().request(`/admin/packages/${createdBody.data.id}`, {
-//             method: "DELETE",
-//             headers: authHeaders(adminSession.token)
-//         });
-//         const deleteBody = await deleteRes.json();
-//         expect(deleteRes.status).toBe(200);
-//         expect(deleteBody.message).toBe("Package deleted successfully");
-//         const pkg = DB.instance().select().from(DB.Tables.packages).where(eq(DB.Tables.packages.id, createdBody.data.id)).get();
-//         expect(pkg).toBeUndefined();
-//     });
-
-//     test("Admin user management CRUD", async () => {
-//         const { user: admin } = await seedUser("admin");
-//         const adminSession = await SessionHandler.createSession(admin.id);
-
-//         const createRes = await API.getApp().request("/admin/users", {
-//             method: "POST",
-//             headers: {
-//                 ...authHeaders(adminSession.token),
-//                 "Content-Type": "application/json"
-//             },
-//             body: JSON.stringify({
-//                 username: "managed",
-//                 display_name: "Managed User",
-//                 email: "managed@example.com",
-//                 password: "Adm1nManage!",
-//                 role: "user"
-//             })
-//         });
-//         expect(createRes.status).toBe(201);
-//         const created = await createRes.json();
-
-//         const updateRes = await API.getApp().request(`/admin/users/${created.data.id}`, {
-//             method: "PUT",
-//             headers: {
-//                 ...authHeaders(adminSession.token),
-//                 "Content-Type": "application/json"
-//             },
-//             body: JSON.stringify({ display_name: "Renamed", role: "developer" })
-//         });
-//         const updateBody = await updateRes.json();
-//         expect(updateRes.status).toBe(200);
-//         expect(updateBody.message).toBe("User updated successfully");
-
-//         const passwordRes = await API.getApp().request(`/admin/users/${created.data.id}/password`, {
-//             method: "PUT",
-//             headers: {
-//                 ...authHeaders(adminSession.token),
-//                 "Content-Type": "application/json"
-//             },
-//             body: JSON.stringify({ password: "N3wAdm1nPw" })
-//         });
-//         expect(passwordRes.status).toBe(200);
-
-//         const deleteRes = await API.getApp().request(`/admin/users/${created.data.id}`, {
-//             method: "DELETE",
-//             headers: authHeaders(adminSession.token)
-//         });
-//         expect(deleteRes.status).toBe(200);
-//         const deleted = DB.instance().select().from(DB.Tables.users).where(eq(DB.Tables.users.id, created.data.id)).get();
-//         expect(deleted).toBeUndefined();
-//     });
-// });
 
 
 describe("Global API routes", async () => {
@@ -1085,6 +959,935 @@ describe("Package sub-routes coverage", async () => {
         )).get();
 
         expect(assignment).toBeUndefined();
+    });
+});
+
+
+describe("Publisher permission matrix coverage", async () => {
+
+    let owner: SeededUser;
+    let ownerSessionToken: string;
+    let siteAdmin: SeededUser;
+    let siteAdminSessionToken: string;
+    let orgAdmin: SeededUser;
+    let orgAdminSessionToken: string;
+    let maintainer: SeededUser;
+    let maintainerSessionToken: string;
+    let developer: SeededUser;
+    let developerSessionToken: string;
+    let viewer: SeededUser;
+    let viewerSessionToken: string;
+    let outsider: SeededUser;
+    let outsiderSessionToken: string;
+    let hiddenMemberUser: SeededUser;
+    let transferTarget: SeededUser;
+
+    let publisher: DB.Models.Publisher;
+
+    beforeAll(async () => {
+        owner = await seedUser("user");
+        siteAdmin = await seedUser("admin");
+        orgAdmin = await seedUser("user");
+        maintainer = await seedUser("user");
+        developer = await seedUser("user");
+        viewer = await seedUser("user");
+        outsider = await seedUser("user");
+        hiddenMemberUser = await seedUser("user");
+        transferTarget = await seedUser("user");
+
+        ownerSessionToken = await seedSession(owner.id).then(s => s.token);
+        siteAdminSessionToken = await seedSession(siteAdmin.id).then(s => s.token);
+        orgAdminSessionToken = await seedSession(orgAdmin.id).then(s => s.token);
+        maintainerSessionToken = await seedSession(maintainer.id).then(s => s.token);
+        developerSessionToken = await seedSession(developer.id).then(s => s.token);
+        viewerSessionToken = await seedSession(viewer.id).then(s => s.token);
+        outsiderSessionToken = await seedSession(outsider.id).then(s => s.token);
+
+        publisher = await seedPublisherWithOwner(owner.id, {
+            name: `pub-perm-${randomUUID().slice(0, 8)}`,
+            display_name: "Publisher Permission Coverage",
+            description: "Publisher permission matrix",
+            homepage_url: "https://publisher-permissions.example.com"
+        });
+
+        await upsertPublisherMember(publisher.id, orgAdmin.id, PermissionHelper.OrgRoles.ADMIN);
+        await upsertPublisherMember(publisher.id, maintainer.id, PermissionHelper.OrgRoles.MAINTAINER);
+        await upsertPublisherMember(publisher.id, developer.id, PermissionHelper.OrgRoles.DEVELOPER);
+        await upsertPublisherMember(publisher.id, viewer.id, PermissionHelper.OrgRoles.VIEWER);
+        await upsertPublisherMember(publisher.id, hiddenMemberUser.id, PermissionHelper.OrgRoles.VIEWER, true);
+    });
+
+    test("GET /publishers?onlyMembershipByMe=true scopes by membership records", async () => {
+        const unauth = await makeAPIRequest("/v1/publishers?onlyMembershipByMe=true", {}, 200);
+        expect(unauth).toEqual([]);
+
+        const ownerList = await makeAPIRequest("/v1/publishers?onlyMembershipByMe=true", {
+            authToken: ownerSessionToken
+        }, 200);
+        expect(ownerList.some((p: any) => p.id === publisher.id)).toBe(false);
+
+        const outsiderList = await makeAPIRequest("/v1/publishers?onlyMembershipByMe=true", {
+            authToken: outsiderSessionToken
+        }, 200);
+        expect(outsiderList.some((p: any) => p.id === publisher.id)).toBe(false);
+
+        const memberList = await makeAPIRequest("/v1/publishers?onlyMembershipByMe=true", {
+            authToken: orgAdminSessionToken
+        }, 200);
+        expect(memberList.some((p: any) => p.id === publisher.id)).toBe(true);
+    });
+
+    test("PUT /publishers/:publisherName enforces publisher.update permission matrix", async () => {
+        const cases: Array<{ label: string; token?: string; code: number; }> = [
+            { label: "unauth", code: 403 },
+            { label: "outsider", token: outsiderSessionToken, code: 403 },
+            { label: "viewer", token: viewerSessionToken, code: 403 },
+            { label: "developer", token: developerSessionToken, code: 403 },
+            { label: "maintainer", token: maintainerSessionToken, code: 403 },
+            { label: "org-admin", token: orgAdminSessionToken, code: 200 },
+            { label: "site-admin", token: siteAdminSessionToken, code: 200 },
+            { label: "owner", token: ownerSessionToken, code: 200 },
+        ];
+
+        for (const current of cases) {
+            await makeAPIRequest(`/v1/publishers/${publisher.name}`, {
+                method: "PUT",
+                authToken: current.token,
+                body: {
+                    description: `publisher-update-${current.label}-${randomUUID().slice(0, 6)}`
+                }
+            }, current.code);
+        }
+    });
+
+    test("GET /publishers/:publisherName/members hides hidden members from unauthenticated and outsiders", async () => {
+        const unauth = await makeAPIRequest(`/v1/publishers/${publisher.name}/members`, {}, 200);
+        expect(unauth.some((m: any) => m.user_id === hiddenMemberUser.id)).toBe(false);
+
+        const outsiderList = await makeAPIRequest(`/v1/publishers/${publisher.name}/members`, {
+            authToken: outsiderSessionToken
+        }, 200);
+        expect(outsiderList.some((m: any) => m.user_id === hiddenMemberUser.id)).toBe(false);
+
+        const memberList = await makeAPIRequest(`/v1/publishers/${publisher.name}/members`, {
+            authToken: viewerSessionToken
+        }, 200);
+        expect(memberList.some((m: any) => m.user_id === hiddenMemberUser.id)).toBe(true);
+
+        const siteAdminList = await makeAPIRequest(`/v1/publishers/${publisher.name}/members`, {
+            authToken: siteAdminSessionToken
+        }, 200);
+        expect(siteAdminList.some((m: any) => m.user_id === hiddenMemberUser.id)).toBe(true);
+    });
+
+    test("GET /publishers/:publisherName/members/:userId only reveals hidden members to members/admins", async () => {
+        await makeAPIRequest(`/v1/publishers/${publisher.name}/members/${hiddenMemberUser.id}`, {}, 404);
+
+        await makeAPIRequest(`/v1/publishers/${publisher.name}/members/${hiddenMemberUser.id}`, {
+            authToken: outsiderSessionToken
+        }, 404);
+
+        const memberView = await makeAPIRequest(`/v1/publishers/${publisher.name}/members/${hiddenMemberUser.id}`, {
+            authToken: viewerSessionToken
+        }, 200);
+        expect(memberView.user_id).toBe(hiddenMemberUser.id);
+
+        const adminView = await makeAPIRequest(`/v1/publishers/${publisher.name}/members/${hiddenMemberUser.id}`, {
+            authToken: siteAdminSessionToken
+        }, 200);
+        expect(adminView.user_id).toBe(hiddenMemberUser.id);
+    });
+
+    test("POST /publishers/:publisherName/members enforces invite permissions and hierarchy", async () => {
+        const deniedCases: Array<{ token?: string; role: PermissionHelper.OrgRoles; }> = [
+            { role: PermissionHelper.OrgRoles.VIEWER },
+            { token: outsiderSessionToken, role: PermissionHelper.OrgRoles.VIEWER },
+            { token: viewerSessionToken, role: PermissionHelper.OrgRoles.VIEWER },
+            { token: developerSessionToken, role: PermissionHelper.OrgRoles.VIEWER },
+            { token: maintainerSessionToken, role: PermissionHelper.OrgRoles.VIEWER },
+        ];
+
+        for (const denied of deniedCases) {
+            const invitee = await seedUser("user");
+            await makeAPIRequest(`/v1/publishers/${publisher.name}/members`, {
+                method: "POST",
+                authToken: denied.token,
+                body: {
+                    user_id: invitee.id,
+                    role: denied.role,
+                }
+            }, 403);
+        }
+
+        const orgAdminCannotInviteAdmin = await seedUser("user");
+        await makeAPIRequest(`/v1/publishers/${publisher.name}/members`, {
+            method: "POST",
+            authToken: orgAdminSessionToken,
+            body: {
+                user_id: orgAdminCannotInviteAdmin.id,
+                role: PermissionHelper.OrgRoles.ADMIN,
+            }
+        }, 403);
+
+        const orgAdminCanInviteMaintainer = await seedUser("user");
+        await makeAPIRequest(`/v1/publishers/${publisher.name}/members`, {
+            method: "POST",
+            authToken: orgAdminSessionToken,
+            body: {
+                user_id: orgAdminCanInviteMaintainer.id,
+                role: PermissionHelper.OrgRoles.MAINTAINER,
+            }
+        }, 201);
+
+        const ownerCanInviteAdmin = await seedUser("user");
+        await makeAPIRequest(`/v1/publishers/${publisher.name}/members`, {
+            method: "POST",
+            authToken: ownerSessionToken,
+            body: {
+                user_id: ownerCanInviteAdmin.id,
+                role: PermissionHelper.OrgRoles.ADMIN,
+            }
+        }, 201);
+
+        const siteAdminCanInviteAdmin = await seedUser("user");
+        await makeAPIRequest(`/v1/publishers/${publisher.name}/members`, {
+            method: "POST",
+            authToken: siteAdminSessionToken,
+            body: {
+                user_id: siteAdminCanInviteAdmin.id,
+                role: PermissionHelper.OrgRoles.ADMIN,
+            }
+        }, 201);
+    });
+
+    test("PUT /publishers/:publisherName/members/:userId enforces update permissions and hierarchy", async () => {
+        const editableTarget = await seedUser("user");
+        await upsertPublisherMember(publisher.id, editableTarget.id, PermissionHelper.OrgRoles.VIEWER);
+
+        const deniedTokens = [undefined, outsiderSessionToken, viewerSessionToken, developerSessionToken, maintainerSessionToken];
+        for (const token of deniedTokens) {
+            await makeAPIRequest(`/v1/publishers/${publisher.name}/members/${editableTarget.id}`, {
+                method: "PUT",
+                authToken: token,
+                body: {
+                    role: PermissionHelper.OrgRoles.DEVELOPER,
+                }
+            }, 403);
+        }
+
+        await makeAPIRequest(`/v1/publishers/${publisher.name}/members/${editableTarget.id}`, {
+            method: "PUT",
+            authToken: orgAdminSessionToken,
+            body: {
+                role: PermissionHelper.OrgRoles.DEVELOPER,
+            }
+        }, 200);
+
+        await makeAPIRequest(`/v1/publishers/${publisher.name}/members/${editableTarget.id}`, {
+            method: "PUT",
+            authToken: orgAdminSessionToken,
+            body: {
+                role: PermissionHelper.OrgRoles.ADMIN,
+            }
+        }, 403);
+
+        await makeAPIRequest(`/v1/publishers/${publisher.name}/members/${editableTarget.id}`, {
+            method: "PUT",
+            authToken: ownerSessionToken,
+            body: {
+                role: PermissionHelper.OrgRoles.ADMIN,
+            }
+        }, 200);
+
+        await makeAPIRequest(`/v1/publishers/${publisher.name}/members/${editableTarget.id}`, {
+            method: "PUT",
+            authToken: siteAdminSessionToken,
+            body: {
+                role: PermissionHelper.OrgRoles.VIEWER,
+            }
+        }, 200);
+    });
+
+    test("DELETE /publishers/:publisherName/members/:userId enforces remove permissions and hierarchy", async () => {
+        const lowRoleTarget = await seedUser("user");
+        await upsertPublisherMember(publisher.id, lowRoleTarget.id, PermissionHelper.OrgRoles.VIEWER);
+
+        const deniedTokens = [undefined, outsiderSessionToken, viewerSessionToken, developerSessionToken, maintainerSessionToken];
+        for (const token of deniedTokens) {
+            await makeAPIRequest(`/v1/publishers/${publisher.name}/members/${lowRoleTarget.id}`, {
+                method: "DELETE",
+                authToken: token,
+            }, 403);
+        }
+
+        await makeAPIRequest(`/v1/publishers/${publisher.name}/members/${lowRoleTarget.id}`, {
+            method: "DELETE",
+            authToken: orgAdminSessionToken,
+        }, 200);
+
+        const peerAdminTarget = await seedUser("user");
+        await upsertPublisherMember(publisher.id, peerAdminTarget.id, PermissionHelper.OrgRoles.ADMIN);
+
+        await makeAPIRequest(`/v1/publishers/${publisher.name}/members/${peerAdminTarget.id}`, {
+            method: "DELETE",
+            authToken: orgAdminSessionToken,
+        }, 403);
+
+        await makeAPIRequest(`/v1/publishers/${publisher.name}/members/${peerAdminTarget.id}`, {
+            method: "DELETE",
+            authToken: ownerSessionToken,
+        }, 200);
+
+        const secondAdminTarget = await seedUser("user");
+        await upsertPublisherMember(publisher.id, secondAdminTarget.id, PermissionHelper.OrgRoles.ADMIN);
+
+        await makeAPIRequest(`/v1/publishers/${publisher.name}/members/${secondAdminTarget.id}`, {
+            method: "DELETE",
+            authToken: siteAdminSessionToken,
+        }, 200);
+    });
+
+    test("POST /publishers/:publisherName/transfer-ownership is owner/site-admin only and ensures owner membership", async () => {
+        await makeAPIRequest(`/v1/publishers/${publisher.name}/transfer-ownership`, {
+            method: "POST",
+            body: {
+                new_owner_user_id: transferTarget.id
+            }
+        }, 401);
+
+        await makeAPIRequest(`/v1/publishers/${publisher.name}/transfer-ownership`, {
+            method: "POST",
+            authToken: outsiderSessionToken,
+            body: {
+                new_owner_user_id: transferTarget.id
+            }
+        }, 403);
+
+        await makeAPIRequest(`/v1/publishers/${publisher.name}/transfer-ownership`, {
+            method: "POST",
+            authToken: orgAdminSessionToken,
+            body: {
+                new_owner_user_id: transferTarget.id
+            }
+        }, 403);
+
+        await makeAPIRequest(`/v1/publishers/${publisher.name}/transfer-ownership`, {
+            method: "POST",
+            authToken: ownerSessionToken,
+            body: {
+                new_owner_user_id: transferTarget.id
+            }
+        }, 200);
+
+        const transferred = DB.instance().select().from(DB.Tables.publishers).where(eq(DB.Tables.publishers.id, publisher.id)).get();
+        expect(transferred?.owner_user_id).toBe(transferTarget.id);
+
+        const transferTargetMembership = DB.instance().select().from(DB.Tables.publisherMembers).where(and(
+            eq(DB.Tables.publisherMembers.publisher_id, publisher.id),
+            eq(DB.Tables.publisherMembers.user_id, transferTarget.id)
+        )).get();
+
+        expect(transferTargetMembership?.role).toBe(PermissionHelper.OrgRoles.ADMIN);
+        expect(transferTargetMembership?.is_publicly_hidden).toBe(false);
+
+        await makeAPIRequest(`/v1/publishers/${publisher.name}/transfer-ownership`, {
+            method: "POST",
+            authToken: siteAdminSessionToken,
+            body: {
+                new_owner_user_id: owner.id
+            }
+        }, 200);
+
+        const transferredBack = DB.instance().select().from(DB.Tables.publishers).where(eq(DB.Tables.publishers.id, publisher.id)).get();
+        expect(transferredBack?.owner_user_id).toBe(owner.id);
+    });
+
+    test("DELETE /publishers/:publisherName enforces owner/site-admin and package-empty rules", async () => {
+        const blockingPackage = await seedPackageForPublisher(publisher.id, {
+            name: `pkg-block-${randomUUID().slice(0, 8)}`,
+            description: "Used to block publisher deletion"
+        });
+
+        await makeAPIRequest(`/v1/publishers/${publisher.name}`, {
+            method: "DELETE",
+            authToken: ownerSessionToken,
+        }, 400);
+
+        await DB.instance().delete(DB.Tables.packages).where(eq(DB.Tables.packages.id, blockingPackage.id));
+
+        await makeAPIRequest(`/v1/publishers/${publisher.name}`, {
+            method: "DELETE",
+            authToken: outsiderSessionToken,
+        }, 403);
+
+        await makeAPIRequest(`/v1/publishers/${publisher.name}`, {
+            method: "DELETE",
+            authToken: orgAdminSessionToken,
+        }, 403);
+
+        await makeAPIRequest(`/v1/publishers/${publisher.name}`, {
+            method: "DELETE",
+        }, 401);
+
+        await makeAPIRequest(`/v1/publishers/${publisher.name}`, {
+            method: "DELETE",
+            authToken: siteAdminSessionToken,
+        }, 200);
+
+        const deleted = DB.instance().select().from(DB.Tables.publishers).where(eq(DB.Tables.publishers.id, publisher.id)).get();
+        expect(deleted).toBeUndefined();
+    });
+});
+
+
+describe("Publisher package-route permission matrix", async () => {
+
+    let owner: SeededUser;
+    let ownerSessionToken: string;
+    let siteAdmin: SeededUser;
+    let siteAdminSessionToken: string;
+    let orgAdmin: SeededUser;
+    let orgAdminSessionToken: string;
+    let maintainer: SeededUser;
+    let maintainerSessionToken: string;
+    let developer: SeededUser;
+    let developerSessionToken: string;
+    let viewer: SeededUser;
+    let viewerSessionToken: string;
+    let outsider: SeededUser;
+    let outsiderSessionToken: string;
+
+    let publisher: DB.Models.Publisher;
+
+    beforeAll(async () => {
+        owner = await seedUser("user");
+        siteAdmin = await seedUser("admin");
+        orgAdmin = await seedUser("user");
+        maintainer = await seedUser("user");
+        developer = await seedUser("user");
+        viewer = await seedUser("user");
+        outsider = await seedUser("user");
+
+        ownerSessionToken = await seedSession(owner.id).then(s => s.token);
+        siteAdminSessionToken = await seedSession(siteAdmin.id).then(s => s.token);
+        orgAdminSessionToken = await seedSession(orgAdmin.id).then(s => s.token);
+        maintainerSessionToken = await seedSession(maintainer.id).then(s => s.token);
+        developerSessionToken = await seedSession(developer.id).then(s => s.token);
+        viewerSessionToken = await seedSession(viewer.id).then(s => s.token);
+        outsiderSessionToken = await seedSession(outsider.id).then(s => s.token);
+
+        publisher = await seedPublisherWithOwner(owner.id, {
+            name: `pkg-perm-${randomUUID().slice(0, 8)}`,
+            display_name: "Package Permission Publisher",
+            description: "Publisher for package permission matrix",
+            homepage_url: "https://package-permissions.example.com"
+        });
+
+        await upsertPublisherMember(publisher.id, orgAdmin.id, PermissionHelper.OrgRoles.ADMIN);
+        await upsertPublisherMember(publisher.id, maintainer.id, PermissionHelper.OrgRoles.MAINTAINER);
+        await upsertPublisherMember(publisher.id, developer.id, PermissionHelper.OrgRoles.DEVELOPER);
+        await upsertPublisherMember(publisher.id, viewer.id, PermissionHelper.OrgRoles.VIEWER);
+    });
+
+    test("POST /packages enforces create permissions", async () => {
+        const cases: Array<{ label: string; token?: string; code: number; }> = [
+            { label: "unauth", code: 401 },
+            { label: "outsider", token: outsiderSessionToken, code: 403 },
+            { label: "viewer", token: viewerSessionToken, code: 403 },
+            { label: "developer", token: developerSessionToken, code: 201 },
+            { label: "maintainer", token: maintainerSessionToken, code: 201 },
+            { label: "org-admin", token: orgAdminSessionToken, code: 201 },
+            { label: "owner", token: ownerSessionToken, code: 201 },
+            { label: "site-admin", token: siteAdminSessionToken, code: 201 },
+        ];
+
+        for (const current of cases) {
+            const created = await makeAPIRequest("/v1/packages", {
+                method: "POST",
+                authToken: current.token,
+                body: {
+                    publisher_id: publisher.id,
+                    name: `pkg-create-${current.label}-${randomUUID().slice(0, 6)}`,
+                    display_name: `Create Matrix ${current.label}`,
+                    description: "Create permission matrix",
+                    homepage_url: "https://pkg-create-matrix.example.com",
+                    requires_patching: false
+                }
+            }, current.code);
+
+            if (current.code === 201) {
+                expect(created.id).toBeNumber();
+            }
+        }
+    });
+
+    test("PUT /packages/:publisherName/:packageName enforces package update permissions", async () => {
+        const pkg = await seedPackageForPublisher(publisher.id, {
+            name: `pkg-update-${randomUUID().slice(0, 8)}`,
+            description: "Initial update permission package"
+        });
+
+        const cases: Array<{ token?: string; code: number; }> = [
+            { code: 403 },
+            { token: outsiderSessionToken, code: 403 },
+            { token: viewerSessionToken, code: 403 },
+            { token: developerSessionToken, code: 403 },
+            { token: maintainerSessionToken, code: 200 },
+            { token: orgAdminSessionToken, code: 200 },
+            { token: ownerSessionToken, code: 200 },
+            { token: siteAdminSessionToken, code: 200 },
+        ];
+
+        for (const current of cases) {
+            await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}`, {
+                method: "PUT",
+                authToken: current.token,
+                body: {
+                    description: `package-update-${randomUUID().slice(0, 8)}`
+                }
+            }, current.code);
+        }
+    });
+
+    test("DELETE /packages/:publisherName/:packageName blocks non-delete roles", async () => {
+        const deniedCases: Array<{ token?: string; }> = [
+            {},
+            { token: outsiderSessionToken },
+            { token: viewerSessionToken },
+            { token: developerSessionToken },
+            { token: maintainerSessionToken },
+        ];
+
+        for (const denied of deniedCases) {
+            const pkg = await seedPackageForPublisher(publisher.id, {
+                name: `pkg-delete-denied-${randomUUID().slice(0, 8)}`,
+                description: "Delete denied matrix package"
+            });
+
+            await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}`, {
+                method: "DELETE",
+                authToken: denied.token,
+            }, 403);
+        }
+    });
+
+    test("POST /packages/:publisherName/:packageName/releases enforces publish permissions", async () => {
+        const cases: Array<{ label: string; token?: string; code: number; }> = [
+            { label: "unauth", code: 403 },
+            { label: "outsider", token: outsiderSessionToken, code: 403 },
+            { label: "viewer", token: viewerSessionToken, code: 403 },
+            { label: "developer", token: developerSessionToken, code: 201 },
+            { label: "maintainer", token: maintainerSessionToken, code: 201 },
+            { label: "org-admin", token: orgAdminSessionToken, code: 201 },
+            { label: "owner", token: ownerSessionToken, code: 201 },
+            { label: "site-admin", token: siteAdminSessionToken, code: 201 },
+        ];
+
+        for (const current of cases) {
+            const pkg = await seedPackageForPublisher(publisher.id, {
+                name: `pkg-release-create-${current.label}-${randomUUID().slice(0, 6)}`,
+            });
+
+            await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/releases`, {
+                method: "POST",
+                authToken: current.token,
+                body: {
+                    version_with_leios_patch: `2.0.${Math.floor(Math.random() * 9000) + 1000}`,
+                    changelog: "Release create permission matrix"
+                }
+            }, current.code);
+        }
+    });
+
+    test("PUT /packages/:publisherName/:packageName/releases/:version enforces release update permissions", async () => {
+        const cases: Array<{ token?: string; code: number; }> = [
+            { code: 403 },
+            { token: outsiderSessionToken, code: 403 },
+            { token: viewerSessionToken, code: 403 },
+            { token: developerSessionToken, code: 403 },
+            { token: maintainerSessionToken, code: 200 },
+            { token: orgAdminSessionToken, code: 200 },
+            { token: ownerSessionToken, code: 200 },
+            { token: siteAdminSessionToken, code: 200 },
+        ];
+
+        for (const current of cases) {
+            const pkg = await seedPackageForPublisher(publisher.id, {
+                name: `pkg-release-update-${randomUUID().slice(0, 8)}`,
+            });
+            const release = await seedPackageRelease(pkg.id, {
+                version_with_leios_patch: `3.0.${Math.floor(Math.random() * 9000) + 1000}`,
+                changelog: "Before update"
+            });
+
+            await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/releases/${release.version_with_leios_patch}`, {
+                method: "PUT",
+                authToken: current.token,
+                body: {
+                    changelog: `After update ${randomUUID().slice(0, 6)}`
+                }
+            }, current.code);
+        }
+    });
+
+    test("DELETE /packages/:publisherName/:packageName/releases/:version blocks non-delete roles", async () => {
+        const deniedCases: Array<{ token?: string; }> = [
+            {},
+            { token: outsiderSessionToken },
+            { token: viewerSessionToken },
+            { token: developerSessionToken },
+            { token: maintainerSessionToken },
+        ];
+
+        for (const denied of deniedCases) {
+            const pkg = await seedPackageForPublisher(publisher.id, {
+                name: `pkg-release-delete-${randomUUID().slice(0, 8)}`,
+            });
+            const release = await seedPackageRelease(pkg.id, {
+                version_with_leios_patch: `4.0.${Math.floor(Math.random() * 9000) + 1000}`,
+            });
+
+            await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/releases/${release.version_with_leios_patch}`, {
+                method: "DELETE",
+                authToken: denied.token,
+            }, 403);
+        }
+    });
+
+    test("POST /packages/:publisherName/:packageName/releases/:version/:arch blocks non-publish roles", async () => {
+        const pkg = await seedPackageForPublisher(publisher.id, {
+            name: `pkg-release-upload-${randomUUID().slice(0, 8)}`,
+        });
+        const release = await seedPackageRelease(pkg.id, {
+            version_with_leios_patch: "9.9.9"
+        });
+
+        const formData = new FormData();
+        formData.set("file", new File(["fake-deb"], "fake.deb"));
+
+        const deniedCases: Array<{ token?: string; }> = [
+            {},
+            { token: outsiderSessionToken },
+            { token: viewerSessionToken },
+        ];
+
+        for (const denied of deniedCases) {
+            await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/releases/${release.version_with_leios_patch}/amd64`, {
+                method: "POST",
+                authToken: denied.token,
+                additionalOptions: {
+                    body: formData
+                }
+            }, 403);
+        }
+    });
+
+    test("POST /packages/:publisherName/:packageName/stable-promotion-requests enforces requestStable permissions", async () => {
+        const cases: Array<{ label: string; token?: string; code: number; }> = [
+            { label: "unauth", code: 403 },
+            { label: "outsider", token: outsiderSessionToken, code: 403 },
+            { label: "viewer", token: viewerSessionToken, code: 403 },
+            { label: "developer", token: developerSessionToken, code: 201 },
+            { label: "maintainer", token: maintainerSessionToken, code: 201 },
+            { label: "org-admin", token: orgAdminSessionToken, code: 201 },
+            { label: "owner", token: ownerSessionToken, code: 201 },
+            { label: "site-admin", token: siteAdminSessionToken, code: 201 },
+        ];
+
+        for (const current of cases) {
+            const pkg = await seedPackageForPublisher(publisher.id, {
+                name: `pkg-stable-create-${current.label}-${randomUUID().slice(0, 6)}`,
+            });
+            const release = await seedPackageRelease(pkg.id, {
+                version_with_leios_patch: `5.0.${Math.floor(Math.random() * 9000) + 1000}`,
+            });
+
+            const created = await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/stable-promotion-requests`, {
+                method: "POST",
+                authToken: current.token,
+                body: {
+                    package_release_id: release.id
+                }
+            }, current.code);
+
+            if (current.code === 201) {
+                expect(created.id).toBeNumber();
+            }
+        }
+    });
+
+    test("DELETE /packages/:publisherName/:packageName/stable-promotion-requests/:id enforces requestStable permissions", async () => {
+        const cases: Array<{ token?: string; code: number; }> = [
+            { code: 403 },
+            { token: outsiderSessionToken, code: 403 },
+            { token: viewerSessionToken, code: 403 },
+            { token: developerSessionToken, code: 200 },
+            { token: maintainerSessionToken, code: 200 },
+            { token: orgAdminSessionToken, code: 200 },
+            { token: ownerSessionToken, code: 200 },
+            { token: siteAdminSessionToken, code: 200 },
+        ];
+
+        for (const current of cases) {
+            const pkg = await seedPackageForPublisher(publisher.id, {
+                name: `pkg-stable-delete-${randomUUID().slice(0, 8)}`,
+            });
+            const release = await seedPackageRelease(pkg.id, {
+                version_with_leios_patch: `6.0.${Math.floor(Math.random() * 9000) + 1000}`,
+            });
+            const request = await seedStablePromotionRequest(pkg.id, release.id);
+
+            await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/stable-promotion-requests/${request.id}`, {
+                method: "DELETE",
+                authToken: current.token,
+            }, current.code);
+        }
+    });
+
+    test("GET /packages/:publisherName/:packageName/role-assignments enforces list permissions", async () => {
+        const pkg = await seedPackageForPublisher(publisher.id, {
+            name: `pkg-role-list-${randomUUID().slice(0, 8)}`,
+        });
+
+        const cases: Array<{ token?: string; code: number; }> = [
+            { code: 403 },
+            { token: outsiderSessionToken, code: 403 },
+            { token: viewerSessionToken, code: 403 },
+            { token: developerSessionToken, code: 403 },
+            { token: maintainerSessionToken, code: 403 },
+            { token: orgAdminSessionToken, code: 200 },
+            { token: ownerSessionToken, code: 200 },
+            { token: siteAdminSessionToken, code: 200 },
+        ];
+
+        for (const current of cases) {
+            await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/role-assignments`, {
+                authToken: current.token,
+            }, current.code);
+        }
+    });
+
+    test("POST /packages/:publisherName/:packageName/role-assignments enforces permissions and strict role escalation", async () => {
+        const pkg = await seedPackageForPublisher(publisher.id, {
+            name: `pkg-role-create-${randomUUID().slice(0, 8)}`,
+        });
+
+        const deniedCases: Array<{ token?: string; }> = [
+            {},
+            { token: outsiderSessionToken },
+            { token: viewerSessionToken },
+            { token: developerSessionToken },
+            { token: maintainerSessionToken },
+        ];
+
+        for (const denied of deniedCases) {
+            const target = await seedUser("user");
+            await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/role-assignments`, {
+                method: "POST",
+                authToken: denied.token,
+                body: {
+                    user_id: target.id,
+                    role: PermissionHelper.OrgRoles.VIEWER
+                }
+            }, 403);
+        }
+
+        const strictTarget = await seedUser("user");
+        await upsertPublisherMember(publisher.id, strictTarget.id, PermissionHelper.OrgRoles.VIEWER);
+
+        await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/role-assignments`, {
+            method: "POST",
+            authToken: ownerSessionToken,
+            body: {
+                user_id: strictTarget.id,
+                role: PermissionHelper.OrgRoles.VIEWER
+            }
+        }, 400);
+
+        await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/role-assignments`, {
+            method: "POST",
+            authToken: ownerSessionToken,
+            body: {
+                user_id: strictTarget.id,
+                role: PermissionHelper.OrgRoles.DEVELOPER
+            }
+        }, 201);
+
+        const orgAdminAllowedTarget = await seedUser("user");
+        await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/role-assignments`, {
+            method: "POST",
+            authToken: orgAdminSessionToken,
+            body: {
+                user_id: orgAdminAllowedTarget.id,
+                role: PermissionHelper.OrgRoles.VIEWER
+            }
+        }, 201);
+
+        const siteAdminAllowedTarget = await seedUser("user");
+        await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/role-assignments`, {
+            method: "POST",
+            authToken: siteAdminSessionToken,
+            body: {
+                user_id: siteAdminAllowedTarget.id,
+                role: PermissionHelper.OrgRoles.VIEWER
+            }
+        }, 201);
+    });
+
+    test("PUT /packages/:publisherName/:packageName/role-assignments/:userId enforces permissions and strict role escalation", async () => {
+        const pkg = await seedPackageForPublisher(publisher.id, {
+            name: `pkg-role-update-${randomUUID().slice(0, 8)}`,
+        });
+
+        const deniedCases: Array<{ token?: string; }> = [
+            {},
+            { token: outsiderSessionToken },
+            { token: viewerSessionToken },
+            { token: developerSessionToken },
+            { token: maintainerSessionToken },
+        ];
+
+        for (const denied of deniedCases) {
+            const target = await seedUser("user");
+            await DB.instance().insert(DB.Tables.roleAssignments).values({
+                package_id: pkg.id,
+                user_id: target.id,
+                role: PermissionHelper.OrgRoles.VIEWER
+            }).run();
+
+            await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/role-assignments/${target.id}`, {
+                method: "PUT",
+                authToken: denied.token,
+                body: {
+                    role: PermissionHelper.OrgRoles.DEVELOPER
+                }
+            }, 403);
+        }
+
+        const strictTarget = await seedUser("user");
+        await upsertPublisherMember(publisher.id, strictTarget.id, PermissionHelper.OrgRoles.DEVELOPER);
+        await DB.instance().insert(DB.Tables.roleAssignments).values({
+            package_id: pkg.id,
+            user_id: strictTarget.id,
+            role: PermissionHelper.OrgRoles.ADMIN
+        }).run();
+
+        await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/role-assignments/${strictTarget.id}`, {
+            method: "PUT",
+            authToken: ownerSessionToken,
+            body: {
+                role: PermissionHelper.OrgRoles.DEVELOPER
+            }
+        }, 400);
+
+        const orgAdminAllowedTarget = await seedUser("user");
+        await DB.instance().insert(DB.Tables.roleAssignments).values({
+            package_id: pkg.id,
+            user_id: orgAdminAllowedTarget.id,
+            role: PermissionHelper.OrgRoles.VIEWER
+        }).run();
+
+        await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/role-assignments/${orgAdminAllowedTarget.id}`, {
+            method: "PUT",
+            authToken: orgAdminSessionToken,
+            body: {
+                role: PermissionHelper.OrgRoles.DEVELOPER
+            }
+        }, 200);
+
+        const ownerAllowedTarget = await seedUser("user");
+        await DB.instance().insert(DB.Tables.roleAssignments).values({
+            package_id: pkg.id,
+            user_id: ownerAllowedTarget.id,
+            role: PermissionHelper.OrgRoles.VIEWER
+        }).run();
+
+        await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/role-assignments/${ownerAllowedTarget.id}`, {
+            method: "PUT",
+            authToken: ownerSessionToken,
+            body: {
+                role: PermissionHelper.OrgRoles.DEVELOPER
+            }
+        }, 200);
+
+        const siteAdminAllowedTarget = await seedUser("user");
+        await DB.instance().insert(DB.Tables.roleAssignments).values({
+            package_id: pkg.id,
+            user_id: siteAdminAllowedTarget.id,
+            role: PermissionHelper.OrgRoles.VIEWER
+        }).run();
+
+        await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/role-assignments/${siteAdminAllowedTarget.id}`, {
+            method: "PUT",
+            authToken: siteAdminSessionToken,
+            body: {
+                role: PermissionHelper.OrgRoles.DEVELOPER
+            }
+        }, 200);
+    });
+
+    test("DELETE /packages/:publisherName/:packageName/role-assignments/:userId enforces permissions", async () => {
+        const pkg = await seedPackageForPublisher(publisher.id, {
+            name: `pkg-role-delete-${randomUUID().slice(0, 8)}`,
+        });
+
+        const deniedCases: Array<{ token?: string; }> = [
+            {},
+            { token: outsiderSessionToken },
+            { token: viewerSessionToken },
+            { token: developerSessionToken },
+            { token: maintainerSessionToken },
+        ];
+
+        for (const denied of deniedCases) {
+            const target = await seedUser("user");
+            await DB.instance().insert(DB.Tables.roleAssignments).values({
+                package_id: pkg.id,
+                user_id: target.id,
+                role: PermissionHelper.OrgRoles.VIEWER
+            }).run();
+
+            await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/role-assignments/${target.id}`, {
+                method: "DELETE",
+                authToken: denied.token,
+            }, 403);
+        }
+
+        const orgAdminAllowedTarget = await seedUser("user");
+        await DB.instance().insert(DB.Tables.roleAssignments).values({
+            package_id: pkg.id,
+            user_id: orgAdminAllowedTarget.id,
+            role: PermissionHelper.OrgRoles.VIEWER
+        }).run();
+
+        await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/role-assignments/${orgAdminAllowedTarget.id}`, {
+            method: "DELETE",
+            authToken: orgAdminSessionToken,
+        }, 200);
+
+        const ownerAllowedTarget = await seedUser("user");
+        await DB.instance().insert(DB.Tables.roleAssignments).values({
+            package_id: pkg.id,
+            user_id: ownerAllowedTarget.id,
+            role: PermissionHelper.OrgRoles.VIEWER
+        }).run();
+
+        await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/role-assignments/${ownerAllowedTarget.id}`, {
+            method: "DELETE",
+            authToken: ownerSessionToken,
+        }, 200);
+
+        const siteAdminAllowedTarget = await seedUser("user");
+        await DB.instance().insert(DB.Tables.roleAssignments).values({
+            package_id: pkg.id,
+            user_id: siteAdminAllowedTarget.id,
+            role: PermissionHelper.OrgRoles.VIEWER
+        }).run();
+
+        await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/role-assignments/${siteAdminAllowedTarget.id}`, {
+            method: "DELETE",
+            authToken: siteAdminSessionToken,
+        }, 200);
     });
 });
 
