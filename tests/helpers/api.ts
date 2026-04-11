@@ -5,7 +5,7 @@ import { Logger } from "../../src/utils/logger";
 
 type HeadersInit = RequestInit["headers"];
 
-export async function makeAPIRequest<ReturnBody = null>(
+export async function makeAPIRequest<ReturnBody = any>(
     path: string,
     opts: {
         method?: "GET" | "POST" | "PUT" | "DELETE",
