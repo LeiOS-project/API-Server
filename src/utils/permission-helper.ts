@@ -1,12 +1,32 @@
 import { and, eq } from "drizzle-orm";
-import { DB } from "../db";
+import type { DB } from "../db";
 import type { AuthHandler } from "../api/utils/authHandler";
 
 export class PermissionHelper {
 
+    private static _dbModule: typeof DB | null = null;
+
+    private static get DB() {
+        if (!this._dbModule) {
+            throw new Error("PermissionHelper DB module not initialized. Call PermissionHelper.init() before using any methods.");
+        }
+        return this._dbModule;
+    }
+
+    static async init() {
+
+        if (!this._dbModule) {
+            this._dbModule = await import("../db").then(module => module.DB);
+        }
+    }
+
+
     /**
-     * Return the highest of two roles (ordered ADMIN > MAINTAINER > DEVELOPER > VIEWER).
-     * `null` means "no role", and anything non-null beats it.
+     * Simple utility to compare two roles. Returns:
+     *   -1 if a < b (a is lower role than b)
+     *    0 if a == b
+     *    1 if a > b (a is higher role than b)
+     * Note: null is treated as "no role" and is lower than any actual role.
      */
     static compareRoles(
         a: PermissionHelper.OrgRoles | null,
@@ -25,7 +45,7 @@ export class PermissionHelper {
     }
 
     /**
-     * Pick the higher of two roles. `null` is treated as "no role".
+     * Return the highest of two roles (ordered ADMIN > MAINTAINER > DEVELOPER > VIEWER).
      */
     static maxRole(
         a: PermissionHelper.OrgRoles | null,
@@ -39,16 +59,29 @@ export class PermissionHelper {
     /**
      * Whether the given user owns the publisher (i.e. publishers.owner_user_id === userId).
      */
-    static async isPublisherOwner(params: {
-        userId: number;
-        publisherId: number;
-    }): Promise<boolean> {
-        const row = await DB.instance()
-            .select({ owner_user_id: DB.Tables.publishers.owner_user_id })
-            .from(DB.Tables.publishers)
-            .where(eq(DB.Tables.publishers.id, params.publisherId))
+    static async isPublisherOwner(params: { userId: number; publisherId: number; }): Promise<boolean>;
+    static async isPublisherOwner(params: { userId: number; publisher: DB.Models.Publisher; }): Promise<boolean>;
+    static async isPublisherOwner(params: { userId: number; publisherId?: number; publisher?: DB.Models.Publisher; }): Promise<boolean> {
+
+        if (typeof params.publisher === 'object' && 'owner_user_id' in params.publisher) {
+            return params.publisher.owner_user_id === params.userId;
+        }
+        if (!params.publisherId) {
+            throw new Error("Either publisherId or publisher object must be provided");
+        }
+
+        const row = await this.DB.instance()
+            .select({ owner_user_id: this.DB.Tables.publishers.owner_user_id })
+            .from(this.DB.Tables.publishers)
+            .where(eq(this.DB.Tables.publishers.id, params.publisherId))
             .get();
-        return row?.owner_user_id === params.userId;
+
+        if (!row) {
+            console.warn(`isPublisherOwner: publisher with id ${params.publisherId} not found`);
+            return false;
+        }
+        
+        return row.owner_user_id === params.userId;
     }
 
     /**
@@ -66,24 +99,24 @@ export class PermissionHelper {
     }): Promise<PermissionHelper.OrgRoles | null> {
         const { userId, publisherId, packageId } = params;
 
-        const membership = await DB.instance()
-            .select({ role: DB.Tables.publisherMembers.role })
-            .from(DB.Tables.publisherMembers)
+        const membership = await this.DB.instance()
+            .select({ role: this.DB.Tables.publisherMembers.role })
+            .from(this.DB.Tables.publisherMembers)
             .where(and(
-                eq(DB.Tables.publisherMembers.user_id, userId),
-                eq(DB.Tables.publisherMembers.publisher_id, publisherId)
+                eq(this.DB.Tables.publisherMembers.user_id, userId),
+                eq(this.DB.Tables.publisherMembers.publisher_id, publisherId)
             ))
             .get();
 
         let role: PermissionHelper.OrgRoles | null = membership?.role ?? null;
 
         if (packageId !== undefined) {
-            const assignment = await DB.instance()
-                .select({ role: DB.Tables.roleAssignments.role })
-                .from(DB.Tables.roleAssignments)
+            const assignment = await this.DB.instance()
+                .select({ role: this.DB.Tables.roleAssignments.role })
+                .from(this.DB.Tables.roleAssignments)
                 .where(and(
-                    eq(DB.Tables.roleAssignments.user_id, userId),
-                    eq(DB.Tables.roleAssignments.package_id, packageId)
+                    eq(this.DB.Tables.roleAssignments.user_id, userId),
+                    eq(this.DB.Tables.roleAssignments.package_id, packageId)
                 ))
                 .get();
 
@@ -118,24 +151,60 @@ export class PermissionHelper {
         authContext: AuthHandler.AuthContext;
         publisherId: number;
         packageId?: number;
-        permission: (perms: PermissionHelper.OrgPermissions) => boolean;
+        check: (perms: PermissionHelper.OrgPermissions, role: PermissionHelper.OrgRoles) => boolean;
+    }): Promise<boolean>;
+
+    static async can(params: {
+        authContext: AuthHandler.AuthContext;
+        publisher: DB.Models.Publisher;
+        packageId?: number;
+        check: (perms: PermissionHelper.OrgPermissions, role: PermissionHelper.OrgRoles) => boolean;
+    }): Promise<boolean>;
+
+    static async can(params: {
+        authContext: AuthHandler.AuthContext;
+        publisherId?: number;
+        publisher?: DB.Models.Publisher;
+        packageId?: number;
+        check: (perms: PermissionHelper.OrgPermissions, role: PermissionHelper.OrgRoles) => boolean;
     }): Promise<boolean> {
-        const { authContext, publisherId, packageId, permission } = params;
+
+        const { authContext, packageId, check: permission } = params;
 
         if (authContext.type === 'unauthenticated') return false;
         if (authContext.user_role === 'admin') return true;
 
-        if (await this.isPublisherOwner({ userId: authContext.user_id, publisherId })) {
-            return true;
+        let publisherId: number;
+
+        if (params.publisher) {
+
+            if (authContext.user_id === params.publisher.owner_user_id) {
+                return true;
+            }
+            
+            publisherId = params.publisher.id;
+
+        } else if (params.publisherId) {
+
+            if (await this.isPublisherOwner({ userId: authContext.user_id, publisherId: params.publisherId })) {
+                return true;
+            }
+
+            publisherId = params.publisherId;
+
+        } else {
+            throw new Error("Either publisher or publisherId must be provided");
         }
 
-        const perms = await this.getEffectivePermissions({
+        const role = await this.getEffectiveRole({
             userId: authContext.user_id,
             publisherId,
             packageId
         });
-        if (!perms) return false;
-        return !!permission(perms);
+        if (!role) return false;
+        const perms = PermissionHelper.RolePermissions[role];
+
+        return !!permission(perms, role);
     }
 
 }
@@ -186,7 +255,7 @@ export namespace PermissionHelper {
         members: {
             invite: boolean;
             remove: boolean;
-            updateRole: boolean;
+            update: boolean;
         }
 
     }
@@ -213,7 +282,7 @@ export namespace PermissionHelper {
             members: {
                 invite: true,
                 remove: true,
-                updateRole: true
+                update: true
             }
         },
 
@@ -237,7 +306,7 @@ export namespace PermissionHelper {
             members: {
                 invite: false,
                 remove: false,
-                updateRole: false
+                update: false
             }
         },
 
@@ -261,7 +330,7 @@ export namespace PermissionHelper {
             members: {
                 invite: false,
                 remove: false,
-                updateRole: false
+                update: false
             }
         },
 
@@ -285,7 +354,7 @@ export namespace PermissionHelper {
             members: {
                 invite: false,
                 remove: false,
-                updateRole: false
+                update: false
             }
         }
     } as const satisfies Record<OrgRoles, OrgPermissions>;

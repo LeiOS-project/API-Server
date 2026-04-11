@@ -7,6 +7,7 @@ import { DB } from "../../src/db";
 import { API } from "../../src/api";
 import { drizzle } from "drizzle-orm/bun-sqlite";
 import { migrate } from "drizzle-orm/bun-sqlite/migrator";
+import { PermissionHelper } from "../../src/utils/permission-helper";
 
 // Allow overriding the env file used for tests without clobbering existing env vars.
 const TEST_ENV_FILE = process.env.TEST_ENV_FILE ?? ".env.test.local";
@@ -48,6 +49,8 @@ beforeAll(async () => {
         true,
         TMP_ROOT
     );
+
+    await PermissionHelper.init();
 
     await AptlyAPIServer.init({
         aptlyRoot: path.join(TMP_ROOT, "aptly"),

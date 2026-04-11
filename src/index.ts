@@ -6,6 +6,7 @@ import { Logger } from "./utils/logger";
 import { TaskScheduler } from "./tasks";
 import { LiveRepoUtils } from "./utils/live-repo";
 import { Utils } from "./utils";
+import { PermissionHelper } from "./utils/permission-helper";
 
 export class Main {
 
@@ -26,6 +27,8 @@ export class Main {
             config.LRA_DB_AUTO_MIGRATE,
             config.LRA_CONFIG_BASE_DIR ?? "./config"
         );
+
+        await PermissionHelper.init();
 
 
         await Utils.ensureDirectoryExists(config.LRA_LOG_DIR ?? "./data/logs");

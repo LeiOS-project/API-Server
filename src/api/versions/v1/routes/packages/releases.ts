@@ -70,7 +70,7 @@ router.post('/',
             authContext,
             publisherId: pkg.publisher_id,
             packageId: pkg.id,
-            permission: (p) => p.packages.releases.publish
+            check: (p) => p.packages.releases.publish
         });
 
         if (!allowed) {
@@ -186,7 +186,7 @@ router.put('/:version_with_leios_patch',
             authContext,
             publisherId: pkg.publisher_id,
             packageId: pkg.id,
-            permission: (p) => p.packages.releases.update
+            check: (p) => p.packages.releases.update
         });
 
         if (!allowed) {
@@ -238,7 +238,7 @@ router.post('/:version_with_leios_patch/:arch',
             authContext,
             publisherId: pkg.publisher_id,
             packageId: pkg.id,
-            permission: (p) => p.packages.releases.publish
+            check: (p) => p.packages.releases.publish
         });
 
         if (!allowed) {
@@ -370,7 +370,7 @@ router.delete('/:version_with_leios_patch',
             authContext,
             publisherId: pkg.publisher_id,
             packageId: pkg.id,
-            permission: (p) => p.packages.releases.delete
+            check: (p) => p.packages.releases.delete
         });
 
         if (!allowed) {

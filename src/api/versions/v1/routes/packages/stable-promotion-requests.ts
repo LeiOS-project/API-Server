@@ -94,7 +94,7 @@ router.post('/',
             authContext,
             publisherId: pkg.publisher_id,
             packageId: pkg.id,
-            permission: (p) => p.packages.releases.requestStable
+            check: (p) => p.packages.releases.requestStable
         });
 
         if (!allowed) {
@@ -221,7 +221,7 @@ router.delete('/:stablePromotionRequestID',
             authContext,
             publisherId: pkg.publisher_id,
             packageId: pkg.id,
-            permission: (p) => p.packages.releases.requestStable
+            check: (p) => p.packages.releases.requestStable
         });
 
         if (!allowed) {

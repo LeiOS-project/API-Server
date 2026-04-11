@@ -113,6 +113,12 @@ export namespace PublisherModel.CreatePublisher {
     });
 
     export type Body = z.infer<typeof Body>;
+
+    export const Response = z.object({
+        id: z.number().int().positive()
+    });
+
+    export type Response = z.infer<typeof Response>;
 }
 
 export namespace PublisherModel.UpdatePublisher {
@@ -139,21 +145,27 @@ export namespace PublisherModel.TransferOwnership {
 
 }
 
-export namespace PublisherModel.Member {
+export namespace PublisherModel.Members.GetMemberByID {
 
-    export const Entity = createSelectSchema(DB.Tables.publisherMembers);
-    export type Entity = z.infer<typeof Entity>;
+    export const Response = createSelectSchema(DB.Tables.publisherMembers).omit({
+        publisher_id: true,
+    }).extend({
+        user_username: z.string(),
+        user_display_name: z.string(),
+    });
 
-}
-
-export namespace PublisherModel.ListMembers {
-
-    export const Response = z.array(PublisherModel.Member.Entity);
     export type Response = z.infer<typeof Response>;
 
 }
 
-export namespace PublisherModel.AddMember {
+export namespace PublisherModel.Members.ListAll {
+
+    export const Response = z.array(PublisherModel.Members.GetMemberByID.Response);
+    export type Response = z.infer<typeof Response>;
+
+}
+
+export namespace PublisherModel.Members.AddMember {
 
     export const Body = z.object({
         user_id: z.number().int().positive(),
@@ -163,9 +175,16 @@ export namespace PublisherModel.AddMember {
 
     export type Body = z.infer<typeof Body>;
 
+    
+    export const Response = z.object({
+        id: z.number().int().positive()
+    });
+    
+    export type Response = z.infer<typeof Response>;
+
 }
 
-export namespace PublisherModel.UpdateMember {
+export namespace PublisherModel.Members.UpdateMember {
 
     export const Body = z.object({
         role: PublisherModel.OrgRoleSchema.optional(),

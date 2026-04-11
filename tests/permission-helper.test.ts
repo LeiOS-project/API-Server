@@ -187,7 +187,7 @@ describe("PermissionHelper.can", () => {
         const allowed = await PermissionHelper.can({
             authContext,
             publisherId,
-            permission: (p) => p.publisher.update,
+            check: (p) => p.publisher.update,
         });
         expect(allowed).toBe(false);
     });
@@ -196,7 +196,7 @@ describe("PermissionHelper.can", () => {
         const allowed = await PermissionHelper.can({
             authContext: fakeAuth(siteAdmin),
             publisherId,
-            permission: (p) => p.packages.delete,
+            check: (p) => p.packages.delete,
         });
         expect(allowed).toBe(true);
     });
@@ -205,7 +205,7 @@ describe("PermissionHelper.can", () => {
         const allowed = await PermissionHelper.can({
             authContext: fakeAuth(owner),
             publisherId,
-            permission: (p) => p.publisher.delete, // `delete` is false on ADMIN, but owner bypass wins
+            check: (p) => p.publisher.delete, // `delete` is false on ADMIN, but owner bypass wins
         });
         expect(allowed).toBe(true);
     });
@@ -214,7 +214,7 @@ describe("PermissionHelper.can", () => {
         const allowed = await PermissionHelper.can({
             authContext: fakeAuth(stranger),
             publisherId,
-            permission: (p) => p.packages.create,
+            check: (p) => p.packages.create,
         });
         expect(allowed).toBe(false);
     });
@@ -223,12 +223,12 @@ describe("PermissionHelper.can", () => {
         const canCreate = await PermissionHelper.can({
             authContext: fakeAuth(developer),
             publisherId,
-            permission: (p) => p.packages.create,
+            check: (p) => p.packages.create,
         });
         const canDelete = await PermissionHelper.can({
             authContext: fakeAuth(developer),
             publisherId,
-            permission: (p) => p.packages.delete,
+            check: (p) => p.packages.delete,
         });
         expect(canCreate).toBe(true);
         expect(canDelete).toBe(false);
@@ -238,7 +238,7 @@ describe("PermissionHelper.can", () => {
         const allowed = await PermissionHelper.can({
             authContext: fakeAuth(viewer),
             publisherId,
-            permission: (p) => p.packages.releases.publish,
+            check: (p) => p.packages.releases.publish,
         });
         expect(allowed).toBe(false);
     });
@@ -251,7 +251,7 @@ describe("PermissionHelper.can", () => {
             authContext: fakeAuth(developer),
             publisherId,
             packageId,
-            permission: (p) => p.packages.update,
+            check: (p) => p.packages.update,
         });
         expect(canUpdateOverriddenPkg).toBe(true);
 
@@ -259,7 +259,7 @@ describe("PermissionHelper.can", () => {
             authContext: fakeAuth(developer),
             publisherId,
             packageId: secondPkg.id,
-            permission: (p) => p.packages.update,
+            check: (p) => p.packages.update,
         });
         expect(canUpdateSiblingPkg).toBe(false);
     });

@@ -111,7 +111,7 @@ router.post('/',
         const allowed = await PermissionHelper.can({
             authContext,
             publisherId: publisher.id,
-            permission: (p) => p.packages.create
+            check: (p) => p.packages.create
         });
 
         if (!allowed) {
@@ -246,7 +246,7 @@ router.put('/:publisherName/:packageName',
             authContext,
             publisherId: pkg.publisher_id,
             packageId: pkg.id,
-            permission: (p) => p.packages.update
+            check: (p) => p.packages.update
         });
 
         if (!allowed) {
@@ -289,7 +289,7 @@ router.delete('/:publisherName/:packageName',
             authContext,
             publisherId: pkg.publisher_id,
             packageId: pkg.id,
-            permission: (p) => p.packages.delete
+            check: (p) => p.packages.delete
         });
 
         if (!allowed) {

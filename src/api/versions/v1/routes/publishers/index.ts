@@ -93,7 +93,7 @@ router.post('/',
         tags: [DOCS_TAGS.PUBLISHERS],
 
         responses: APIResponseSpec.describeWithWrongInputs(
-            APIResponseSpec.createdNoData("Publisher created successfully"),
+            APIResponseSpec.created("Publisher created successfully", PublisherModel.CreatePublisher.Response),
             APIResponseSpec.conflict("Publisher with this name already exists"),
             APIResponseSpec.unauthorized("Authentication required")
         )
@@ -143,7 +143,7 @@ router.post('/',
             return publisher;
         });
 
-        return APIResponse.created(c, "Publisher created successfully", { id: publisher.id });
+        return APIResponse.created(c, "Publisher created successfully", { id: publisher.id } satisfies PublisherModel.CreatePublisher.Response);
     }
 );
 
@@ -216,6 +216,7 @@ router.put('/:publisherName',
         summary: "Update publisher",
         description: "Update publisher details. Requires publisher.update permission.",
         tags: [DOCS_TAGS.PUBLISHERS],
+
         responses: APIResponseSpec.describeWithWrongInputs(
             APIResponseSpec.successNoData("Publisher updated successfully"),
             APIResponseSpec.notFound("Publisher not found"),
@@ -234,8 +235,8 @@ router.put('/:publisherName',
 
         const allowed = await PermissionHelper.can({
             authContext,
-            publisherId: publisher.id,
-            permission: (p) => p.publisher.update
+            publisher,
+            check: (p) => p.publisher.update
         });
 
         if (!allowed) {
@@ -251,63 +252,6 @@ router.put('/:publisherName',
     }
 );
 
-// Delete publisher — owner-only
-router.delete('/:publisherName',
-
-    APIRouteSpec.authenticated({
-        summary: "Delete publisher",
-        description: "Delete a publisher. Only the publisher owner (or site admin) can delete, and the publisher must have no packages.",
-        tags: [DOCS_TAGS.PUBLISHERS],
-        responses: APIResponseSpec.describeBasic(
-            APIResponseSpec.successNoData("Publisher deleted successfully"),
-            APIResponseSpec.notFound("Publisher not found"),
-            APIResponseSpec.forbidden("Only the publisher owner can delete this publisher"),
-            APIResponseSpec.badRequest("Cannot delete publisher with existing packages")
-        )
-    }),
-
-    async (c) => {
-        // @ts-ignore
-        const publisher = c.get("publisher") as DB.Models.Publisher;
-        // @ts-ignore
-        const authContext = c.get("authContext") as AuthHandler.AuthContext;
-
-        if (authContext.type === "unauthenticated") {
-            return APIResponse.unauthorized(c, "Authentication required");
-        }
-
-        const isOwner = await PermissionHelper.isPublisherOwner({
-            userId: authContext.user_id,
-            publisherId: publisher.id
-        });
-
-        if (!isOwner && authContext.user_role !== 'admin') {
-            return APIResponse.forbidden(c, "Only the publisher owner can delete this publisher");
-        }
-
-        const packageCount = await DB.instance()
-            .select({ id: DB.Tables.packages.id })
-            .from(DB.Tables.packages)
-            .where(eq(DB.Tables.packages.publisher_id, publisher.id))
-            .limit(1);
-
-        if (packageCount.length > 0) {
-            return APIResponse.badRequest(c, "Cannot delete publisher with existing packages");
-        }
-
-        await DB.instance().transaction(async (tx) => {
-            await tx.delete(DB.Tables.publisherMembers).where(
-                eq(DB.Tables.publisherMembers.publisher_id, publisher.id)
-            );
-            await tx.delete(DB.Tables.publishers).where(
-                eq(DB.Tables.publishers.id, publisher.id)
-            );
-        });
-
-        return APIResponse.successNoData(c, "Publisher deleted successfully");
-    }
-);
-
 // Transfer ownership of a publisher to another user.
 router.post('/:publisherName/transfer-ownership',
 
@@ -315,6 +259,7 @@ router.post('/:publisherName/transfer-ownership',
         summary: "Transfer publisher ownership",
         description: "Transfer ownership of a publisher to another user. Only the current owner (or site admin) can perform this action.",
         tags: [DOCS_TAGS.PUBLISHERS],
+
         responses: APIResponseSpec.describeWithWrongInputs(
             APIResponseSpec.successNoData("Publisher ownership transferred successfully"),
             APIResponseSpec.notFound("Publisher not found"),
@@ -335,10 +280,7 @@ router.post('/:publisherName/transfer-ownership',
             return APIResponse.unauthorized(c, "Authentication required");
         }
 
-        const isOwner = await PermissionHelper.isPublisherOwner({
-            userId: authContext.user_id,
-            publisherId: publisher.id
-        });
+        const isOwner = publisher.owner_user_id === authContext.user_id;
 
         if (!isOwner && authContext.user_role !== 'admin') {
             return APIResponse.forbidden(c, "Only the current owner can transfer ownership");
@@ -383,6 +325,61 @@ router.post('/:publisherName/transfer-ownership',
         });
 
         return APIResponse.successNoData(c, "Publisher ownership transferred successfully");
+    }
+);
+
+// Delete publisher — owner-only
+router.delete('/:publisherName',
+
+    APIRouteSpec.authenticated({
+        summary: "Delete publisher",
+        description: "Delete a publisher. Only the publisher owner (or site admin) can delete, and the publisher must have no packages.",
+        tags: [DOCS_TAGS.PUBLISHERS],
+
+        responses: APIResponseSpec.describeBasic(
+            APIResponseSpec.successNoData("Publisher deleted successfully"),
+            APIResponseSpec.notFound("Publisher not found"),
+            APIResponseSpec.forbidden("Only the publisher owner can delete this publisher"),
+            APIResponseSpec.badRequest("Cannot delete publisher with existing packages")
+        )
+    }),
+
+    async (c) => {
+        // @ts-ignore
+        const publisher = c.get("publisher") as DB.Models.Publisher;
+        // @ts-ignore
+        const authContext = c.get("authContext") as AuthHandler.AuthContext;
+
+        if (authContext.type === "unauthenticated") {
+            return APIResponse.unauthorized(c, "Authentication required");
+        }
+
+        const isOwner = publisher.owner_user_id === authContext.user_id;
+
+        if (!isOwner && authContext.user_role !== 'admin') {
+            return APIResponse.forbidden(c, "Only the publisher owner can delete this publisher");
+        }
+
+        const packageCount = await DB.instance()
+            .select({ id: DB.Tables.packages.id })
+            .from(DB.Tables.packages)
+            .where(eq(DB.Tables.packages.publisher_id, publisher.id))
+            .limit(1);
+
+        if (packageCount.length > 0) {
+            return APIResponse.badRequest(c, "Cannot delete publisher with existing packages");
+        }
+
+        await DB.instance().transaction(async (tx) => {
+            await tx.delete(DB.Tables.publisherMembers).where(
+                eq(DB.Tables.publisherMembers.publisher_id, publisher.id)
+            );
+            await tx.delete(DB.Tables.publishers).where(
+                eq(DB.Tables.publishers.id, publisher.id)
+            );
+        });
+
+        return APIResponse.successNoData(c, "Publisher deleted successfully");
     }
 );
 

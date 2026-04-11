@@ -54,7 +54,7 @@ router.get('/',
         const allowed = await PermissionHelper.can({
             authContext,
             publisherId: pkg.publisher_id,
-            permission: (p) => p.members.invite
+            check: (p) => p.members.invite
         });
 
         if (!allowed) {
@@ -100,7 +100,7 @@ router.post('/',
         const allowed = await PermissionHelper.can({
             authContext,
             publisherId: pkg.publisher_id,
-            permission: (p) => p.members.updateRole
+            check: (p) => p.members.update
         });
 
         if (!allowed) {
@@ -179,7 +179,7 @@ router.put('/:userId',
         const allowed = await PermissionHelper.can({
             authContext,
             publisherId: pkg.publisher_id,
-            permission: (p) => p.members.updateRole
+            check: (p) => p.members.update
         });
 
         if (!allowed) {
@@ -242,7 +242,7 @@ router.delete('/:userId',
         const allowed = await PermissionHelper.can({
             authContext,
             publisherId: pkg.publisher_id,
-            permission: (p) => p.members.updateRole
+            check: (p) => p.members.update
         });
 
         if (!allowed) {
