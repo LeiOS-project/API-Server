@@ -29,8 +29,7 @@ export namespace PackageModel {
     export type PackageFlags = z.infer<typeof PackageFlags>;
 
     export const Param = z.object({
-        publisherName: z.string(),
-        packageName: z.string()
+        fullPackageName: z.string()
     });
 
 }

@@ -28,7 +28,7 @@ router.get('/',
 
     async (c) => {
         // @ts-ignore
-        const pkg = c.get("package") as DB.Models.Package;
+        const pkg = c.get("package") as DB.Models.PackageFullView;
 
         const releases = await DB.instance().select().from(DB.Tables.packageReleases).where(
             eq(DB.Tables.packageReleases.package_id, pkg.id)
@@ -57,7 +57,7 @@ router.post('/',
 
     async (c) => {
         // @ts-ignore
-        const pkg = c.get("package") as DB.Models.Package;
+        const pkg = c.get("package") as DB.Models.PackageFullView;
         // @ts-ignore
         const authContext = c.get("authContext") as AuthHandler.AuthContext;
         const body = c.req.valid("json");
@@ -114,7 +114,7 @@ router.use('/:version_with_leios_patch/*',
         // @ts-ignore
         const { version_with_leios_patch } = c.req.valid("param") as { version_with_leios_patch: string };
         // @ts-ignore
-        const pkg = c.get("package") as DB.Models.Package;
+        const pkg = c.get("package") as DB.Models.PackageFullView;
 
         const releaseData = await DB.instance().select().from(DB.Tables.packageReleases).where(and(
             eq(DB.Tables.packageReleases.package_id, pkg.id),
@@ -171,7 +171,7 @@ router.put('/:version_with_leios_patch',
 
     async (c) => {
         // @ts-ignore
-        const pkg = c.get("package") as DB.Models.Package;
+        const pkg = c.get("package") as DB.Models.PackageFullView;
         // @ts-ignore
         const release = c.get("release") as DB.Models.PackageRelease;
         // @ts-ignore
@@ -222,7 +222,7 @@ router.post('/:version_with_leios_patch/:arch',
 
     async (c) => {
         // @ts-ignore
-        const pkg = c.get("package") as DB.Models.Package;
+        const pkg = c.get("package") as DB.Models.PackageFullView;
         // @ts-ignore
         const release = c.get("release") as DB.Models.PackageRelease;
         // @ts-ignore
@@ -356,7 +356,7 @@ router.delete('/:version_with_leios_patch',
 
     async (c) => {
         // @ts-ignore
-        const pkg = c.get("package") as DB.Models.Package;
+        const pkg = c.get("package") as DB.Models.PackageFullView;
         // @ts-ignore
         const release = c.get("release") as DB.Models.PackageRelease;
         // @ts-ignore

@@ -14,6 +14,7 @@ import { DOCS_TAGS } from "../../docs";
 import { router as releasesRouter } from "./releases";
 import { router as stableRequestsRouter } from "./stable-promotion-requests";
 import { router as roleAssignmentsRouter } from "./role-assignments";
+import { Utils } from "../../../../../utils";
 
 export const router = new Hono().basePath('/packages');
 
@@ -150,44 +151,32 @@ router.post('/',
 
 
 // Loads the package (and its publisher) by :publisherName/:packageName for sub-routes.
-router.use('/:publisherName/:packageName/*',
+router.use('/:fullPackageName/*',
 
     zValidator("param", PackageModel.Param),
 
     async (c, next) => {
         // @ts-ignore
-        const { publisherName, packageName } = c.req.valid("param") as { publisherName: string; packageName: string };
+        const { fullPackageName } = c.req.valid("param") as { fullPackageName: string };
 
-        const row = await DB.instance()
-            .select({
-                publisher: DB.Tables.publishers,
-                pkg: DB.Tables.packages
-            })
-            .from(DB.Tables.packages)
-            .innerJoin(
-                DB.Tables.publishers,
-                eq(DB.Tables.publishers.id, DB.Tables.packages.publisher_id)
-            )
-            .where(and(
-                eq(DB.Tables.publishers.name, publisherName),
-                eq(DB.Tables.packages.name, packageName)
-            ))
-            .get();
+        const row = await DB.instance().select().from(DB.Tables.packagesFullView).where(
+            eq(DB.Tables.packagesFullView.fullname, fullPackageName)
+        ).get();
 
         if (!row) {
             return APIResponse.notFound(c, "Package with specified name not found");
         }
 
-        // @ts-ignore
-        c.set("publisher", row.publisher);
-        // @ts-ignore
-        c.set("package", row.pkg);
+        c.set(// @ts-ignore
+            "package",
+            row satisfies DB.Models.PackageFullView
+        );
 
         return await next();
     }
 );
 
-router.get('/:publisherName/:packageName',
+router.get('/:fullPackageName',
 
     APIRouteSpec.unauthenticated({
         summary: "Get package details",
@@ -202,20 +191,13 @@ router.get('/:publisherName/:packageName',
 
     async (c) => {
         // @ts-ignore
-        const pkg = c.get("package") as DB.Models.Package;
-        // @ts-ignore
-        const publisher = c.get("publisher") as DB.Models.Publisher;
+        const pkg = c.get("package") as DB.Models.PackageFullView;
 
-        const result = {
-            ...pkg,
-            fullname: `${publisher.name}.${pkg.name}`
-        };
-
-        return APIResponse.success(c, "Package retrieved successfully", result satisfies PackageModel.GetPackageByFullName.Response);
+        return APIResponse.success(c, "Package retrieved successfully", Utils.asExact<PackageModel.GetPackageByFullName.Response>()(pkg));
     }
 );
 
-router.put('/:publisherName/:packageName',
+router.put('/:fullPackageName',
 
     APIRouteSpec.authenticated({
         summary: "Update package details",
@@ -233,7 +215,7 @@ router.put('/:publisherName/:packageName',
 
     async (c) => {
         // @ts-ignore
-        const pkg = c.get("package") as DB.Models.Package;
+        const pkg = c.get("package") as DB.Models.PackageFullView
         // @ts-ignore
         const authContext = c.get("authContext") as AuthHandler.AuthContext;
         const updateData = c.req.valid("json");
@@ -261,7 +243,7 @@ router.put('/:publisherName/:packageName',
     }
 );
 
-router.delete('/:publisherName/:packageName',
+router.delete('/:fullPackageName',
 
     APIRouteSpec.authenticated({
         summary: "Delete a package",
@@ -277,7 +259,7 @@ router.delete('/:publisherName/:packageName',
 
     async (c) => {
         // @ts-ignore
-        const pkg = c.get("package") as DB.Models.Package;
+        const pkg = c.get("package") as DB.Models.PackageFullView;
         // @ts-ignore
         const authContext = c.get("authContext") as AuthHandler.AuthContext;
 
@@ -326,6 +308,6 @@ router.delete('/:publisherName/:packageName',
     }
 );
 
-router.route('/:publisherName/:packageName', releasesRouter);
-router.route('/:publisherName/:packageName', stableRequestsRouter);
-router.route('/:publisherName/:packageName', roleAssignmentsRouter);
+router.route('/:fullPackageName', releasesRouter);
+router.route('/:fullPackageName', stableRequestsRouter);
+router.route('/:fullPackageName', roleAssignmentsRouter);

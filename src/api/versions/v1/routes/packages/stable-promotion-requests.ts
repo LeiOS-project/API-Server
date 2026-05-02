@@ -29,7 +29,7 @@ router.get('/',
 
     async (c) => {
         // @ts-ignore
-        const pkg = c.get("package") as DB.Models.Package;
+        const pkg = c.get("package") as DB.Models.PackageFullView;
         const filters = c.req.valid("query");
 
         let query = DB.instance().select({
@@ -85,7 +85,7 @@ router.post('/',
 
     async (c) => {
         // @ts-ignore
-        const pkg = c.get("package") as DB.Models.Package;
+        const pkg = c.get("package") as DB.Models.PackageFullView;
         // @ts-ignore
         const authContext = c.get("authContext") as AuthHandler.AuthContext;
         const body = c.req.valid("json");
@@ -138,7 +138,7 @@ router.use('/:stablePromotionRequestID',
         // @ts-ignore
         const { stablePromotionRequestID } = c.req.valid("param") as { stablePromotionRequestID: number };
         // @ts-ignore
-        const pkg = c.get("package") as DB.Models.Package;
+        const pkg = c.get("package") as DB.Models.PackageFullView;
 
         const requestData = await DB.instance().select({
             id: DB.Tables.stablePromotionRequests.id,
@@ -211,7 +211,7 @@ router.delete('/:stablePromotionRequestID',
 
     async (c) => {
         // @ts-ignore
-        const pkg = c.get("package") as DB.Models.Package;
+        const pkg = c.get("package") as DB.Models.PackageFullView;
         // @ts-ignore
         const authContext = c.get("authContext") as AuthHandler.AuthContext;
         // @ts-ignore

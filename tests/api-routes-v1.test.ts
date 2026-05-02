@@ -736,7 +736,7 @@ describe("Package sub-routes coverage", async () => {
     let viewerSessionToken: string;
 
     let publisher: DB.Models.Publisher;
-    let packageName: string;
+    let fullPackageName: string;
     let packageID: number;
     let releaseID: number;
     let stablePromotionRequestID: number;
@@ -754,7 +754,9 @@ describe("Package sub-routes coverage", async () => {
     });
 
     test("POST /packages creates a package", async () => {
-        packageName = `pkg-${randomUUID().slice(0, 8)}`;
+
+        const packageName = `pkg-${randomUUID().slice(0, 8)}`;
+        fullPackageName = `${publisher.name}.${packageName}`;
 
         const created = await makeAPIRequest("/v1/packages", {
             method: "POST",
@@ -766,7 +768,7 @@ describe("Package sub-routes coverage", async () => {
                 description: "Package coverage tests",
                 homepage_url: "https://package.example.com",
                 requires_patching: false
-            }
+            } satisfies PackageModel.CreatePackage.Body
         }, 201);
 
         packageID = created.id;
@@ -781,13 +783,13 @@ describe("Package sub-routes coverage", async () => {
         expect(list.some(pkg => pkg.id === packageID)).toBe(true);
     });
 
-    test("GET /packages/:publisherName/:packageName returns package", async () => {
-        const pkg = await makeAPIRequest(`/v1/packages/${publisher.name}/${packageName}`, {}, 200);
+    test("GET /packages/:fullPackageName returns package", async () => {
+        const pkg = await makeAPIRequest(`/v1/packages/${fullPackageName}`, {}, 200);
         expect(pkg.id).toBe(packageID);
     });
 
-    test("PUT /packages/:publisherName/:packageName updates package", async () => {
-        await makeAPIRequest(`/v1/packages/${publisher.name}/${packageName}`, {
+    test("PUT /packages/:fullPackageName updates package", async () => {
+        await makeAPIRequest(`/v1/packages/${fullPackageName}`, {
             method: "PUT",
             authToken: ownerSessionToken,
             body: {
@@ -799,20 +801,20 @@ describe("Package sub-routes coverage", async () => {
         expect(pkg?.description).toBe("Updated package coverage description");
     });
 
-    test("DELETE /packages/:publisherName/:packageName is forbidden for developer role", async () => {
-        await makeAPIRequest(`/v1/packages/${publisher.name}/${packageName}`, {
+    test("DELETE /packages/:fullPackageName is forbidden for developer role", async () => {
+        await makeAPIRequest(`/v1/packages/${fullPackageName}`, {
             method: "DELETE",
             authToken: developerSessionToken
         }, 403);
     });
 
-    test("GET /packages/:publisherName/:packageName/releases lists releases", async () => {
-        const releases = await makeAPIRequest(`/v1/packages/${publisher.name}/${packageName}/releases`, {}, 200);
+    test("GET /packages/:fullPackageName/releases lists releases", async () => {
+        const releases = await makeAPIRequest(`/v1/packages/${fullPackageName}/releases`, {}, 200);
         expect(releases).toEqual([]);
     });
 
-    test("POST /packages/:publisherName/:packageName/releases creates release", async () => {
-        await makeAPIRequest(`/v1/packages/${publisher.name}/${packageName}/releases`, {
+    test("POST /packages/:fullPackageName/releases creates release", async () => {
+        await makeAPIRequest(`/v1/packages/${fullPackageName}/releases`, {
             method: "POST",
             authToken: ownerSessionToken,
             body: {
@@ -830,13 +832,13 @@ describe("Package sub-routes coverage", async () => {
         releaseID = release!.id;
     });
 
-    test("GET /packages/:publisherName/:packageName/releases/:version_with_leios_patch returns release", async () => {
-        const release = await makeAPIRequest(`/v1/packages/${publisher.name}/${packageName}/releases/1.0.0`, {}, 200);
+    test("GET /packages/:fullPackageName/releases/:version_with_leios_patch returns release", async () => {
+        const release = await makeAPIRequest(`/v1/packages/${fullPackageName}/releases/1.0.0`, {}, 200);
         expect(release.id).toBe(releaseID);
     });
 
-    test("PUT /packages/:publisherName/:packageName/releases/:version_with_leios_patch updates release", async () => {
-        await makeAPIRequest(`/v1/packages/${publisher.name}/${packageName}/releases/1.0.0`, {
+    test("PUT /packages/:fullPackageName/releases/:version_with_leios_patch updates release", async () => {
+        await makeAPIRequest(`/v1/packages/${fullPackageName}/releases/1.0.0`, {
             method: "PUT",
             authToken: ownerSessionToken,
             body: {
@@ -848,11 +850,11 @@ describe("Package sub-routes coverage", async () => {
         expect(release?.changelog).toBe("Updated release changelog");
     });
 
-    test("POST /packages/:publisherName/:packageName/releases/:version_with_leios_patch/:arch checks publish permission", async () => {
+    test("POST /packages/:fullPackageName/releases/:version_with_leios_patch/:arch checks publish permission", async () => {
         const formData = new FormData();
         formData.set("file", new File(["fake-deb"], "fake.deb"));
 
-        await makeAPIRequest(`/v1/packages/${publisher.name}/${packageName}/releases/1.0.0/amd64`, {
+        await makeAPIRequest(`/v1/packages/${fullPackageName}/releases/1.0.0/amd64`, {
             method: "POST",
             authToken: viewerSessionToken,
             additionalOptions: {
@@ -861,15 +863,15 @@ describe("Package sub-routes coverage", async () => {
         }, 403);
     });
 
-    test("DELETE /packages/:publisherName/:packageName/releases/:version_with_leios_patch is forbidden for developer", async () => {
-        await makeAPIRequest(`/v1/packages/${publisher.name}/${packageName}/releases/1.0.0`, {
+    test("DELETE /packages/:fullPackageName/releases/:version_with_leios_patch is forbidden for developer", async () => {
+        await makeAPIRequest(`/v1/packages/${fullPackageName}/releases/1.0.0`, {
             method: "DELETE",
             authToken: developerSessionToken
         }, 403);
     });
 
-    test("POST /packages/:publisherName/:packageName/stable-promotion-requests creates request", async () => {
-        const created = await makeAPIRequest(`/v1/packages/${publisher.name}/${packageName}/stable-promotion-requests`, {
+    test("POST /packages/:fullPackageName/stable-promotion-requests creates request", async () => {
+        const created = await makeAPIRequest(`/v1/packages/${fullPackageName}/stable-promotion-requests`, {
             method: "POST",
             authToken: ownerSessionToken,
             body: {
@@ -881,18 +883,18 @@ describe("Package sub-routes coverage", async () => {
         expect(created.id).toBeNumber();
     });
 
-    test("GET /packages/:publisherName/:packageName/stable-promotion-requests lists requests", async () => {
-        const list = await makeAPIRequest(`/v1/packages/${publisher.name}/${packageName}/stable-promotion-requests`, {}, 200);
+    test("GET /packages/:fullPackageName/stable-promotion-requests lists requests", async () => {
+        const list = await makeAPIRequest(`/v1/packages/${fullPackageName}/stable-promotion-requests`, {}, 200);
         expect(list.some((item: any) => item.id === stablePromotionRequestID)).toBe(true);
     });
 
-    test("GET /packages/:publisherName/:packageName/stable-promotion-requests/:stablePromotionRequestID returns request", async () => {
-        const item = await makeAPIRequest(`/v1/packages/${publisher.name}/${packageName}/stable-promotion-requests/${stablePromotionRequestID}`, {}, 200);
+    test("GET /packages/:fullPackageName/stable-promotion-requests/:stablePromotionRequestID returns request", async () => {
+        const item = await makeAPIRequest(`/v1/packages/${fullPackageName}/stable-promotion-requests/${stablePromotionRequestID}`, {}, 200);
         expect(item.id).toBe(stablePromotionRequestID);
     });
 
-    test("DELETE /packages/:publisherName/:packageName/stable-promotion-requests/:stablePromotionRequestID removes request", async () => {
-        await makeAPIRequest(`/v1/packages/${publisher.name}/${packageName}/stable-promotion-requests/${stablePromotionRequestID}`, {
+    test("DELETE /packages/:fullPackageName/stable-promotion-requests/:stablePromotionRequestID removes request", async () => {
+        await makeAPIRequest(`/v1/packages/${fullPackageName}/stable-promotion-requests/${stablePromotionRequestID}`, {
             method: "DELETE",
             authToken: ownerSessionToken
         }, 200);
@@ -904,16 +906,16 @@ describe("Package sub-routes coverage", async () => {
         expect(request).toBeUndefined();
     });
 
-    test("GET /packages/:publisherName/:packageName/role-assignments lists assignments", async () => {
-        const list = await makeAPIRequest(`/v1/packages/${publisher.name}/${packageName}/role-assignments`, {
+    test("GET /packages/:fullPackageName/role-assignments lists assignments", async () => {
+        const list = await makeAPIRequest(`/v1/packages/${fullPackageName}/role-assignments`, {
             authToken: ownerSessionToken
         }, 200);
 
         expect(Array.isArray(list)).toBe(true);
     });
 
-    test("POST /packages/:publisherName/:packageName/role-assignments creates assignment", async () => {
-        await makeAPIRequest(`/v1/packages/${publisher.name}/${packageName}/role-assignments`, {
+    test("POST /packages/:fullPackageName/role-assignments creates assignment", async () => {
+        await makeAPIRequest(`/v1/packages/${fullPackageName}/role-assignments`, {
             method: "POST",
             authToken: ownerSessionToken,
             body: {
@@ -930,8 +932,8 @@ describe("Package sub-routes coverage", async () => {
         expect(assignment?.role).toBe(PermissionHelper.OrgRoles.MAINTAINER);
     });
 
-    test("PUT /packages/:publisherName/:packageName/role-assignments/:userId updates assignment", async () => {
-        await makeAPIRequest(`/v1/packages/${publisher.name}/${packageName}/role-assignments/${developer.id}`, {
+    test("PUT /packages/:fullPackageName/role-assignments/:userId updates assignment", async () => {
+        await makeAPIRequest(`/v1/packages/${fullPackageName}/role-assignments/${developer.id}`, {
             method: "PUT",
             authToken: ownerSessionToken,
             body: {
@@ -947,8 +949,8 @@ describe("Package sub-routes coverage", async () => {
         expect(assignment?.role).toBe(PermissionHelper.OrgRoles.ADMIN);
     });
 
-    test("DELETE /packages/:publisherName/:packageName/role-assignments/:userId removes assignment", async () => {
-        await makeAPIRequest(`/v1/packages/${publisher.name}/${packageName}/role-assignments/${developer.id}`, {
+    test("DELETE /packages/:fullPackageName/role-assignments/:userId removes assignment", async () => {
+        await makeAPIRequest(`/v1/packages/${fullPackageName}/role-assignments/${developer.id}`, {
             method: "DELETE",
             authToken: ownerSessionToken,
         }, 200);
@@ -1421,7 +1423,7 @@ describe("Publisher package-route permission matrix", async () => {
         }
     });
 
-    test("PUT /packages/:publisherName/:packageName enforces package update permissions", async () => {
+    test("PUT /packages/:fullPackageName enforces package update permissions", async () => {
         const pkg = await seedPackageForPublisher(publisher.id, {
             name: `pkg-update-${randomUUID().slice(0, 8)}`,
             description: "Initial update permission package"
@@ -1439,7 +1441,7 @@ describe("Publisher package-route permission matrix", async () => {
         ];
 
         for (const current of cases) {
-            await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}`, {
+            await makeAPIRequest(`/v1/packages/${publisher.name}.${pkg.name}`, {
                 method: "PUT",
                 authToken: current.token,
                 body: {
@@ -1449,7 +1451,7 @@ describe("Publisher package-route permission matrix", async () => {
         }
     });
 
-    test("DELETE /packages/:publisherName/:packageName blocks non-delete roles", async () => {
+    test("DELETE /packages/:fullPackageName blocks non-delete roles", async () => {
         const deniedCases: Array<{ token?: string; }> = [
             {},
             { token: outsiderSessionToken },
@@ -1464,14 +1466,14 @@ describe("Publisher package-route permission matrix", async () => {
                 description: "Delete denied matrix package"
             });
 
-            await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}`, {
+            await makeAPIRequest(`/v1/packages/${publisher.name}.${pkg.name}`, {
                 method: "DELETE",
                 authToken: denied.token,
             }, 403);
         }
     });
 
-    test("POST /packages/:publisherName/:packageName/releases enforces publish permissions", async () => {
+    test("POST /packages/:fullPackageName/releases enforces publish permissions", async () => {
         const cases: Array<{ label: string; token?: string; code: number; }> = [
             { label: "unauth", code: 403 },
             { label: "outsider", token: outsiderSessionToken, code: 403 },
@@ -1488,7 +1490,7 @@ describe("Publisher package-route permission matrix", async () => {
                 name: `pkg-release-create-${current.label}-${randomUUID().slice(0, 6)}`,
             });
 
-            await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/releases`, {
+            await makeAPIRequest(`/v1/packages/${publisher.name}.${pkg.name}/releases`, {
                 method: "POST",
                 authToken: current.token,
                 body: {
@@ -1499,7 +1501,7 @@ describe("Publisher package-route permission matrix", async () => {
         }
     });
 
-    test("PUT /packages/:publisherName/:packageName/releases/:version enforces release update permissions", async () => {
+    test("PUT /packages/:fullPackageName/releases/:version enforces release update permissions", async () => {
         const cases: Array<{ token?: string; code: number; }> = [
             { code: 403 },
             { token: outsiderSessionToken, code: 403 },
@@ -1520,7 +1522,7 @@ describe("Publisher package-route permission matrix", async () => {
                 changelog: "Before update"
             });
 
-            await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/releases/${release.version_with_leios_patch}`, {
+            await makeAPIRequest(`/v1/packages/${publisher.name}.${pkg.name}/releases/${release.version_with_leios_patch}`, {
                 method: "PUT",
                 authToken: current.token,
                 body: {
@@ -1530,7 +1532,7 @@ describe("Publisher package-route permission matrix", async () => {
         }
     });
 
-    test("DELETE /packages/:publisherName/:packageName/releases/:version blocks non-delete roles", async () => {
+    test("DELETE /packages/:fullPackageName/releases/:version blocks non-delete roles", async () => {
         const deniedCases: Array<{ token?: string; }> = [
             {},
             { token: outsiderSessionToken },
@@ -1547,14 +1549,14 @@ describe("Publisher package-route permission matrix", async () => {
                 version_with_leios_patch: `4.0.${Math.floor(Math.random() * 9000) + 1000}`,
             });
 
-            await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/releases/${release.version_with_leios_patch}`, {
+            await makeAPIRequest(`/v1/packages/${publisher.name}.${pkg.name}/releases/${release.version_with_leios_patch}`, {
                 method: "DELETE",
                 authToken: denied.token,
             }, 403);
         }
     });
 
-    test("POST /packages/:publisherName/:packageName/releases/:version/:arch blocks non-publish roles", async () => {
+    test("POST /packages/:fullPackageName/releases/:version/:arch blocks non-publish roles", async () => {
         const pkg = await seedPackageForPublisher(publisher.id, {
             name: `pkg-release-upload-${randomUUID().slice(0, 8)}`,
         });
@@ -1572,7 +1574,7 @@ describe("Publisher package-route permission matrix", async () => {
         ];
 
         for (const denied of deniedCases) {
-            await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/releases/${release.version_with_leios_patch}/amd64`, {
+            await makeAPIRequest(`/v1/packages/${publisher.name}.${pkg.name}/releases/${release.version_with_leios_patch}/amd64`, {
                 method: "POST",
                 authToken: denied.token,
                 additionalOptions: {
@@ -1582,7 +1584,7 @@ describe("Publisher package-route permission matrix", async () => {
         }
     });
 
-    test("POST /packages/:publisherName/:packageName/stable-promotion-requests enforces requestStable permissions", async () => {
+    test("POST /packages/:fullPackageName/stable-promotion-requests enforces requestStable permissions", async () => {
         const cases: Array<{ label: string; token?: string; code: number; }> = [
             { label: "unauth", code: 403 },
             { label: "outsider", token: outsiderSessionToken, code: 403 },
@@ -1602,7 +1604,7 @@ describe("Publisher package-route permission matrix", async () => {
                 version_with_leios_patch: `5.0.${Math.floor(Math.random() * 9000) + 1000}`,
             });
 
-            const created = await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/stable-promotion-requests`, {
+            const created = await makeAPIRequest(`/v1/packages/${publisher.name}.${pkg.name}/stable-promotion-requests`, {
                 method: "POST",
                 authToken: current.token,
                 body: {
@@ -1616,7 +1618,7 @@ describe("Publisher package-route permission matrix", async () => {
         }
     });
 
-    test("DELETE /packages/:publisherName/:packageName/stable-promotion-requests/:id enforces requestStable permissions", async () => {
+    test("DELETE /packages/:fullPackageName/stable-promotion-requests/:id enforces requestStable permissions", async () => {
         const cases: Array<{ token?: string; code: number; }> = [
             { code: 403 },
             { token: outsiderSessionToken, code: 403 },
@@ -1637,14 +1639,14 @@ describe("Publisher package-route permission matrix", async () => {
             });
             const request = await seedStablePromotionRequest(pkg.id, release.id);
 
-            await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/stable-promotion-requests/${request.id}`, {
+            await makeAPIRequest(`/v1/packages/${publisher.name}.${pkg.name}/stable-promotion-requests/${request.id}`, {
                 method: "DELETE",
                 authToken: current.token,
             }, current.code);
         }
     });
 
-    test("GET /packages/:publisherName/:packageName/role-assignments enforces list permissions", async () => {
+    test("GET /packages/:fullPackageName/role-assignments enforces list permissions", async () => {
         const pkg = await seedPackageForPublisher(publisher.id, {
             name: `pkg-role-list-${randomUUID().slice(0, 8)}`,
         });
@@ -1661,13 +1663,13 @@ describe("Publisher package-route permission matrix", async () => {
         ];
 
         for (const current of cases) {
-            await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/role-assignments`, {
+            await makeAPIRequest(`/v1/packages/${publisher.name}.${pkg.name}/role-assignments`, {
                 authToken: current.token,
             }, current.code);
         }
     });
 
-    test("POST /packages/:publisherName/:packageName/role-assignments enforces permissions and strict role escalation", async () => {
+    test("POST /packages/:fullPackageName/role-assignments enforces permissions and strict role escalation", async () => {
         const pkg = await seedPackageForPublisher(publisher.id, {
             name: `pkg-role-create-${randomUUID().slice(0, 8)}`,
         });
@@ -1682,7 +1684,7 @@ describe("Publisher package-route permission matrix", async () => {
 
         for (const denied of deniedCases) {
             const target = await seedUser("user");
-            await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/role-assignments`, {
+            await makeAPIRequest(`/v1/packages/${publisher.name}.${pkg.name}/role-assignments`, {
                 method: "POST",
                 authToken: denied.token,
                 body: {
@@ -1695,7 +1697,7 @@ describe("Publisher package-route permission matrix", async () => {
         const strictTarget = await seedUser("user");
         await upsertPublisherMember(publisher.id, strictTarget.id, PermissionHelper.OrgRoles.VIEWER);
 
-        await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/role-assignments`, {
+        await makeAPIRequest(`/v1/packages/${publisher.name}.${pkg.name}/role-assignments`, {
             method: "POST",
             authToken: ownerSessionToken,
             body: {
@@ -1704,7 +1706,7 @@ describe("Publisher package-route permission matrix", async () => {
             }
         }, 400);
 
-        await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/role-assignments`, {
+        await makeAPIRequest(`/v1/packages/${publisher.name}.${pkg.name}/role-assignments`, {
             method: "POST",
             authToken: ownerSessionToken,
             body: {
@@ -1714,7 +1716,7 @@ describe("Publisher package-route permission matrix", async () => {
         }, 201);
 
         const orgAdminAllowedTarget = await seedUser("user");
-        await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/role-assignments`, {
+        await makeAPIRequest(`/v1/packages/${publisher.name}.${pkg.name}/role-assignments`, {
             method: "POST",
             authToken: orgAdminSessionToken,
             body: {
@@ -1724,7 +1726,7 @@ describe("Publisher package-route permission matrix", async () => {
         }, 201);
 
         const siteAdminAllowedTarget = await seedUser("user");
-        await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/role-assignments`, {
+        await makeAPIRequest(`/v1/packages/${publisher.name}.${pkg.name}/role-assignments`, {
             method: "POST",
             authToken: siteAdminSessionToken,
             body: {
@@ -1734,7 +1736,7 @@ describe("Publisher package-route permission matrix", async () => {
         }, 201);
     });
 
-    test("PUT /packages/:publisherName/:packageName/role-assignments/:userId enforces permissions and strict role escalation", async () => {
+    test("PUT /packages/:fullPackageName/role-assignments/:userId enforces permissions and strict role escalation", async () => {
         const pkg = await seedPackageForPublisher(publisher.id, {
             name: `pkg-role-update-${randomUUID().slice(0, 8)}`,
         });
@@ -1755,7 +1757,7 @@ describe("Publisher package-route permission matrix", async () => {
                 role: PermissionHelper.OrgRoles.VIEWER
             }).run();
 
-            await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/role-assignments/${target.id}`, {
+            await makeAPIRequest(`/v1/packages/${publisher.name}.${pkg.name}/role-assignments/${target.id}`, {
                 method: "PUT",
                 authToken: denied.token,
                 body: {
@@ -1772,7 +1774,7 @@ describe("Publisher package-route permission matrix", async () => {
             role: PermissionHelper.OrgRoles.ADMIN
         }).run();
 
-        await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/role-assignments/${strictTarget.id}`, {
+        await makeAPIRequest(`/v1/packages/${publisher.name}.${pkg.name}/role-assignments/${strictTarget.id}`, {
             method: "PUT",
             authToken: ownerSessionToken,
             body: {
@@ -1787,7 +1789,7 @@ describe("Publisher package-route permission matrix", async () => {
             role: PermissionHelper.OrgRoles.VIEWER
         }).run();
 
-        await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/role-assignments/${orgAdminAllowedTarget.id}`, {
+        await makeAPIRequest(`/v1/packages/${publisher.name}.${pkg.name}/role-assignments/${orgAdminAllowedTarget.id}`, {
             method: "PUT",
             authToken: orgAdminSessionToken,
             body: {
@@ -1802,7 +1804,7 @@ describe("Publisher package-route permission matrix", async () => {
             role: PermissionHelper.OrgRoles.VIEWER
         }).run();
 
-        await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/role-assignments/${ownerAllowedTarget.id}`, {
+        await makeAPIRequest(`/v1/packages/${publisher.name}.${pkg.name}/role-assignments/${ownerAllowedTarget.id}`, {
             method: "PUT",
             authToken: ownerSessionToken,
             body: {
@@ -1817,7 +1819,7 @@ describe("Publisher package-route permission matrix", async () => {
             role: PermissionHelper.OrgRoles.VIEWER
         }).run();
 
-        await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/role-assignments/${siteAdminAllowedTarget.id}`, {
+        await makeAPIRequest(`/v1/packages/${publisher.name}.${pkg.name}/role-assignments/${siteAdminAllowedTarget.id}`, {
             method: "PUT",
             authToken: siteAdminSessionToken,
             body: {
@@ -1826,7 +1828,7 @@ describe("Publisher package-route permission matrix", async () => {
         }, 200);
     });
 
-    test("DELETE /packages/:publisherName/:packageName/role-assignments/:userId enforces permissions", async () => {
+    test("DELETE /packages/:fullPackageName/role-assignments/:userId enforces permissions", async () => {
         const pkg = await seedPackageForPublisher(publisher.id, {
             name: `pkg-role-delete-${randomUUID().slice(0, 8)}`,
         });
@@ -1847,7 +1849,7 @@ describe("Publisher package-route permission matrix", async () => {
                 role: PermissionHelper.OrgRoles.VIEWER
             }).run();
 
-            await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/role-assignments/${target.id}`, {
+            await makeAPIRequest(`/v1/packages/${publisher.name}.${pkg.name}/role-assignments/${target.id}`, {
                 method: "DELETE",
                 authToken: denied.token,
             }, 403);
@@ -1860,7 +1862,7 @@ describe("Publisher package-route permission matrix", async () => {
             role: PermissionHelper.OrgRoles.VIEWER
         }).run();
 
-        await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/role-assignments/${orgAdminAllowedTarget.id}`, {
+        await makeAPIRequest(`/v1/packages/${publisher.name}.${pkg.name}/role-assignments/${orgAdminAllowedTarget.id}`, {
             method: "DELETE",
             authToken: orgAdminSessionToken,
         }, 200);
@@ -1872,7 +1874,7 @@ describe("Publisher package-route permission matrix", async () => {
             role: PermissionHelper.OrgRoles.VIEWER
         }).run();
 
-        await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/role-assignments/${ownerAllowedTarget.id}`, {
+        await makeAPIRequest(`/v1/packages/${publisher.name}.${pkg.name}/role-assignments/${ownerAllowedTarget.id}`, {
             method: "DELETE",
             authToken: ownerSessionToken,
         }, 200);
@@ -1884,7 +1886,7 @@ describe("Publisher package-route permission matrix", async () => {
             role: PermissionHelper.OrgRoles.VIEWER
         }).run();
 
-        await makeAPIRequest(`/v1/packages/${publisher.name}/${pkg.name}/role-assignments/${siteAdminAllowedTarget.id}`, {
+        await makeAPIRequest(`/v1/packages/${publisher.name}.${pkg.name}/role-assignments/${siteAdminAllowedTarget.id}`, {
             method: "DELETE",
             authToken: siteAdminSessionToken,
         }, 200);

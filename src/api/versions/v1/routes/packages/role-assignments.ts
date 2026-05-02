@@ -47,7 +47,7 @@ router.get('/',
 
     async (c) => {
         // @ts-ignore
-        const pkg = c.get("package") as DB.Models.Package;
+        const pkg = c.get("package") as DB.Models.PackageFullView;
         // @ts-ignore
         const authContext = c.get("authContext") as AuthHandler.AuthContext;
 
@@ -90,9 +90,8 @@ router.post('/',
 
     async (c) => {
         // @ts-ignore
-        const pkg = c.get("package") as DB.Models.Package;
-        // @ts-ignore
-        const publisher = c.get("publisher") as DB.Models.Publisher;
+        const pkg = c.get("package") as DB.Models.PackageFullView;
+        
         // @ts-ignore
         const authContext = c.get("authContext") as AuthHandler.AuthContext;
         const body = c.req.valid("json");
@@ -116,7 +115,17 @@ router.post('/',
             return APIResponse.notFound(c, "User not found");
         }
 
-        const publisherRole = await getPublisherLevelRole(publisher.id, publisher.owner_user_id, body.user_id);
+        const publisher_owner_user_id = await DB.instance()
+            .select({ owner_user_id: DB.Tables.publishers.owner_user_id })
+            .from(DB.Tables.publishers)
+            .where(eq(DB.Tables.publishers.id, pkg.publisher_id))
+            .get()?.owner_user_id;
+
+        if (!publisher_owner_user_id) {
+            throw new Error("Publisher not found for package"); // This should never happen since the package exists, but we need this data for the role comparison below
+        }
+
+        const publisherRole = await getPublisherLevelRole(pkg.publisher_id, publisher_owner_user_id, body.user_id);
         if (publisherRole !== null && PermissionHelper.compareRoles(body.role, publisherRole) <= 0) {
             return APIResponse.badRequest(c, "Package-level role must be strictly higher than the user's publisher-level role");
         }
@@ -167,9 +176,7 @@ router.put('/:userId',
 
     async (c) => {
         // @ts-ignore
-        const pkg = c.get("package") as DB.Models.Package;
-        // @ts-ignore
-        const publisher = c.get("publisher") as DB.Models.Publisher;
+        const pkg = c.get("package") as DB.Models.PackageFullView;
         // @ts-ignore
         const authContext = c.get("authContext") as AuthHandler.AuthContext;
         // @ts-ignore
@@ -199,7 +206,17 @@ router.put('/:userId',
             return APIResponse.notFound(c, "Role assignment not found");
         }
 
-        const publisherRole = await getPublisherLevelRole(publisher.id, publisher.owner_user_id, userId);
+        const publisher_owner_user_id = await DB.instance()
+            .select({ owner_user_id: DB.Tables.publishers.owner_user_id })
+            .from(DB.Tables.publishers)
+            .where(eq(DB.Tables.publishers.id, pkg.publisher_id))
+            .get()?.owner_user_id;
+
+        if (!publisher_owner_user_id) {
+            throw new Error("Publisher not found for package"); // This should never happen since the package exists, but we need this data for the role comparison below
+        }
+
+        const publisherRole = await getPublisherLevelRole(pkg.publisher_id, publisher_owner_user_id, userId);
         if (publisherRole !== null && PermissionHelper.compareRoles(body.role, publisherRole) <= 0) {
             return APIResponse.badRequest(c, "Package-level role must be strictly higher than the user's publisher-level role");
         }
@@ -233,7 +250,7 @@ router.delete('/:userId',
 
     async (c) => {
         // @ts-ignore
-        const pkg = c.get("package") as DB.Models.Package;
+        const pkg = c.get("package") as DB.Models.PackageFullView;
         // @ts-ignore
         const authContext = c.get("authContext") as AuthHandler.AuthContext;
         // @ts-ignore
