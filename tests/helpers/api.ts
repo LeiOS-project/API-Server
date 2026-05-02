@@ -44,9 +44,20 @@ export async function makeAPIRequest<ReturnBody = any>(
     const res = await API.getApp().request(path, options);
 
     if (!expectedCode) {
-        expect(res.status).toBeOneOf([200, 201, 202, 204]);
+
+        const successStatusCodes = [200, 201, 202, 204];
+
+        expect(res.status).toBeOneOf(successStatusCodes);
+        if (!successStatusCodes.includes(res.status)) {
+            const errorText = await res.text();
+            Logger.error(`Expected status 2xx but got ${res.status}. Response body: ${errorText}`);
+        }
     } else {
         expect(res.status).toBe(expectedCode);
+        if (res.status !== expectedCode) {
+            const errorText = await res.text();
+            Logger.error(`Expected status ${expectedCode} but got ${res.status}. Response body: ${errorText}`);
+        }
     }
 
     const contentType = res.headers.get("content-type") || "";
