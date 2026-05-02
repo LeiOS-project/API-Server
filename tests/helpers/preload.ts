@@ -5,9 +5,8 @@ import { AptlyAPIServer } from "../../src/aptly/server";
 import { ConfigHandler } from "../../src/utils/config";
 import { DB } from "../../src/db";
 import { API } from "../../src/api";
-import { drizzle } from "drizzle-orm/bun-sqlite";
-import { migrate } from "drizzle-orm/bun-sqlite/migrator";
 import { PermissionHelper } from "../../src/utils/permission-helper";
+import S3rver from "s3rver";
 
 // Allow overriding the env file used for tests without clobbering existing env vars.
 const TEST_ENV_FILE = process.env.TEST_ENV_FILE ?? ".env.test.local";
@@ -36,13 +35,39 @@ async function createIsolatedDataDir(): Promise<string> {
 }
 
 let TMP_ROOT: string | null = null;
+let s3rverInstance: S3rver | null = null;
 
 beforeAll(async () => {
     await loadTestEnv(TEST_ENV_FILE);
+    
+    // We overwrite S3 config specifically for tests to use the local built-in server.
+    process.env.LRA_S3_ENDPOINT = "http://localhost:4568";
+    process.env.LRA_S3_REGION = "us-east-1";
+    process.env.LRA_S3_BUCKET = "leios-test-repo";
+    process.env.LRA_S3_ACCESS_KEY_ID = "S3RVER";
+    process.env.LRA_S3_SECRET_ACCESS_KEY = "S3RVER";
 
     const config = await ConfigHandler.loadConfig();
 
     TMP_ROOT = await createIsolatedDataDir();
+    
+    // Start local S3 server
+    const s3rverDir = path.join(TMP_ROOT, "s3rver");
+    await fs.mkdir(s3rverDir, { recursive: true });
+    s3rverInstance = new S3rver({
+        port: 4568,
+        address: "localhost",
+        silent: true,
+        directory: s3rverDir,
+        configureBuckets: [{ name: config.LRA_S3_BUCKET }]
+    });
+    
+    await new Promise<void>((resolve, reject) => {
+        s3rverInstance!.run((err) => {
+            if (err) reject(err);
+            else resolve();
+        });
+    });
 
     await DB.init(
         path.join(TMP_ROOT, "db.sqlite"),
@@ -85,8 +110,13 @@ afterAll(async () => {
 
     await DB.close();
 
-    if (TMP_ROOT) {
+    if (s3rverInstance) {
+        await new Promise<void>((resolve) => {
+            s3rverInstance!.close(() => resolve());
+        });
+    }
 
+    if (TMP_ROOT) {
         await fs.rm(TMP_ROOT, { recursive: true, force: true });
     }
 });
