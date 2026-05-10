@@ -350,7 +350,8 @@ router.delete('/:version_with_leios_patch',
         responses: APIResponseSpec.describeBasic(
             APIResponseSpec.successNoData("Package release deleted successfully"),
             APIResponseSpec.notFound("Package release with specified version not found"),
-            APIResponseSpec.forbidden("You do not have permission to delete releases for this package")
+            APIResponseSpec.forbidden("You do not have permission to delete releases for this package"),
+            APIResponseSpec.serverError("Failed to delete release from Aptly repositories")
         )
     }),
 
@@ -377,17 +378,29 @@ router.delete('/:version_with_leios_patch',
             return APIResponse.forbidden(c, "You do not have permission to delete releases for this package");
         }
 
+        let aptlyDeleted: boolean;
+
+        try {
+            aptlyDeleted = await AptlyAPI.Packages.deleteAllInAllRepos(pkg.name, release.version_with_leios_patch, undefined);
+        } catch {
+            return APIResponse.serverError(c, "Failed to delete release from Aptly repositories");
+        }
+
+        if (!aptlyDeleted) {
+            return APIResponse.serverError(c, "Failed to delete release from Aptly repositories");
+        }
+
         await RuntimeMetadata.removeOSReleasePendingPackageIfExists(release.id);
 
-        await DB.instance().delete(DB.Tables.packageReleases).where(
-            eq(DB.Tables.packageReleases.id, release.id)
-        );
+        await DB.instance().transaction(async (tx) => {
+            await tx.delete(DB.Tables.stablePromotionRequests).where(
+                eq(DB.Tables.stablePromotionRequests.package_release_id, release.id)
+            );
 
-        await DB.instance().delete(DB.Tables.stablePromotionRequests).where(
-            eq(DB.Tables.stablePromotionRequests.package_release_id, release.id)
-        );
-
-        await AptlyAPI.Packages.deleteAllInAllRepos(pkg.name, release.version_with_leios_patch, undefined);
+            await tx.delete(DB.Tables.packageReleases).where(
+                eq(DB.Tables.packageReleases.id, release.id)
+            );
+        });
 
         await TaskScheduler.enqueueTask("testing-repo:update", {}, { created_by_user_id: null });
 

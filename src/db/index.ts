@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import * as TableSchema from './schema';
-import { randomBytes as crypto_randomBytes } from 'crypto';
+import { randomBytes as crypto_randomBytes, createHash as crypto_createHash } from 'crypto';
 import { type DrizzleDB } from './utils';
 import { Logger } from '../utils/logger';
 import { eq } from 'drizzle-orm';
@@ -50,7 +50,7 @@ export class DB {
 
         const passwordResetToken = crypto_randomBytes(64).toString('hex');
         await this.db.insert(DB.Tables.passwordResets).values({
-            token: passwordResetToken,
+            token: crypto_createHash('sha256').update(passwordResetToken).digest('hex'),
             user_id: admin_user_id,
             expires_at: Date.now() + 7 * 24 * 60 * 60 * 1000 // 7 Days
         });

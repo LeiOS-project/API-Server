@@ -6,7 +6,7 @@ import { OSReleasesModel } from "./model";
 import { DB } from "../../../../../../db";
 import { APIResponse } from "../../../../../utils/api-res";
 import { eq, desc } from "drizzle-orm";
-import { TaskScheduler } from "../../../../../../tasks";
+import { TaskQueueUtils } from "../../../../../../tasks";
 import { RuntimeMetadata } from "../../../../../utils/metadata";
 import { OSReleaseUtils } from "../../../../../utils/os-release-utils";
 import { ApiHelperModels } from "../../../../../utils/shared-models/api-helper-models";
@@ -86,26 +86,36 @@ router.post('/',
 		const now = new Date(Date.now());
 
 		const version = OSReleaseUtils.getVersionString(now, lastReleaseVersion as string);
-
-		const taskID = await TaskScheduler.enqueueTask("os-release:create", {
+		const taskArgs = {
 			pkgReleasesToIncludeByID: await RuntimeMetadata.getOSReleasePendingPackages(),
 			version,
 			timestamp: now.getTime(),
-		}, {
+		};
+
+		const taskID = await TaskQueueUtils.createPendingTaskRecord("os-release:create", taskArgs, {
 			created_by_user_id: null
 		}, {
 			storeLogs: true
 		});
 
-		const result = {
-			...await DB.instance().insert(DB.Tables.os_releases).values({
-				version,
-				changelog: newReleaseData.changelog,
-				taskID,
-			}).returning().get(),
-			published_at: null,
-			publishing_status: "pending"
-		} as const;
+		const result = await (async () => {
+			try {
+				return {
+					...await DB.instance().insert(DB.Tables.os_releases).values({
+						version,
+						changelog: newReleaseData.changelog,
+						taskID,
+					}).returning().get(),
+					published_at: null,
+					publishing_status: "pending"
+				} as const;
+			} catch (error) {
+				await TaskQueueUtils.deleteTaskRecord(taskID);
+				throw error;
+			}
+		})();
+
+		await TaskQueueUtils.activatePendingTask(taskID);
 
 		return APIResponse.accepted(c, "OS release creation task enqueued", result satisfies OSReleasesModel.CreateRelease.Response);
 	}

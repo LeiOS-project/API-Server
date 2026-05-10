@@ -77,6 +77,7 @@ router.post('/',
             APIResponseSpec.created("Stable promotion request submitted", StablePromotionRequestsModel.Create.Response),
             APIResponseSpec.notFound("Release not found in archive repository"),
             APIResponseSpec.forbidden("You do not have permission to request stable promotions for this package"),
+            APIResponseSpec.badRequest("Release does not have any uploaded package artifacts"),
             APIResponseSpec.conflict("A request already for this release already exists or the release is already stable")
         )
     }),
@@ -101,13 +102,21 @@ router.post('/',
             return APIResponse.forbidden(c, "You do not have permission to request stable promotions for this package");
         }
 
-        const releaseExists = await DB.instance().select({ id: DB.Tables.packageReleases.id }).from(DB.Tables.packageReleases).where(and(
+        const releaseExists = await DB.instance().select({
+            id: DB.Tables.packageReleases.id,
+            architectures: DB.Tables.packageReleases.architectures
+        }).from(DB.Tables.packageReleases).where(and(
             eq(DB.Tables.packageReleases.id, body.package_release_id),
             eq(DB.Tables.packageReleases.package_id, pkg.id)
         )).get();
 
         if (!releaseExists) {
             return APIResponse.notFound(c, "Release not found in archive repository");
+        }
+
+        const hasUploadedArtifacts = releaseExists.architectures.is_all || releaseExists.architectures.amd64 || releaseExists.architectures.arm64;
+        if (!hasUploadedArtifacts) {
+            return APIResponse.badRequest(c, "Release does not have any uploaded package artifacts");
         }
 
         const alreadyExists = await DB.instance().select({ id: DB.Tables.stablePromotionRequests.id }).from(DB.Tables.stablePromotionRequests).where(

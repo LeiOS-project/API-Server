@@ -63,7 +63,7 @@ beforeAll(async () => {
     });
     
     await new Promise<void>((resolve, reject) => {
-        s3rverInstance!.run((err) => {
+        s3rverInstance!.run((err?: Error | null) => {
             if (err) reject(err);
             else resolve();
         });

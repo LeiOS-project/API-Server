@@ -59,6 +59,20 @@ export class RuntimeMetadata {
         }
     }
 
+    static async removeOSReleasePendingPackagesIfExist(packageReleaseIds: number[]) {
+        if (packageReleaseIds.length === 0) {
+            return;
+        }
+
+        const idsToRemove = new Set(packageReleaseIds);
+        const pendingPackages = await this.getOSReleasePendingPackages();
+        const remainingPackages = pendingPackages.filter((packageReleaseId) => !idsToRemove.has(packageReleaseId));
+
+        if (remainingPackages.length !== pendingPackages.length) {
+            await this.setMetadata("os-release-pending-packages", remainingPackages);
+        }
+    }
+
     static async clearOSReleasePendingPackages() {
         await this.setMetadata("os-release-pending-packages", []);
     }

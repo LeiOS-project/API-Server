@@ -16,11 +16,9 @@ const LOGIN_MAX_ATTEMPTS = 5;
 const loginAttempts = new Map<string, { count: number; resetAt: number }>();
 
 function getClientId(c: Context) {
-    // Prefer forwarded header, fallback to remote IP if available
-    const forwarded = c.req.header("x-forwarded-for")?.split(",")[0]?.trim();
     // @ts-ignore bun/hono provides a native request with connection info
     const remote = (c.req.raw as any)?.remoteAddr?.hostname;
-    return forwarded || remote || "unknown";
+    return remote || "unknown";
 }
 
 function isLoginRateLimited(clientId: string) {
