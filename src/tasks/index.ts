@@ -14,6 +14,25 @@ type AdditionalTaskMeta = {
 };
 type TaskData = TaskHandler.BaseTaskData<AdditionalTaskMeta>;
 
+function buildPendingTaskData(
+	fn: TaskData["fn"],
+	args: TaskData["args"],
+	additionalMeta: AdditionalTaskMeta,
+	execOpts?: TaskHandler.TaskExecOptions,
+): Omit<TaskData, "id"> {
+	return {
+		...additionalMeta,
+		fn,
+		args,
+		execOptions: execOpts ?? null,
+		status: "pending",
+		created_at: Date.now(),
+		finished_at: null,
+		result: null,
+		message: null,
+	};
+}
+
 export class TaskStorage extends TaskHandler.AbstractStorageDriver<TaskData, AdditionalTaskMeta> {
 
 	private transportToDBFormat(task: TaskData, withID?: true): DB.Models.ScheduledTask;
@@ -225,9 +244,37 @@ const Registry = new TaskHandler.TaskFNRegistry()
 .register(OsReleaseTask)
 .register(UpdateTestingRepoTask);
 
+const taskStorage = new TaskStorage();
+
 export const TaskScheduler = new TaskHandler<typeof Registry["registry"], InstanceType<typeof TaskStorage>, TaskData, AdditionalTaskMeta>({
-	storage: new TaskStorage(),
+	storage: taskStorage,
 	defaultLogger: Logger,
 	persistentLogger: PersistentLogger
 }, Registry);
 
+export class TaskQueueUtils {
+
+	static async createPendingTaskRecord(
+		fn: TaskData["fn"],
+		args: TaskData["args"],
+		additionalMeta: AdditionalTaskMeta,
+		execOpts?: TaskHandler.TaskExecOptions,
+	) {
+		return await taskStorage.createTask(buildPendingTaskData(fn, args, additionalMeta, execOpts));
+	}
+
+	static async activatePendingTask(taskID: number) {
+		const task = await taskStorage.loadTask(taskID);
+		if (!task) {
+			throw new Error(`Task ${taskID} not found after creation.`);
+		}
+
+		(TaskScheduler as any).pendingTasks.push(task);
+		void TaskScheduler.processQueue();
+	}
+
+	static async deleteTaskRecord(taskID: number) {
+		await taskStorage.deleteTask(taskID);
+	}
+
+}

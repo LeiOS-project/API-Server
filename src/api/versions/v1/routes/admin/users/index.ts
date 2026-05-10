@@ -5,7 +5,7 @@ import { DB } from "../../../../../../db";
 import { APIResponse } from "../../../../../utils/api-res";
 import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers";
 import { UsersModel } from "./model";
-import { AuthHandler, SessionHandler } from "../../../../../utils/authHandler";
+import { AuthHandler } from "../../../../../utils/authHandler";
 import { DOCS_TAGS } from "../../../docs";
 
 const TARGET_USER_KEY = "targetUser";
@@ -250,7 +250,11 @@ router.put('/:userId/password',
             eq(DB.Tables.users.id, user.id)
         ).run();
 
-        await SessionHandler.inValidateAllSessionsForUser(user.id);
+        await AuthHandler.invalidateAllAuthContextsForUser(user.id);
+
+        await DB.instance().delete(DB.Tables.passwordResets).where(
+            eq(DB.Tables.passwordResets.user_id, user.id)
+        ).run();
 
         return APIResponse.successNoData(c, "Password reset successfully");
     }

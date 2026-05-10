@@ -2,6 +2,7 @@ import { TaskHandler } from "@cleverjs/utils";
 import { DB } from "../db";
 import { eq } from "drizzle-orm";
 import { AptlyAPI } from "../aptly/api";
+import { RuntimeMetadata } from "../api/utils/metadata";
 
 interface Payload {
     pkgReleasesToIncludeByID: number[];
@@ -37,20 +38,17 @@ OsReleaseTask.addStep("Move packages from archive to local stable repo", async (
             const pkgReleaseID = payload.pkgReleasesToIncludeByID[state.nextPackageIndexToMove];
 
             if (!pkgReleaseID) {
-                logger.error("Invalid package release ID at index", state.nextPackageIndexToMove, ", skipping.");
-                continue;
+                return { success: false, message: `Invalid package release ID at index ${state.nextPackageIndexToMove}.` };
             }
 
-            const result = await DB.instance().transaction(async (tx) => {
+            await DB.instance().transaction(async (tx) => {
 
                 const release = tx.select().from(DB.Tables.packageReleases).where(
                     eq(DB.Tables.packageReleases.id, pkgReleaseID)
                 ).get();
 
                 if (!release) {
-                    logger.error(`Package release with ID ${pkgReleaseID} not found, skipping.`);
-                    tx.rollback()
-                    return false;
+                    throw new Error(`Package release with ID ${pkgReleaseID} not found.`);
                 }
 
                 const packageData = tx.select().from(DB.Tables.packages).where(
@@ -58,20 +56,21 @@ OsReleaseTask.addStep("Move packages from archive to local stable repo", async (
                 ).get();
 
                 if (!packageData?.name) {
-                    logger.error(`Package with ID ${release.package_id} not found for release ID ${pkgReleaseID}, skipping.`);
-                    tx.rollback()
-                    return false;
+                    throw new Error(`Package with ID ${release.package_id} not found for release ID ${pkgReleaseID}.`);
                 }
 
                 pkgName = packageData.name;
                 pkgReleaseVersion = release.version_with_leios_patch;
 
+                const hasUploadedArtifacts = release.architectures.is_all || release.architectures.amd64 || release.architectures.arm64;
+                if (!hasUploadedArtifacts) {
+                    throw new Error(`Package ${packageData.name} version ${release.version_with_leios_patch} has no uploaded artifacts.`);
+                }
+
                 if (release.architectures.is_all) {
 
                     if (!release.architectures.amd64 || !release.architectures.arm64) {
-                        logger.error(`Release ID ${pkgReleaseID} marked as 'all' architectures but missing specific architectures, skipping.`);
-                        tx.rollback()
-                        return false;
+                        throw new Error(`Release ID ${pkgReleaseID} is marked as 'all' architectures but is missing specific architecture flags.`);
                     }
 
                     // delete in stable for this package first
@@ -112,18 +111,19 @@ OsReleaseTask.addStep("Move packages from archive to local stable repo", async (
                 }).where(
                     eq(DB.Tables.packages.id, packageData.id)
                 );
-
-                return true;
             });
-
-            if (!result) {
-                continue;
-            }
 
             logger.info(`Successfully moved package ${pkgName} version ${pkgReleaseVersion} to local stable repo.`);
 
         } catch (err) {
             logger.error("Error moving package release ID", payload.pkgReleasesToIncludeByID[state.nextPackageIndexToMove], ":", err);
+
+            return {
+                success: false,
+                message: Error.isError(err)
+                    ? err.message
+                    : `Failed to move package release ID ${payload.pkgReleasesToIncludeByID[state.nextPackageIndexToMove]}`
+            };
         }
     }
 
@@ -193,6 +193,8 @@ OsReleaseTask.addStep("Publish OS release snapshot to S3", async (payload, logge
 });
 
 OsReleaseTask.addStep("Finalize OS release", async (payload, logger) => {
+
+	await RuntimeMetadata.removeOSReleasePendingPackagesIfExist(payload.pkgReleasesToIncludeByID);
 
     logger.info("OS release process completed successfully for version", payload.version);
 

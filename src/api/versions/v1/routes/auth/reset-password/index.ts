@@ -4,10 +4,14 @@ import { validator as zValidator } from "hono-openapi";
 import { DB } from "../../../../../../db";
 import { eq } from "drizzle-orm";
 import { APIResponse } from "../../../../../utils/api-res";
-import { AuthHandler, SessionHandler } from "../../../../../utils/authHandler";
+import { AuthHandler } from "../../../../../utils/authHandler";
 import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers";
 import { DOCS_TAGS } from "../../../docs";
-import { randomBytes as crypto_randomBytes } from "crypto" 
+import { randomBytes as crypto_randomBytes, createHash as crypto_createHash } from "crypto"
+
+function hashResetToken(resetToken: string) {
+    return crypto_createHash("sha256").update(resetToken).digest("hex");
+}
 
 export const router = new Hono().basePath('/reset-password');
 
@@ -36,10 +40,18 @@ router.post('/',
         }
 
         const resetData = c.req.valid("json");
+        const hashedResetToken = hashResetToken(resetData.reset_token);
 
-        const checkToken = DB.instance().select().from(DB.Tables.passwordResets).where(
-            eq(DB.Tables.passwordResets.token, resetData.reset_token)
+        let checkToken = DB.instance().select().from(DB.Tables.passwordResets).where(
+            eq(DB.Tables.passwordResets.token, hashedResetToken)
         ).get();
+
+        if (!checkToken) {
+            // Keep existing plaintext tokens usable until they expire.
+            checkToken = DB.instance().select().from(DB.Tables.passwordResets).where(
+                eq(DB.Tables.passwordResets.token, resetData.reset_token)
+            ).get();
+        }
 
         if (!checkToken) {
             return APIResponse.badRequest(c, "Invalid reset token");
@@ -65,11 +77,10 @@ router.post('/',
             eq(DB.Tables.users.id, user.id)
         ).run();
 
-        await SessionHandler.inValidateAllSessionsForUser(user.id);
+        await AuthHandler.invalidateAllAuthContextsForUser(user.id);
 
-        // Delete used reset token
-        DB.instance().delete(DB.Tables.passwordResets).where(
-            eq(DB.Tables.passwordResets.token, resetData.reset_token)
+        await DB.instance().delete(DB.Tables.passwordResets).where(
+            eq(DB.Tables.passwordResets.user_id, user.id)
         ).run();
 
         return APIResponse.successNoData(c, "Password has been reset successfully");
@@ -116,7 +127,7 @@ router.post('/request',
             // Create new reset token
             DB.instance().insert(DB.Tables.passwordResets).values({
                 user_id: user.id,
-                token: resetToken,
+                token: hashResetToken(resetToken),
                 // 7 Days
                 expires_at: Date.now() + 7 * 24 * 60 * 60 * 1000
             }).run();
@@ -128,4 +139,3 @@ router.post('/request',
         return APIResponse.successNoData(c, "If the username exists, a password reset has been requested");
     }
 );
-

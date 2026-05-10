@@ -101,7 +101,9 @@ router.post('/',
             return APIResponse.forbidden(c, "You do not have permission to request stable promotions for this package");
         }
 
-        const releaseExists = await DB.instance().select({ id: DB.Tables.packageReleases.id }).from(DB.Tables.packageReleases).where(and(
+        const releaseExists = await DB.instance().select({
+            id: DB.Tables.packageReleases.id,
+        }).from(DB.Tables.packageReleases).where(and(
             eq(DB.Tables.packageReleases.id, body.package_release_id),
             eq(DB.Tables.packageReleases.package_id, pkg.id)
         )).get();

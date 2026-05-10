@@ -253,7 +253,8 @@ router.delete('/:fullPackageName',
         responses: APIResponseSpec.describeBasic(
             APIResponseSpec.successNoData("Package deleted successfully"),
             APIResponseSpec.notFound("Package with specified name not found"),
-            APIResponseSpec.forbidden("System-managed packages cannot be deleted / You do not have permission to delete this package")
+            APIResponseSpec.forbidden("System-managed packages cannot be deleted / You do not have permission to delete this package"),
+            APIResponseSpec.serverError("Failed to delete package from Aptly repositories")
         )
     }),
 
@@ -284,23 +285,35 @@ router.delete('/:fullPackageName',
             eq(DB.Tables.packageReleases.package_id, pkg.id)
         );
 
+        let aptlyDeleted: boolean;
+
+        try {
+            aptlyDeleted = await AptlyAPI.Packages.deleteAllInAllRepos(pkg.name);
+        } catch {
+            return APIResponse.serverError(c, "Failed to delete package from Aptly repositories");
+        }
+
+        if (!aptlyDeleted) {
+            return APIResponse.serverError(c, "Failed to delete package from Aptly repositories");
+        }
+
         for (const pkgRelease of packageReleaseIDs) {
             await RuntimeMetadata.removeOSReleasePendingPackageIfExists(pkgRelease.id);
         }
 
-        await DB.instance().delete(DB.Tables.packageReleases).where(
-            eq(DB.Tables.packageReleases.package_id, pkg.id)
-        );
+        await DB.instance().transaction(async (tx) => {
+            await tx.delete(DB.Tables.stablePromotionRequests).where(
+                eq(DB.Tables.stablePromotionRequests.package_id, pkg.id)
+            );
 
-        await DB.instance().delete(DB.Tables.stablePromotionRequests).where(
-            eq(DB.Tables.stablePromotionRequests.package_id, pkg.id)
-        );
+            await tx.delete(DB.Tables.packageReleases).where(
+                eq(DB.Tables.packageReleases.package_id, pkg.id)
+            );
 
-        await DB.instance().delete(DB.Tables.packages).where(
-            eq(DB.Tables.packages.id, pkg.id)
-        );
-
-        await AptlyAPI.Packages.deleteAllInAllRepos(pkg.name);
+            await tx.delete(DB.Tables.packages).where(
+                eq(DB.Tables.packages.id, pkg.id)
+            );
+        });
 
         await TaskScheduler.enqueueTask("testing-repo:update", {}, { created_by_user_id: null });
 

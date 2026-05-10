@@ -5,7 +5,7 @@ import { DB } from "../../../../../db";
 import { eq } from "drizzle-orm";
 import { APIResponse } from "../../../../utils/api-res";
 import { APIResponseSpec, APIRouteSpec } from "../../../../utils/specHelpers";
-import { AuthHandler, SessionHandler } from "../../../../utils/authHandler";
+import { AuthHandler } from "../../../../utils/authHandler";
 import { DOCS_TAGS } from "../../docs";
 import { router as apiKeyRouter } from "./apikeys";
 
@@ -129,7 +129,11 @@ router.put('/password',
             eq(DB.Tables.users.id, authContext.user_id)
         ).run();
 
-        await SessionHandler.inValidateAllSessionsForUser(authContext.user_id);
+        await AuthHandler.invalidateAllAuthContextsForUser(authContext.user_id);
+
+        await DB.instance().delete(DB.Tables.passwordResets).where(
+            eq(DB.Tables.passwordResets.user_id, authContext.user_id)
+        ).run();
 
         return APIResponse.successNoData(c, "Password changed successfully");
     }
@@ -164,8 +168,8 @@ router.delete('/',
             return APIResponse.badRequest(c, "You are the owner of one or more publishers. Transfer ownership or delete them before deleting your account.");
         }
 
-        // invalidate all sessions for the user
-        await SessionHandler.inValidateAllSessionsForUser(authContext.user_id);
+        // invalidate all remaining bearer credentials before removing the user
+        await AuthHandler.invalidateAllAuthContextsForUser(authContext.user_id);
 
         // delete password resets
         DB.instance().delete(DB.Tables.passwordResets).where(
