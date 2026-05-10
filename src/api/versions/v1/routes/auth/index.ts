@@ -21,12 +21,16 @@ function getClientId(c: Context) {
     return remote || "unknown";
 }
 
-function isLoginRateLimited(clientId: string) {
+function getLoginAttemptKey(clientId: string, username: string) {
+    return `${clientId}:${username.toLowerCase()}`;
+}
+
+function getLoginRateLimitState(loginAttemptKey: string) {
     const now = Date.now();
-    const entry = loginAttempts.get(clientId);
+    const entry = loginAttempts.get(loginAttemptKey);
 
     if (!entry || entry.resetAt <= now) {
-        loginAttempts.set(clientId, { count: 1, resetAt: now + LOGIN_WINDOW_MS });
+        loginAttempts.delete(loginAttemptKey);
         return { limited: false };
     }
 
@@ -34,8 +38,23 @@ function isLoginRateLimited(clientId: string) {
         return { limited: true, retryAfterMs: entry.resetAt - now };
     }
 
-    entry.count += 1;
     return { limited: false };
+}
+
+function registerFailedLoginAttempt(loginAttemptKey: string) {
+    const now = Date.now();
+    const entry = loginAttempts.get(loginAttemptKey);
+
+    if (!entry || entry.resetAt <= now) {
+        loginAttempts.set(loginAttemptKey, { count: 1, resetAt: now + LOGIN_WINDOW_MS });
+        return;
+    }
+
+    entry.count += 1;
+}
+
+function clearFailedLoginAttempts(loginAttemptKey: string) {
+    loginAttempts.delete(loginAttemptKey);
 }
 
 export const router = new Hono().basePath('/auth');
@@ -64,25 +83,30 @@ router.post('/login',
             return APIResponse.unauthorized(c, "You are already authenticated");
         }
 
+        const { username, password } = c.req.valid("json");
+
         const clientId = getClientId(c);
-        const rate = isLoginRateLimited(clientId);
+        const loginAttemptKey = getLoginAttemptKey(clientId, username);
+        const rate = getLoginRateLimitState(loginAttemptKey);
         if (rate.limited) {
             const retrySeconds = Math.max(1, Math.ceil((rate.retryAfterMs ?? LOGIN_WINDOW_MS) / 1000));
             c.header("Retry-After", retrySeconds.toString());
             return c.json({ success: false, code: 429, message: `Too many login attempts. Try again in ${retrySeconds}s` }, 429);
         }
 
-        const { username, password } = c.req.valid("json");
-
         const user = DB.instance().select().from(DB.Tables.users).where(eq(DB.Tables.users.username, username)).get();
         if (!user) {
+            registerFailedLoginAttempt(loginAttemptKey);
             return APIResponse.unauthorized(c, "Invalid username or password");
         }
 
         const passwordMatch = await Bun.password.verify(password, user.password_hash);
         if (!passwordMatch) {
+            registerFailedLoginAttempt(loginAttemptKey);
             return APIResponse.unauthorized(c, "Invalid username or password");
         }
+
+        clearFailedLoginAttempts(loginAttemptKey);
 
         const session = await SessionHandler.createSession(user.id);
 

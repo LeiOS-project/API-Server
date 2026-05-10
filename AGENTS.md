@@ -31,7 +31,7 @@
 
 ## Testing Gotchas
 - `bunfig.toml` preloads `tests/helpers/preload.ts` for every test run.
-- Preload loads `.env.test.local` by default (override with `TEST_ENV_FILE`) and starts Aptly/API on fixed ports `12150` and `12151`.
+- Preload builds a fully self-contained test env and starts Aptly/API on fixed ports `12150` and `12151`.
 - Tests are integration-heavy (DB + Aptly + S3-style publish config + local GPG keys), not pure unit tests.
 - `tests/aptly.test.ts` needs `.deb` fixtures under `testdata/`.
 
