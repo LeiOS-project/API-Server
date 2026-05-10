@@ -4,12 +4,14 @@ import { DB } from "../src/db";
 import { AuthHandler, AuthUtils, SessionHandler } from "../src/api/utils/authHandler";
 import { AptlyAPI } from "../src/aptly/api";
 import { randomUUID } from "crypto";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, gte } from "drizzle-orm";
 import { AuthModel } from "../src/api/versions/v1/routes/auth/model";
 import { makeAPIRequest } from "./helpers/api";
 import { AccountModel } from "../src/api/versions/v1/routes/account/model";
 import { PackageModel } from "../src/api/utils/shared-models/package";
 import { PermissionHelper } from "../src/utils/permission-helper";
+import { RuntimeMetadata } from "../src/api/utils/metadata";
+import { TaskScheduler } from "../src/tasks";
 
 // type Arch = AptlyAPI.Utils.Architectures;
 
@@ -133,6 +135,43 @@ async function seedTask(overrides: Partial<DB.Models.ScheduledTask> = {}) {
         result: overrides.result,
         message: overrides.message,
     }).returning().get();
+}
+
+async function waitForTaskById(taskID: number, timeoutMs = 15000) {
+    const deadline = Date.now() + timeoutMs;
+
+    while (Date.now() < deadline) {
+        const task = DB.instance().select().from(DB.Tables.scheduled_tasks).where(
+            eq(DB.Tables.scheduled_tasks.id, taskID)
+        ).get();
+
+        if (task && (task.status === "completed" || task.status === "failed")) {
+            return task;
+        }
+
+        await Bun.sleep(100);
+    }
+
+    throw new Error(`Timed out waiting for task ${taskID} to finish`);
+}
+
+async function waitForLatestTaskByFunction(functionName: string, minCreatedAt: number, timeoutMs = 15000) {
+    const deadline = Date.now() + timeoutMs;
+
+    while (Date.now() < deadline) {
+        const task = DB.instance().select().from(DB.Tables.scheduled_tasks).where(and(
+            eq(DB.Tables.scheduled_tasks.function, functionName),
+            gte(DB.Tables.scheduled_tasks.created_at, minCreatedAt)
+        )).orderBy(desc(DB.Tables.scheduled_tasks.created_at)).get();
+
+        if (task && (task.status === "completed" || task.status === "failed")) {
+            return task;
+        }
+
+        await Bun.sleep(100);
+    }
+
+    throw new Error(`Timed out waiting for latest '${functionName}' task to finish`);
 }
 
 let testUser: SeededUser;
@@ -1914,7 +1953,8 @@ describe("Admin sub-routes coverage", async () => {
             function: "test:no-logs",
             created_by_user_id: adminUser.id,
             storeLogs: false,
-            status: "pending"
+            status: "completed",
+            finished_at: Date.now()
         });
         taskWithoutLogsID = taskWithoutLogs.id;
 
@@ -2138,6 +2178,166 @@ describe("Admin sub-routes coverage", async () => {
 
         const deleted = DB.instance().select().from(DB.Tables.users).where(eq(DB.Tables.users.id, managedUserID)).get();
         expect(deleted).toBeUndefined();
+    });
+});
+
+describe("Task queue execution coverage", async () => {
+
+    let siteAdmin: SeededUser;
+    let siteAdminSessionToken: string;
+
+    beforeAll(async () => {
+        siteAdmin = await seedUser("admin");
+        siteAdminSessionToken = await seedSession(siteAdmin.id).then(s => s.token);
+
+        await TaskScheduler.processQueue();
+    });
+
+    afterAll(async () => {
+        await RuntimeMetadata.clearOSReleasePendingPackages();
+        await AptlyAPI.Packages.deleteAllInAllRepos("fastfetch").catch(() => null);
+        await AptlyAPI.Packages.deleteAllInAllRepos("base-files").catch(() => null);
+        await TaskScheduler.stopProcessing();
+    });
+
+    test("release upload executes testing-repo:update task to completion", async () => {
+        const owner = await seedUser("user");
+        const publisher = await seedPublisherWithOwner(owner.id, {
+            name: `queue-pub-${randomUUID().slice(0, 8)}`
+        });
+
+        const pkg = await seedPackageForPublisher(publisher.id, {
+            name: "fastfetch",
+            display_name: "Fastfetch Queue Coverage",
+            description: "Queue coverage package"
+        });
+
+        const release = await seedPackageRelease(pkg.id, {
+            version_with_leios_patch: "2.55.0",
+            changelog: "Queue coverage release"
+        });
+
+        const fileData = new File([
+            await Bun.file("/home/leicraft/projects/LeiOS/API-Server/testdata/fastfetch_2.55.0_amd64.deb").arrayBuffer()
+        ], "fastfetch_2.55.0_amd64.deb");
+        const formData = new FormData();
+        formData.set("file", fileData);
+
+        const taskStartTime = Date.now();
+
+        await makeAPIRequest(`/v1/packages/${publisher.name}.${pkg.name}/releases/${release.version_with_leios_patch}/amd64`, {
+            method: "POST",
+            authToken: siteAdminSessionToken,
+            additionalOptions: {
+                body: formData
+            }
+        }, 201);
+
+        const task = await waitForLatestTaskByFunction("testing-repo:update", taskStartTime);
+
+        expect(task.status).toBe("completed");
+
+        const updatedRelease = DB.instance().select().from(DB.Tables.packageReleases).where(
+            eq(DB.Tables.packageReleases.id, release.id)
+        ).get();
+        expect(updatedRelease?.architectures).toEqual({
+            amd64: true,
+            arm64: false,
+            is_all: false
+        });
+
+        const updatedPackage = DB.instance().select().from(DB.Tables.packages).where(
+            eq(DB.Tables.packages.id, pkg.id)
+        ).get();
+        expect(updatedPackage?.latest_testing_release).toEqual({
+            amd64: "2.55.0",
+            arm64: null
+        });
+
+        expect(await AptlyAPI.Packages.existsInRepo("leios-testing", "fastfetch", "2.55.0", "amd64")).toBe(true);
+    });
+
+    test("os-release route executes async release task to completion", async () => {
+        await RuntimeMetadata.clearOSReleasePendingPackages();
+
+        const owner = await seedUser("user");
+        const publisher = await seedPublisherWithOwner(owner.id, {
+            name: `queue-os-pub-${randomUUID().slice(0, 8)}`
+        });
+
+        const pkg = await seedPackageForPublisher(publisher.id, {
+            name: "base-files",
+            display_name: "Base Files Queue Coverage",
+            description: "OS release queue coverage package"
+        });
+
+        const release = await seedPackageRelease(pkg.id, {
+            version_with_leios_patch: "100.1",
+            changelog: "Queue coverage OS release package"
+        });
+
+        const fileData = new File([
+            await Bun.file("/home/leicraft/projects/LeiOS/API-Server/testdata/vanilla-os-base-files.deb").arrayBuffer()
+        ], "vanilla-os-base-files.deb");
+        const formData = new FormData();
+        formData.set("file", fileData);
+
+        const uploadTaskStartTime = Date.now();
+
+        await makeAPIRequest(`/v1/packages/${publisher.name}.${pkg.name}/releases/${release.version_with_leios_patch}/all`, {
+            method: "POST",
+            authToken: siteAdminSessionToken,
+            additionalOptions: {
+                body: formData
+            }
+        }, 201);
+
+        const uploadTask = await waitForLatestTaskByFunction("testing-repo:update", uploadTaskStartTime);
+        expect(uploadTask.status).toBe("completed");
+
+        await RuntimeMetadata.addOSReleasePendingPackage(release.id);
+
+        const created = await makeAPIRequest("/v1/admin/os-releases", {
+            method: "POST",
+            authToken: siteAdminSessionToken,
+            body: {
+                changelog: "Async OS release queue execution test"
+            }
+        }, 202);
+
+        const osRelease = DB.instance().select().from(DB.Tables.os_releases).where(
+            eq(DB.Tables.os_releases.version, created.version)
+        ).get();
+
+        expect(osRelease).toBeDefined();
+        if (!osRelease) return;
+
+        const task = await waitForTaskById(osRelease.taskID, 20000);
+        expect(task.status).toBe("completed");
+        expect(task.finished_at).toBeNumber();
+
+        const pendingPackages = await RuntimeMetadata.getOSReleasePendingPackages();
+        expect(pendingPackages.includes(release.id)).toBe(false);
+
+        const refreshedPackage = DB.instance().select().from(DB.Tables.packages).where(
+            eq(DB.Tables.packages.id, pkg.id)
+        ).get();
+        expect(refreshedPackage?.latest_stable_release).toEqual({
+            amd64: "100.1",
+            arm64: "100.1"
+        });
+
+        expect(await AptlyAPI.Packages.existsInRepo("leios-stable", "base-files", "100.1", "all")).toBe(true);
+
+        const releaseStatus = await makeAPIRequest(`/v1/admin/os-releases/${created.version}`, {
+            authToken: siteAdminSessionToken
+        }, 200);
+        expect(releaseStatus.publishing_status).toBe("completed");
+
+        const logs = await makeAPIRequest(`/v1/admin/os-releases/${created.version}/publishing-logs`, {
+            authToken: siteAdminSessionToken
+        }, 200);
+        expect(logs.logs).toContain("OS release process completed successfully");
     });
 });
 
