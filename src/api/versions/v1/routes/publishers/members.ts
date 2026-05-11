@@ -306,6 +306,10 @@ router.put('/:userId',
             return APIResponse.forbidden(c, "You do not have permission to manage the member's membership");
         }
 
+        if (member.user_id === publisher.owner_user_id) {
+            return APIResponse.badRequest(c, "Cannot modify the publisher owner's membership");
+        }
+
         const updates: Partial<typeof DB.Tables.publisherMembers.$inferInsert> = {};
         if (body.role !== undefined) updates.role = body.role;
         if (body.is_publicly_hidden !== undefined) updates.is_publicly_hidden = body.is_publicly_hidden;
@@ -359,6 +363,10 @@ router.delete('/:userId',
 
         if (!allowed) {
             return APIResponse.forbidden(c, "You do not have permission to manage members");
+        }
+
+        if (member.user_id === publisher.owner_user_id) {
+            return APIResponse.badRequest(c, "Cannot remove the publisher owner");
         }
 
         await DB.instance().delete(DB.Tables.publisherMembers).where(

@@ -1,4 +1,5 @@
 import { beforeAll, afterAll, describe, expect, test } from "bun:test";
+import { mkdir } from "fs/promises";
 import { API } from "../src/api";
 import { DB } from "../src/db";
 import { AuthHandler, AuthUtils, SessionHandler } from "../src/api/utils/authHandler";
@@ -137,6 +138,12 @@ async function seedTask(overrides: Partial<DB.Models.ScheduledTask> = {}) {
     }).returning().get();
 }
 
+async function writeStoredTaskLog(taskID: number, content: string) {
+    const logDir = process.env.LRA_LOG_DIR ?? "./data/logs";
+    await mkdir(`${logDir}/tasks`, { recursive: true });
+    await Bun.write(`${logDir}/tasks/task-${taskID}.log`, content);
+}
+
 async function waitForTaskById(taskID: number, timeoutMs = 15000) {
     const deadline = Date.now() + timeoutMs;
 
@@ -246,6 +253,91 @@ describe("Auth routes and access checks", async () => {
             authToken: "invalid_token",
         }, 401);
 
+    });
+
+    test("GET /auth/session with invalid authorization header fails", async () => {
+        await makeAPIRequest("/v1/auth/session", {
+            additionalOptions: {
+                headers: {
+                    Authorization: "Token invalid"
+                }
+            }
+        }, 401);
+    });
+
+    test("GET /auth/session with empty bearer token fails", async () => {
+        await makeAPIRequest("/v1/auth/session", {
+            additionalOptions: {
+                headers: {
+                    Authorization: "Bearer "
+                }
+            }
+        }, 401);
+    });
+
+    test("POST /auth/login rate limits repeated failures", async () => {
+        const rateLimitedUser = await seedUser("user", {}, "LimitP@ss1");
+
+        for (let attempt = 0; attempt < 5; attempt++) {
+            await makeAPIRequest("/v1/auth/login", {
+                method: "POST",
+                body: {
+                    username: rateLimitedUser.username,
+                    password: "WrongPassword"
+                }
+            }, 401);
+        }
+
+        await makeAPIRequest("/v1/auth/login", {
+            method: "POST",
+            body: {
+                username: rateLimitedUser.username,
+                password: "WrongPassword"
+            }
+        }, 429);
+    });
+
+    test("POST /auth/login clears failed-attempt counter after successful login", async () => {
+        const resetUser = await seedUser("user", {}, "ResetLimitP@ss1");
+
+        for (let attempt = 0; attempt < 4; attempt++) {
+            await makeAPIRequest("/v1/auth/login", {
+                method: "POST",
+                body: {
+                    username: resetUser.username,
+                    password: "WrongPassword"
+                }
+            }, 401);
+        }
+
+        const login = await makeAPIRequest("/v1/auth/login", {
+            method: "POST",
+            body: {
+                username: resetUser.username,
+                password: resetUser.password
+            },
+            expectedBodySchema: AuthModel.Login.Response
+        }, 200);
+
+        expect(login.token.startsWith("lra_sess_")).toBe(true);
+
+        for (let attempt = 0; attempt < 5; attempt++) {
+            await makeAPIRequest("/v1/auth/login", {
+                method: "POST",
+                body: {
+                    username: resetUser.username,
+                    password: "WrongPassword"
+                }
+            }, 401);
+        }
+
+        await makeAPIRequest("/v1/auth/login", {
+            method: "POST",
+            body: {
+                username: resetUser.username,
+                password: "WrongPassword"
+            }
+        }, 429);
     });
     
     test("GET /admin/users as non-admin fails", async () => {
@@ -871,6 +963,42 @@ describe("Package sub-routes coverage", async () => {
         releaseID = release!.id;
     });
 
+    test("POST /packages/:fullPackageName/releases enforces requires_patching version format", async () => {
+        const patchedPackageName = `pkg-patched-${randomUUID().slice(0, 8)}`;
+        const patchedFullPackageName = `${publisher.name}.${patchedPackageName}`;
+
+        await makeAPIRequest("/v1/packages", {
+            method: "POST",
+            authToken: ownerSessionToken,
+            body: {
+                publisher_id: publisher.id,
+                name: patchedPackageName,
+                display_name: "Patched Coverage Package",
+                description: "Requires patch suffix coverage",
+                homepage_url: "https://patched-coverage.example.com",
+                requires_patching: true
+            } satisfies PackageModel.CreatePackage.Body
+        }, 201);
+
+        await makeAPIRequest(`/v1/packages/${patchedFullPackageName}/releases`, {
+            method: "POST",
+            authToken: ownerSessionToken,
+            body: {
+                version_with_leios_patch: "1.0.0",
+                changelog: "Missing required LeiOS suffix"
+            }
+        }, 400);
+
+        await makeAPIRequest(`/v1/packages/${patchedFullPackageName}/releases`, {
+            method: "POST",
+            authToken: ownerSessionToken,
+            body: {
+                version_with_leios_patch: "1.0.0leios1",
+                changelog: "Has required LeiOS suffix"
+            }
+        }, 201);
+    });
+
     test("GET /packages/:fullPackageName/releases/:version_with_leios_patch returns release", async () => {
         const release = await makeAPIRequest(`/v1/packages/${fullPackageName}/releases/1.0.0`, {}, 200);
         expect(release.id).toBe(releaseID);
@@ -971,6 +1099,17 @@ describe("Package sub-routes coverage", async () => {
         expect(assignment?.role).toBe(PermissionHelper.OrgRoles.MAINTAINER);
     });
 
+    test("POST /packages/:fullPackageName/role-assignments rejects duplicate assignment", async () => {
+        await makeAPIRequest(`/v1/packages/${fullPackageName}/role-assignments`, {
+            method: "POST",
+            authToken: ownerSessionToken,
+            body: {
+                user_id: developer.id,
+                role: PermissionHelper.OrgRoles.ADMIN
+            }
+        }, 409);
+    });
+
     test("PUT /packages/:fullPackageName/role-assignments/:userId updates assignment", async () => {
         await makeAPIRequest(`/v1/packages/${fullPackageName}/role-assignments/${developer.id}`, {
             method: "PUT",
@@ -1000,6 +1139,23 @@ describe("Package sub-routes coverage", async () => {
         )).get();
 
         expect(assignment).toBeUndefined();
+    });
+
+    test("PUT /packages/:fullPackageName/role-assignments/:userId returns 404 when assignment is missing", async () => {
+        await makeAPIRequest(`/v1/packages/${fullPackageName}/role-assignments/${developer.id}`, {
+            method: "PUT",
+            authToken: ownerSessionToken,
+            body: {
+                role: PermissionHelper.OrgRoles.DEVELOPER
+            }
+        }, 404);
+    });
+
+    test("DELETE /packages/:fullPackageName/role-assignments/:userId returns 404 when assignment is missing", async () => {
+        await makeAPIRequest(`/v1/packages/${fullPackageName}/role-assignments/${developer.id}`, {
+            method: "DELETE",
+            authToken: ownerSessionToken,
+        }, 404);
     });
 });
 
@@ -1249,6 +1405,26 @@ describe("Publisher permission matrix coverage", async () => {
         }, 200);
     });
 
+    test("PUT /publishers/:publisherName/members/:userId blocks owner membership changes", async () => {
+        await upsertPublisherMember(publisher.id, owner.id, PermissionHelper.OrgRoles.ADMIN);
+
+        await makeAPIRequest(`/v1/publishers/${publisher.name}/members/${owner.id}`, {
+            method: "PUT",
+            authToken: ownerSessionToken,
+            body: {
+                is_publicly_hidden: true
+            }
+        }, 400);
+
+        await makeAPIRequest(`/v1/publishers/${publisher.name}/members/${owner.id}`, {
+            method: "PUT",
+            authToken: siteAdminSessionToken,
+            body: {
+                role: PermissionHelper.OrgRoles.VIEWER
+            }
+        }, 400);
+    });
+
     test("DELETE /publishers/:publisherName/members/:userId enforces remove permissions and hierarchy", async () => {
         const lowRoleTarget = await seedUser("user");
         await upsertPublisherMember(publisher.id, lowRoleTarget.id, PermissionHelper.OrgRoles.VIEWER);
@@ -1286,6 +1462,20 @@ describe("Publisher permission matrix coverage", async () => {
             method: "DELETE",
             authToken: siteAdminSessionToken,
         }, 200);
+    });
+
+    test("DELETE /publishers/:publisherName/members/:userId blocks owner membership removal", async () => {
+        await upsertPublisherMember(publisher.id, owner.id, PermissionHelper.OrgRoles.ADMIN);
+
+        await makeAPIRequest(`/v1/publishers/${publisher.name}/members/${owner.id}`, {
+            method: "DELETE",
+            authToken: ownerSessionToken,
+        }, 400);
+
+        await makeAPIRequest(`/v1/publishers/${publisher.name}/members/${owner.id}`, {
+            method: "DELETE",
+            authToken: siteAdminSessionToken,
+        }, 400);
     });
 
     test("POST /publishers/:publisherName/transfer-ownership is owner/site-admin only and ensures owner membership", async () => {
@@ -1940,6 +2130,7 @@ describe("Admin sub-routes coverage", async () => {
 
     let managedUserID: number;
 
+    let taskWithLogsID: number;
     let taskWithoutLogsID: number;
     let manualOSReleaseVersion: string;
 
@@ -1948,6 +2139,16 @@ describe("Admin sub-routes coverage", async () => {
     beforeAll(async () => {
         adminUser = await seedUser("admin");
         adminSessionToken = await seedSession(adminUser.id).then(s => s.token);
+
+        const taskWithLogs = await seedTask({
+            function: "test:with-logs",
+            created_by_user_id: adminUser.id,
+            storeLogs: true,
+            status: "completed",
+            finished_at: Date.now()
+        });
+        taskWithLogsID = taskWithLogs.id;
+        await writeStoredTaskLog(taskWithLogsID, "stored task log coverage\nline 2");
 
         const taskWithoutLogs = await seedTask({
             function: "test:no-logs",
@@ -2079,6 +2280,14 @@ describe("Admin sub-routes coverage", async () => {
         expect(task.id).toBe(taskWithoutLogsID);
     });
 
+    test("GET /admin/tasks/:taskID/logs returns stored logs", async () => {
+        const logs = await makeAPIRequest(`/v1/admin/tasks/${taskWithLogsID}/logs`, {
+            authToken: adminSessionToken
+        }, 200);
+
+        expect(logs.logs).toContain("stored task log coverage");
+    });
+
     test("GET /admin/tasks/:taskID/logs rejects tasks without log storage", async () => {
         await makeAPIRequest(`/v1/admin/tasks/${taskWithoutLogsID}/logs`, {
             authToken: adminSessionToken
@@ -2168,6 +2377,43 @@ describe("Admin sub-routes coverage", async () => {
         ).get();
 
         expect(updatedRequest?.status).toBe("denied");
+    });
+
+    test("POST /admin/stable-promotion-requests/:stablePromotionRequestID/decide approval adds pending OS release metadata", async () => {
+        await RuntimeMetadata.clearOSReleasePendingPackages();
+
+        const approvalOwner = await seedUser("user");
+        const approvalPublisher = await seedPublisherWithOwner(approvalOwner.id);
+        const approvalPackage = await seedPackageForPublisher(approvalPublisher.id, {
+            name: `approved-stable-${randomUUID().slice(0, 8)}`
+        });
+        const approvalRelease = await seedPackageRelease(approvalPackage.id, {
+            version_with_leios_patch: `7.0.${Math.floor(Math.random() * 9000) + 1000}`
+        });
+        const approvalRequest = await seedStablePromotionRequest(approvalPackage.id, approvalRelease.id, {
+            status: "pending"
+        });
+
+        await makeAPIRequest(`/v1/admin/stable-promotion-requests/${approvalRequest.id}/decide`, {
+            method: "POST",
+            authToken: adminSessionToken,
+            body: {
+                status: "approved",
+                admin_note: "Ready for OS release"
+            }
+        }, 200);
+
+        const pendingPackages = await RuntimeMetadata.getOSReleasePendingPackages();
+        expect(pendingPackages.includes(approvalRelease.id)).toBe(true);
+
+        await makeAPIRequest(`/v1/admin/stable-promotion-requests/${approvalRequest.id}/decide`, {
+            method: "POST",
+            authToken: adminSessionToken,
+            body: {
+                status: "denied",
+                admin_note: "Should not be allowed twice"
+            }
+        }, 400);
     });
 
     test("DELETE /admin/users/:userId deletes user", async () => {
