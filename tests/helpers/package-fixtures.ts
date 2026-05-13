@@ -57,7 +57,8 @@ async function buildPackage(fixture: PackageFixture) {
     ].join("\n"));
     await Bun.write(payloadPath, fixture.payloadContents);
 
-    await runCommand(["dpkg-deb", "--build", buildRoot, fixture.outputPath]);
+    // Force gzip compression for Aptly compatibility across environments.
+    await runCommand(["dpkg-deb", "-Zgzip", "--build", buildRoot, fixture.outputPath]);
     await fs.rm(buildRoot, { recursive: true, force: true });
 }
 
