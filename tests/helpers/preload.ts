@@ -7,6 +7,7 @@ import { DB } from "../../src/db";
 import { API } from "../../src/api";
 import { PermissionHelper } from "../../src/utils/permission-helper";
 import S3rver from "s3rver";
+import { ensureTestPackageFixtures } from "./package-fixtures";
 
 function setTestEnv(rootDir: string) {
 
@@ -127,6 +128,8 @@ let s3rverInstance: S3rver | null = null;
 
 beforeAll(async () => {
     TMP_ROOT = await createIsolatedDataDir();
+
+    await ensureTestPackageFixtures();
 
     setTestEnv(TMP_ROOT);
 

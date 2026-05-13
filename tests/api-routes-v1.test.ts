@@ -13,6 +13,7 @@ import { PackageModel } from "../src/api/utils/shared-models/package";
 import { PermissionHelper } from "../src/utils/permission-helper";
 import { RuntimeMetadata } from "../src/api/utils/metadata";
 import { TaskScheduler } from "../src/tasks";
+import { TEST_PACKAGE_FIXTURES } from "./helpers/package-fixtures";
 
 // type Arch = AptlyAPI.Utils.Architectures;
 
@@ -2464,7 +2465,7 @@ describe("Task queue execution coverage", async () => {
         });
 
         const fileData = new File([
-            await Bun.file("/home/leicraft/projects/LeiOS/API-Server/testdata/fastfetch_2.55.0_amd64.deb").arrayBuffer()
+            await Bun.file(TEST_PACKAGE_FIXTURES.fastfetchAmd64).arrayBuffer()
         ], "fastfetch_2.55.0_amd64.deb");
         const formData = new FormData();
         formData.set("file", fileData);
@@ -2523,7 +2524,7 @@ describe("Task queue execution coverage", async () => {
         });
 
         const fileData = new File([
-            await Bun.file("/home/leicraft/projects/LeiOS/API-Server/testdata/vanilla-os-base-files.deb").arrayBuffer()
+            await Bun.file(TEST_PACKAGE_FIXTURES.baseFilesAll).arrayBuffer()
         ], "vanilla-os-base-files.deb");
         const formData = new FormData();
         formData.set("file", fileData);
