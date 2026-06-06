@@ -153,7 +153,7 @@ router.post('/',
 router.use('/:publisherName/*',
 
     zValidator("param", z.object({
-        publisherName: PublisherModel.PublisherNameSchema
+        publisherName: PublisherModel.SelectPublisherNameSchema
     })),
 
     async (c, next) => {

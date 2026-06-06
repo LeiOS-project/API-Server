@@ -53,7 +53,19 @@ export namespace PublisherModel {
     ];
 
     // Publisher name validation: lowercase, alphanumeric, hyphens allowed
-    export const PublisherNameSchema = z.string()
+    export const CreatePublisherNameSchema = z.string()
+        .min(2, "Publisher name must be at least 2 characters long.")
+        .max(50, "Publisher name cannot exceed 50 characters.")
+        .regex(
+            /^[a-z0-9][a-z0-9-]*[a-z0-9]$/,
+            "Publisher name must be lowercase, may contain hyphens, and start/end with a letter or number."
+        )
+        .refine((name) => !ForbiddenPublisherNames.includes(name), {
+            message: "This publisher name is reserved and cannot be used."
+        });
+
+    // Publisher name validation: lowercase, alphanumeric, hyphens allowed
+    export const SelectPublisherNameSchema = z.string()
         .min(2, "Publisher name must be at least 2 characters long.")
         .max(50, "Publisher name cannot exceed 50 characters.")
         .regex(
@@ -101,7 +113,7 @@ export namespace PublisherModel.CreatePublisher {
 
     export const Body = createInsertSchema(DB.Tables.publishers, {
 
-        name: PublisherModel.PublisherNameSchema,
+        name: PublisherModel.CreatePublisherNameSchema,
         display_name: z.string().min(1, "Display name is required").max(200, "Display name cannot exceed 200 characters."),
         description: z.string().min(1, "Description is required").max(500, "Description cannot exceed 500 characters."),
         homepage_url: z.url("Homepage URL must be a valid URL.").max(500, "Homepage URL cannot exceed 500 characters."),
