@@ -52,17 +52,6 @@ export namespace PublisherModel {
         "leios"
     ];
 
-    // Publisher name validation: lowercase, alphanumeric, hyphens allowed
-    export const CreatePublisherNameSchema = z.string()
-        .min(2, "Publisher name must be at least 2 characters long.")
-        .max(50, "Publisher name cannot exceed 50 characters.")
-        .regex(
-            /^[a-z0-9][a-z0-9-]*[a-z0-9]$/,
-            "Publisher name must be lowercase, may contain hyphens, and start/end with a letter or number."
-        )
-        .refine((name) => !ForbiddenPublisherNames.includes(name), {
-            message: "This publisher name is reserved and cannot be used."
-        });
 
     // Publisher name validation: lowercase, alphanumeric, hyphens allowed
     export const SelectPublisherNameSchema = z.string()
@@ -72,6 +61,10 @@ export namespace PublisherModel {
             /^[a-z0-9][a-z0-9-]*[a-z0-9]$/,
             "Publisher name must be lowercase, may contain hyphens, and start/end with a letter or number."
         )
+    
+
+    // Publisher name validation: lowercase, alphanumeric, hyphens allowed
+    export const CreatePublisherNameSchema = SelectPublisherNameSchema
         .refine((name) => !ForbiddenPublisherNames.includes(name), {
             message: "This publisher name is reserved and cannot be used."
         });
