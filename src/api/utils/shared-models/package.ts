@@ -125,11 +125,17 @@ export namespace PackageModel.RoleAssignment {
     export const Entity = createSelectSchema(DB.Tables.roleAssignments);
     export type Entity = z.infer<typeof Entity>;
 
+    export const EntityWithUser = Entity.extend({
+        user_username: z.string(),
+        user_display_name: z.string().nullable(),
+    });
+    export type EntityWithUser = z.infer<typeof EntityWithUser>;
+
 }
 
 export namespace PackageModel.ListRoleAssignments {
 
-    export const Response = z.array(PackageModel.RoleAssignment.Entity);
+    export const Response = z.array(PackageModel.RoleAssignment.EntityWithUser);
     export type Response = z.infer<typeof Response>;
 
 }

@@ -62,8 +62,17 @@ router.get('/',
         }
 
         const assignments = await DB.instance()
-            .select()
+            .select({
+                id: DB.Tables.roleAssignments.id,
+                package_id: DB.Tables.roleAssignments.package_id,
+                user_id: DB.Tables.roleAssignments.user_id,
+                role: DB.Tables.roleAssignments.role,
+                created_at: DB.Tables.roleAssignments.created_at,
+                user_username: DB.Tables.users.username,
+                user_display_name: DB.Tables.users.display_name,
+            })
             .from(DB.Tables.roleAssignments)
+            .innerJoin(DB.Tables.users, eq(DB.Tables.users.id, DB.Tables.roleAssignments.user_id))
             .where(eq(DB.Tables.roleAssignments.package_id, pkg.id));
 
         return APIResponse.success(c, "Role assignments retrieved successfully", assignments satisfies PackageModel.ListRoleAssignments.Response);

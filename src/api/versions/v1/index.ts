@@ -6,6 +6,7 @@ import { router as accountRouter } from "./routes/account";
 import { router as publishersRouter } from "./routes/publishers";
 import { router as packagesRouter } from "./routes/packages";
 import { router as adminRouter } from "./routes/admin";
+import { router as usersRouter } from "./routes/users";
 import { authMiddlewareV1 } from "./middleware/auth";
 
 const openAPIConfig: Partial<GenerateSpecOptions> = {
@@ -57,6 +58,7 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
                     "Packages / Releases",
                     "Packages / Stable Promotion Requests",
                     "Packages / Role Assignments",
+                    "Users",
                 ],
             },
             {
@@ -166,6 +168,10 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
             {
                 name: "Authentication",
                 description: "Endpoints for authentication and authorization",
+            },
+            {
+                name: "Users",
+                description: "Public user search, allowing authenticated users to find other users.",
             }
         ]
     }
@@ -180,6 +186,7 @@ router.route("/", accountRouter);
 router.route("/", publishersRouter);
 router.route("/", packagesRouter);
 router.route("/", adminRouter);
+router.route("/", usersRouter);
 
 export class APIv1Router extends APIVersionRouter {
     constructor() {

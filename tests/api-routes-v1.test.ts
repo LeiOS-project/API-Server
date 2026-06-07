@@ -1100,6 +1100,20 @@ describe("Package sub-routes coverage", async () => {
         expect(assignment?.role).toBe(PermissionHelper.OrgRoles.MAINTAINER);
     });
 
+    test("GET /packages/:fullPackageName/role-assignments includes user info in response", async () => {
+        const list = await makeAPIRequest(`/v1/packages/${fullPackageName}/role-assignments`, {
+            authToken: ownerSessionToken
+        }, 200);
+
+        expect(Array.isArray(list)).toBe(true);
+        expect(list.length).toBeGreaterThanOrEqual(1);
+
+        const devAssign = list.find((a: any) => a.user_id === developer.id);
+        expect(devAssign).toBeDefined();
+        expect(devAssign.user_username).toBe(developer.username);
+        expect(devAssign).toHaveProperty("user_display_name");
+    });
+
     test("POST /packages/:fullPackageName/role-assignments rejects duplicate assignment", async () => {
         await makeAPIRequest(`/v1/packages/${fullPackageName}/role-assignments`, {
             method: "POST",
@@ -2120,6 +2134,83 @@ describe("Publisher package-route permission matrix", async () => {
             method: "DELETE",
             authToken: siteAdminSessionToken,
         }, 200);
+    });
+});
+
+
+describe("User search routes", async () => {
+
+    let userA: SeededUser;
+    let userB: SeededUser;
+    let userCSession: string;
+
+    beforeAll(async () => {
+        userA = await seedUser("user", {
+            username: "alice_search",
+            display_name: "Alice Searchable"
+        });
+
+        userB = await seedUser("developer", {
+            username: "bob_searchable",
+            display_name: "Bob Developer"
+        });
+
+        await seedUser("user", {
+            username: "charlie_no_match",
+            display_name: "Charlie Hidden"
+        });
+
+        userCSession = await seedSession(userA.id).then(s => s.token);
+    });
+
+    test("GET /users/search returns 401 when not authenticated", async () => {
+        await makeAPIRequest("/v1/users/search?q=alice", {}, 401);
+    });
+
+    test("GET /users/search matches by username", async () => {
+        const result = await makeAPIRequest("/v1/users/search?q=alice_search", {
+            authToken: userCSession
+        }, 200);
+
+        expect(Array.isArray(result)).toBe(true);
+        expect(result.length).toBeGreaterThanOrEqual(1);
+        const match = result.find((u: any) => u.id === userA.id);
+        expect(match).toBeDefined();
+        expect(match!.username).toBe("alice_search");
+        expect(match!.display_name).toBe("Alice Searchable");
+        // Should not expose email or role
+        expect(match).not.toHaveProperty("email");
+        expect(match).not.toHaveProperty("role");
+    });
+
+    test("GET /users/search matches by display name", async () => {
+        const result = await makeAPIRequest("/v1/users/search?q=Bob+Developer", {
+            authToken: userCSession
+        }, 200);
+
+        expect(Array.isArray(result)).toBe(true);
+        const match = result.find((u: any) => u.id === userB.id);
+        expect(match).toBeDefined();
+        expect(match!.username).toBe("bob_searchable");
+        expect(match!.display_name).toBe("Bob Developer");
+    });
+
+    test("GET /users/search returns empty array for no matches", async () => {
+        const result = await makeAPIRequest("/v1/users/search?q=zzzzzznonexistent", {
+            authToken: userCSession
+        }, 200);
+
+        expect(Array.isArray(result)).toBe(true);
+        expect(result.length).toBe(0);
+    });
+
+    test("GET /users/search respects limit parameter", async () => {
+        const result = await makeAPIRequest("/v1/users/search?q=search&limit=1", {
+            authToken: userCSession
+        }, 200);
+
+        expect(Array.isArray(result)).toBe(true);
+        expect(result.length).toBeLessThanOrEqual(1);
     });
 });
 
