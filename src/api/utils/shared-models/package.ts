@@ -128,6 +128,7 @@ export namespace PackageModel.RoleAssignment {
     export const EntityWithUser = Entity.extend({
         user_username: z.string(),
         user_display_name: z.string().nullable(),
+        publisher_role: z.string().nullable(),
     });
     export type EntityWithUser = z.infer<typeof EntityWithUser>;
 

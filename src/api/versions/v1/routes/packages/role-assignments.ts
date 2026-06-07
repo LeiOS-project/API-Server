@@ -61,7 +61,17 @@ router.get('/',
             return APIResponse.forbidden(c, "You do not have permission to view role assignments for this package");
         }
 
-        const assignments = await DB.instance()
+        const publisher_owner_user_id = await DB.instance()
+            .select({ owner_user_id: DB.Tables.publishers.owner_user_id })
+            .from(DB.Tables.publishers)
+            .where(eq(DB.Tables.publishers.id, pkg.publisher_id))
+            .get()?.owner_user_id;
+
+        if (!publisher_owner_user_id) {
+            throw new Error("Publisher not found for package");
+        }
+
+        const rawAssignments = await DB.instance()
             .select({
                 id: DB.Tables.roleAssignments.id,
                 package_id: DB.Tables.roleAssignments.package_id,
@@ -70,10 +80,21 @@ router.get('/',
                 created_at: DB.Tables.roleAssignments.created_at,
                 user_username: DB.Tables.users.username,
                 user_display_name: DB.Tables.users.display_name,
+                publisher_role: DB.Tables.publisherMembers.role,
             })
             .from(DB.Tables.roleAssignments)
             .innerJoin(DB.Tables.users, eq(DB.Tables.users.id, DB.Tables.roleAssignments.user_id))
+            .leftJoin(DB.Tables.publisherMembers, and(
+                eq(DB.Tables.publisherMembers.publisher_id, pkg.publisher_id),
+                eq(DB.Tables.publisherMembers.user_id, DB.Tables.roleAssignments.user_id)
+            ))
             .where(eq(DB.Tables.roleAssignments.package_id, pkg.id));
+
+        // Publisher owners don't have a publisher_members row, so we set their role to ADMIN manually
+        const assignments = rawAssignments.map((a) => ({
+            ...a,
+            publisher_role: a.user_id === publisher_owner_user_id ? PermissionHelper.OrgRoles.ADMIN : a.publisher_role,
+        }));
 
         return APIResponse.success(c, "Role assignments retrieved successfully", assignments satisfies PackageModel.ListRoleAssignments.Response);
     }

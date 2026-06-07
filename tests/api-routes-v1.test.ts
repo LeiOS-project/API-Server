@@ -1100,7 +1100,7 @@ describe("Package sub-routes coverage", async () => {
         expect(assignment?.role).toBe(PermissionHelper.OrgRoles.MAINTAINER);
     });
 
-    test("GET /packages/:fullPackageName/role-assignments includes user info in response", async () => {
+    test("GET /packages/:fullPackageName/role-assignments includes user info and publisher_role in response", async () => {
         const list = await makeAPIRequest(`/v1/packages/${fullPackageName}/role-assignments`, {
             authToken: ownerSessionToken
         }, 200);
@@ -1112,6 +1112,9 @@ describe("Package sub-routes coverage", async () => {
         expect(devAssign).toBeDefined();
         expect(devAssign.user_username).toBe(developer.username);
         expect(devAssign).toHaveProperty("user_display_name");
+        expect(devAssign).toHaveProperty("publisher_role");
+        // developer is not a publisher member, so publisher_role should be null
+        expect(devAssign.publisher_role).toBeNull();
     });
 
     test("POST /packages/:fullPackageName/role-assignments rejects duplicate assignment", async () => {
