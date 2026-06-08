@@ -57,23 +57,33 @@ export class API {
 
 		this.app.onError(async (err, c) => {
 			if (err instanceof HTTPException) {
-				const res = err.getResponse();
-				let body: any;
-
-				try {
-					// Hono puts zod issues into the response body
-					body = JSON.parse(await res.text())
-				} catch {
-					body = { error: 'Invalid input' }
-				}
-
+				// Return only safe error metadata — never leak Zod validation details
 				return c.json({
 					success: false,
-					code: res.status,
+					code: err.status,
 					message: 'Your input is invalid',
-					data: body
 				}, err.status)
 			}
+
+			// this would potentially leak sensitive information, so we catch it here and return a generic error message instead of the default Hono error response which includes the error message and stack trace in development mode.
+			// if (err instanceof HTTPException) {
+			// 	const res = err.getResponse();
+			// 	let body: any;
+
+			// 	try {
+			// 		// Hono puts zod issues into the response body
+			// 		body = JSON.parse(await res.text())
+			// 	} catch {
+			// 		body = { error: 'Invalid input' }
+			// 	}
+
+			// 	return c.json({
+			// 		success: false,
+			// 		code: res.status,
+			// 		message: 'Your input is invalid',
+			// 		data: body
+			// 	}, err.status)
+			// }
 
 			Logger.error("API Error:", err);
 			return c.json({ success: false, code: 500, message: 'Internal Server Error' }, 500);

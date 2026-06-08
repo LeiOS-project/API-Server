@@ -183,6 +183,13 @@
       "when": 1776347324048,
       "tag": "0025_late_white_tiger",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1780953785801,
+      "tag": "0026_silly_talisman",
+      "breakpoints": true
     }
   ]
 }

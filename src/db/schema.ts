@@ -299,7 +299,7 @@ export const scheduled_tasks = sqliteTable('scheduled_tasks', {
  * @deprecated Use DB.Models.scheduled_tasks_paused_state to access this table.
  */
 export const scheduled_tasks_paused_state = sqliteTable('scheduled_tasks_paused_state', {
-    task_id: integer().primaryKey().references(() => scheduled_tasks.id),
+    task_id: integer().primaryKey().references(() => scheduled_tasks.id, { onDelete: 'cascade' }),
     next_step_to_execute: integer().notNull(),
     data: text({ mode: 'json' }).$type<TaskHandler.TempPausedTaskState["data"]>().notNull(),
 });

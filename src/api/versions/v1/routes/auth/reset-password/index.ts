@@ -7,10 +7,51 @@ import { APIResponse } from "../../../../../utils/api-res";
 import { AuthHandler } from "../../../../../utils/authHandler";
 import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers";
 import { DOCS_TAGS } from "../../../docs";
-import { randomBytes as crypto_randomBytes, createHash as crypto_createHash } from "crypto"
+import { randomBytes as crypto_randomBytes, createHmac as crypto_createHmac } from "crypto"
+import type { Context } from "hono";
 
-function hashResetToken(resetToken: string) {
-    return crypto_createHash("sha256").update(resetToken).digest("hex");
+// Server-side secret for HMAC — derived once at module load.
+// NOTE: This is ephemeral. A server restart invalidates all pending reset tokens,
+// since they were signed with the old key. With a 1-hour TTL this is acceptable,
+// but if reliability across restarts matters, persist this secret (e.g. in DB metadata).
+const HMAC_SECRET = crypto_randomBytes(32).toString('hex');
+
+// In-memory rate limiter for password reset requests
+const RESET_REQUEST_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+const RESET_REQUEST_MAX_PER_EMAIL = 1;
+const RESET_CONSUME_MAX_PER_TOKEN = 3;
+const resetRequestAttempts = new Map<string, { count: number; resetAt: number }>();
+const resetConsumeAttempts = new Map<string, { count: number; resetAt: number }>();
+
+// Periodic cleanup to prevent memory leaks
+const RESET_CLEANUP_INTERVAL = setInterval(() => {
+    const now = Date.now();
+    for (const [key, entry] of resetRequestAttempts) {
+        if (entry.resetAt <= now) resetRequestAttempts.delete(key);
+    }
+    for (const [key, entry] of resetConsumeAttempts) {
+        if (entry.resetAt <= now) resetConsumeAttempts.delete(key);
+    }
+}, RESET_REQUEST_WINDOW_MS);
+RESET_CLEANUP_INTERVAL.unref();
+
+export function hashResetToken(resetToken: string) {
+    return crypto_createHmac("sha256", HMAC_SECRET).update(resetToken).digest("hex");
+}
+
+function checkRateLimit(map: Map<string, { count: number; resetAt: number }>, key: string, maxAttempts: number, windowMs: number): boolean {
+    const now = Date.now();
+    let entry = map.get(key);
+    if (!entry || entry.resetAt <= now) {
+        entry = { count: 1, resetAt: now + windowMs };
+        map.set(key, entry);
+        return true; // allowed
+    }
+    entry.count += 1;
+    if (entry.count > maxAttempts) {
+        return false; // blocked
+    }
+    return true;
 }
 
 export const router = new Hono().basePath('/reset-password');
@@ -42,16 +83,14 @@ router.post('/',
         const resetData = c.req.valid("json");
         const hashedResetToken = hashResetToken(resetData.reset_token);
 
+        // Rate limit: max 3 attempts per token
+        if (!checkRateLimit(resetConsumeAttempts, hashedResetToken, RESET_CONSUME_MAX_PER_TOKEN, RESET_REQUEST_WINDOW_MS)) {
+            return APIResponse.badRequest(c, "Invalid reset token");
+        }
+
         let checkToken = DB.instance().select().from(DB.Tables.passwordResets).where(
             eq(DB.Tables.passwordResets.token, hashedResetToken)
         ).get();
-
-        if (!checkToken) {
-            // Keep existing plaintext tokens usable until they expire.
-            checkToken = DB.instance().select().from(DB.Tables.passwordResets).where(
-                eq(DB.Tables.passwordResets.token, resetData.reset_token)
-            ).get();
-        }
 
         if (!checkToken) {
             return APIResponse.badRequest(c, "Invalid reset token");
@@ -112,6 +151,11 @@ router.post('/request',
 
         const requestData = c.req.valid("json");
 
+        // Rate limit: max 1 reset request per email per 15 minutes
+        if (!checkRateLimit(resetRequestAttempts, requestData.email.toLowerCase(), RESET_REQUEST_MAX_PER_EMAIL, RESET_REQUEST_WINDOW_MS)) {
+            return APIResponse.successNoData(c, "If the username exists, a password reset has been requested");
+        }
+
         const user = DB.instance().select().from(DB.Tables.users).where(
             eq(DB.Tables.users.email, requestData.email)
         ).get();
@@ -124,12 +168,11 @@ router.post('/request',
                 eq(DB.Tables.passwordResets.user_id, user.id)
             ).run();
 
-            // Create new reset token
+            // Create new reset token — 1 hour expiry (OWASP recommendation: 15-60 min)
             DB.instance().insert(DB.Tables.passwordResets).values({
                 user_id: user.id,
                 token: hashResetToken(resetToken),
-                // 7 Days
-                expires_at: Date.now() + 7 * 24 * 60 * 60 * 1000
+                expires_at: Date.now() + 60 * 60 * 1000 // 1 hour
             }).run();
 
             // send email with reset token

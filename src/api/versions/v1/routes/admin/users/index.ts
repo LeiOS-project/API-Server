@@ -124,6 +124,7 @@ router.use('/:userId/*',
             return APIResponse.notFound(c, "User not found");
         }
 
+        // Store the full user in context — strip password_hash only at the response boundary
         // @ts-ignore
         c.set(TARGET_USER_KEY, user);
 
@@ -202,13 +203,18 @@ router.put('/:userId',
 
         const roleChanged = updates.role && updates.role !== user.role;
 
-        await DB.instance().update(DB.Tables.users).set(updates).where(
-            eq(DB.Tables.users.id, user.id)
-        ).run();
+        // Wrap the users table update and auth context update in a transaction
+        // to prevent partial failure: if the auth context update fails, the role
+        // change in the users table must be rolled back.
+        await DB.instance().transaction(async (tx) => {
+            await tx.update(DB.Tables.users).set(updates).where(
+                eq(DB.Tables.users.id, user.id)
+            ).run();
 
-        if (roleChanged && updates.role) {
-            await AuthHandler.changeUserRoleInAuthContexts(user.id, updates.role);
-        }
+            if (roleChanged && updates.role) {
+                await AuthHandler.changeUserRoleInAuthContexts(user.id, updates.role);
+            }
+        });
 
         const refreshed = await DB.instance().select().from(DB.Tables.users).where(
             eq(DB.Tables.users.id, user.id)

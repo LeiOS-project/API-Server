@@ -18,7 +18,7 @@ export const authMiddlewareV1 = createMiddleware(async (c, next) => {
     if (!authHeader.startsWith("Bearer ")) {
 
         // Allow unauthenticated access to the login endpoint and password reset request endpoint, which may be accessed with an invalid or missing token.
-        if (c.req.path.startsWith("/v1/auth/login") || c.req.path.startsWith("/v1/auth/password-reset")) {
+        if (c.req.path.startsWith("/v1/auth/login") || c.req.path.startsWith("/v1/auth/reset-password")) {
 
             const authContext: AuthHandler.UnauthenticatedAuthContext = { type: 'unauthenticated' };
 
@@ -36,7 +36,7 @@ export const authMiddlewareV1 = createMiddleware(async (c, next) => {
 
     if (!authContext || !(await AuthHandler.isValidAuthContext(authContext))) {
 
-        if (c.req.path.startsWith("/v1/auth/login") || c.req.path.startsWith("/v1/auth/password-reset")) {
+        if (c.req.path.startsWith("/v1/auth/login") || c.req.path.startsWith("/v1/auth/reset-password")) {
 
             const unauthenticatedContext: AuthHandler.UnauthenticatedAuthContext = { type: 'unauthenticated' };
 

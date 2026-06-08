@@ -9,6 +9,7 @@ import { and, desc, eq, gte } from "drizzle-orm";
 import { AuthModel } from "../src/api/versions/v1/routes/auth/model";
 import { makeAPIRequest } from "./helpers/api";
 import { AccountModel } from "../src/api/versions/v1/routes/account/model";
+import { hashResetToken } from "../src/api/versions/v1/routes/auth/reset-password";
 import { PackageModel } from "../src/api/utils/shared-models/package";
 import { PermissionHelper } from "../src/utils/permission-helper";
 import { RuntimeMetadata } from "../src/api/utils/metadata";
@@ -389,7 +390,8 @@ describe("Account routes", async () => {
         const newUserData = {
             display_name: "Updated Name",
             username: "updatedusername",
-            email: "updated@example.com"
+            email: "updated@example.com",
+            current_password: testUser.password
         }
 
         await makeAPIRequest("/v1/account", {
@@ -614,7 +616,7 @@ describe("Auth reset-password routes", async () => {
         const correctLoginIP = `203.0.114.${Math.floor(Math.random() * 200) + 1}`;
 
         await DB.instance().insert(DB.Tables.passwordResets).values({
-            token: validResetToken,
+            token: hashResetToken(validResetToken),
             user_id: resetUser.id,
             expires_at: Date.now() + 10 * 60 * 1000
         }).run();

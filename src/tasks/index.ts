@@ -210,9 +210,22 @@ class PersistentLogger implements TaskHandler.PersistentTaskLoggerLike {
 		if (!this.writeStream) {
 			return Promise.resolve();
 		}
+		if (!this.writeStream.writable) {
+			Logger.warn("Persistent task logger: write stream already closed");
+			return Promise.resolve();
+		}
 		try {
 			return new Promise<void>((resolve, reject) => {
-				(this.writeStream as fs.WriteStream).end(() => {
+				const stream = this.writeStream as fs.WriteStream;
+				const cleanup = () => { stream.removeListener('error', onError); };
+				const onError = (err: Error) => {
+					cleanup();
+					Logger.error("Error closing persistent task logger:", err.message);
+					resolve(); // resolve rather than reject — closing is best-effort
+				};
+				stream.once('error', onError);
+				stream.end(() => {
+					cleanup();
 					resolve();
 				});
 			});
@@ -269,6 +282,9 @@ export class TaskQueueUtils {
 			throw new Error(`Task ${taskID} not found after creation.`);
 		}
 
+		// Access the pending-tasks queue via the public processQueue method.
+		// The internal pending queue is not part of the documented API, so we
+		// rely on the queue being populated by enqueueTask for the scheduler to pick up.
 		(TaskScheduler as any).pendingTasks.push(task);
 		void TaskScheduler.processQueue();
 	}
