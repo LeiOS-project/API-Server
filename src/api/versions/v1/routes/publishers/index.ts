@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { validator as zValidator } from "hono-openapi";
 import { z } from "zod";
-import { and, eq, ilike, or, SQL } from "drizzle-orm";
+import { and, eq, like, or, SQL } from "drizzle-orm";
 import { DB } from "../../../../../db";
 import { APIResponse } from "../../../../utils/api-res";
 import { PublisherModel } from "./model";
@@ -69,8 +69,8 @@ router.get('/',
         if (searchString) {
             filters.push(
                 or(
-                    ilike(DB.Tables.publishers.name, `%${searchString}%`),
-                    ilike(DB.Tables.publishers.display_name, `%${searchString}%`)
+                    like(DB.Tables.publishers.name, `%${searchString}%`),
+                    like(DB.Tables.publishers.display_name, `%${searchString}%`)
                 )
             );
         }

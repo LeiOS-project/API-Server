@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { PackageModel } from '../../../../utils/shared-models/package';
 import { validator as zValidator } from "hono-openapi";
 import { APIResponseSpec, APIRouteSpec } from "../../../../utils/specHelpers";
-import { and, eq, ilike, or, SQL } from "drizzle-orm";
+import { and, eq, like, or, SQL } from "drizzle-orm";
 import { DB } from "../../../../../db";
 import { APIResponse } from "../../../../utils/api-res";
 import { AuthHandler } from "../../../../utils/authHandler";
@@ -54,9 +54,9 @@ router.get('/',
         if (searchString) {
             filters.push(
                 or(
-                    ilike(DB.Tables.packagesFullView.name, `%${searchString}%`),
-                    ilike(DB.Tables.packagesFullView.display_name, `%${searchString}%`),
-                    ilike(DB.Tables.packagesFullView.fullname, `%${searchString}%`)
+                    like(DB.Tables.packagesFullView.name, `%${searchString}%`),
+                    like(DB.Tables.packagesFullView.display_name, `%${searchString}%`),
+                    like(DB.Tables.packagesFullView.fullname, `%${searchString}%`)
                 )
             );
         }
