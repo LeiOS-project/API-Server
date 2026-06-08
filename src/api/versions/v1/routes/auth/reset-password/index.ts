@@ -5,6 +5,7 @@ import { DB } from "../../../../../../db";
 import { eq } from "drizzle-orm";
 import { APIResponse } from "../../../../../utils/api-res";
 import { AuthHandler } from "../../../../../utils/authHandler";
+import { EmailService } from "../../../../../utils/email";
 import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers";
 import { DOCS_TAGS } from "../../../docs";
 import { randomBytes as crypto_randomBytes, createHmac as crypto_createHmac } from "crypto"
@@ -175,8 +176,10 @@ router.post('/request',
                 expires_at: Date.now() + 60 * 60 * 1000 // 1 hour
             }).run();
 
-            // send email with reset token
-            // Note: Email sending is not implemented yet
+            // send email with reset token (fire-and-forget — errors are logged server-side)
+            if (EmailService.isEnabled()) {
+                EmailService.sendPasswordResetEmail(user.email, resetToken);
+            }
         }
 
         return APIResponse.successNoData(c, "If the username exists, a password reset has been requested");

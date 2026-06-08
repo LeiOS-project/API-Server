@@ -39,6 +39,13 @@ function setTestEnv(rootDir: string) {
         LRA_S3_ACCESS_KEY_ID: "S3RVER",
         LRA_S3_SECRET_ACCESS_KEY: "S3RVER",
 
+        LRA_SMTP_HOST: "smtp.example.com",
+        LRA_SMTP_PORT: "587",
+        LRA_SMTP_USERNAME: "test",
+        LRA_SMTP_PASSWORD: "test",
+        LRA_SMTP_FROM: "\"Test\" <test@example.com>",
+        LRA_SMTP_SECURE: false,
+
     } as const satisfies ParsedConfig;
 
     for (const [key, value] of Object.entries(envVars)) {
