@@ -10,6 +10,7 @@ import { PermissionHelper } from "../../../../../utils/permission-helper";
 import { AptlyAPI } from "../../../../../aptly/api";
 import { TaskScheduler } from "../../../../../tasks";
 import { RuntimeMetadata } from "../../../../utils/metadata";
+import { Logger } from "../../../../../utils/logger";
 import { DOCS_TAGS } from "../../docs";
 
 export const router = new Hono().basePath('/releases');
@@ -333,7 +334,8 @@ router.post('/:version_with_leios_patch/:arch',
             }).where(eq(DB.Tables.packages.id, pkg.id));
 
         } catch (error) {
-            return APIResponse.serverError(c, "Failed to upload and verify package release: " + error);
+            Logger.error("Failed to upload and verify package release:", error);
+            return APIResponse.serverError(c, "Failed to upload and verify package release");
         }
 
         return APIResponse.createdNoData(c, "Package release file uploaded successfully");

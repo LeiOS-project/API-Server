@@ -7,6 +7,7 @@ import { TaskScheduler } from "./tasks";
 import { LiveRepoUtils } from "./utils/live-repo";
 import { Utils } from "./utils";
 import { PermissionHelper } from "./utils/permission-helper";
+import { EmailService } from "./api/utils/email";
 
 export class Main {
 
@@ -30,6 +31,7 @@ export class Main {
 
         await PermissionHelper.init();
 
+        EmailService.init();
 
         await Utils.ensureDirectoryExists(config.LRA_LOG_DIR ?? "./data/logs");
 

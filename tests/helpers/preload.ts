@@ -39,6 +39,13 @@ function setTestEnv(rootDir: string) {
         LRA_S3_ACCESS_KEY_ID: "S3RVER",
         LRA_S3_SECRET_ACCESS_KEY: "S3RVER",
 
+        LRA_SMTP_HOST: "127.0.0.1",
+        LRA_SMTP_PORT: "12587",
+        LRA_SMTP_USERNAME: "",
+        LRA_SMTP_PASSWORD: "",
+        LRA_SMTP_FROM: "\"LeiOS Test\" <test@leios.local>",
+        LRA_SMTP_SECURE: false,
+
     } as const satisfies ParsedConfig;
 
     for (const [key, value] of Object.entries(envVars)) {
@@ -162,6 +169,9 @@ beforeAll(async () => {
     );
 
     await PermissionHelper.init();
+
+    // EmailService is NOT initialised here — tests that need it call
+    // EmailService.init(mockTransport) in their own beforeAll.
 
     await AptlyAPIServer.init({
         aptlyRoot: path.join(TMP_ROOT, "aptly"),

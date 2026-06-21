@@ -2,7 +2,6 @@ import { randomUUID } from "crypto";
 import { DB } from "../../src/db";
 import { SessionHandler } from "../../src/api/utils/authHandler";
 import { PermissionHelper } from "../../src/utils/permission-helper";
-import { sql } from "drizzle-orm";
 
 export type SeededUser = Omit<DB.Models.User, "password_hash"> & { password: string };
 
@@ -54,27 +53,12 @@ export async function seedMembership(
     role: PermissionHelper.OrgRoles,
     isPubliclyHidden = false
 ): Promise<DB.Models.PublisherMember> {
-    try {
-        DB.instance().run(sql`
-            INSERT INTO publisher_members (publisher_id, user_id, role, is_publicly_hidden)
-            VALUES (${publisherId}, ${userId}, ${role}, ${isPubliclyHidden ? 1 : 0})
-        `);
-    } catch {
-        // Backward compatibility for DBs where this column does not exist yet.
-        DB.instance().run(sql`
-            INSERT INTO publisher_members (publisher_id, user_id, role)
-            VALUES (${publisherId}, ${userId}, ${role})
-        `);
-    }
-
-    return {
-        id: -1,
+    return DB.instance().insert(DB.Tables.publisherMembers).values({
         publisher_id: publisherId,
         user_id: userId,
         role,
         is_publicly_hidden: isPubliclyHidden,
-        added_at: Date.now(),
-    } as DB.Models.PublisherMember;
+    }).returning().get();
 }
 
 export async function seedPackage(

@@ -61,15 +61,17 @@ router.get('/',
             return APIResponse.forbidden(c, "You do not have permission to view role assignments for this package");
         }
 
-        const publisher_owner_user_id = await DB.instance()
+        const publisher = await DB.instance()
             .select({ owner_user_id: DB.Tables.publishers.owner_user_id })
             .from(DB.Tables.publishers)
             .where(eq(DB.Tables.publishers.id, pkg.publisher_id))
-            .get()?.owner_user_id;
+            .get();
 
-        if (!publisher_owner_user_id) {
+        if (!publisher) {
             throw new Error("Publisher not found for package");
         }
+
+        const publisher_owner_user_id = publisher.owner_user_id;
 
         const rawAssignments = await DB.instance()
             .select({

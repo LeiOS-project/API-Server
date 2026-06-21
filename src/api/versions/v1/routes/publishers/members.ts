@@ -178,7 +178,7 @@ router.use('/:userId/*',
         // @ts-ignore
         c.set("member", member);
 
-        return next();
+        return await next();
     }
 );
 
