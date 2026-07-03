@@ -80,6 +80,7 @@ export class Main {
 
             await API.stop();
             await AptlyAPIServer.stop(type);
+            await EmailService.reset();
             await TaskScheduler.stopProcessing();
             await DB.close();
 
