@@ -1,5 +1,4 @@
 import z from "zod";
-import { AptlyAPI } from "../../../aptly/api";
 import { DB } from "../../../db";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 
@@ -11,11 +10,10 @@ export namespace PackageReleaseModel {
     export const versionWithRequiredLeiOSPatchRegex = /^(?:[0-9][0-9A-Za-z.+~\-]*leios\d+(?:\.\d+){0,2})$/;
 
     export const Param = z.object({
-        versionWithLeiosPatch: z.string().regex(versionWithLeiOSPatchRegex)
+        version_with_leios_patch: z.string().regex(versionWithLeiOSPatchRegex)
     });
 
     export const PostParamWithArch = z.object({
-        // versionWithLeiosPatch: z.string().regex(versionWithLeiOSPatchRegex),
         arch: z.enum(["amd64", "arm64", "all"])
     });
 
@@ -23,7 +21,7 @@ export namespace PackageReleaseModel {
 
 export namespace PackageReleaseModel.GetReleaseByVersion {
 
-    export const Response = createSelectSchema(DB.Schema.packageReleases, {
+    export const Response = createSelectSchema(DB.Tables.packageReleases, {
         architectures: z.object({
             amd64: z.boolean(),
             arm64: z.boolean(),
@@ -45,8 +43,8 @@ export namespace PackageReleaseModel.GetAll {
 
 export namespace PackageReleaseModel.CreateRelease {
 
-    export const Body = createInsertSchema(DB.Schema.packageReleases, {
-        versionWithLeiosPatch: z.string().regex(versionWithLeiOSPatchRegex),
+    export const Body = createInsertSchema(DB.Tables.packageReleases, {
+        version_with_leios_patch: z.string().regex(versionWithLeiOSPatchRegex),
         changelog: z.string().min(1, "Changelog cannot be empty").max(10000, "Changelog cannot exceed 10,000 characters")
     }).omit({
         id: true,
@@ -62,7 +60,7 @@ export namespace PackageReleaseModel.CreateRelease {
 export namespace PackageReleaseModel.UpdateRelease {
 
     export const Body = PackageReleaseModel.CreateRelease.Body.partial().omit({
-        versionWithLeiosPatch: true
+        version_with_leios_patch: true
     });
 
     export type Body = z.infer<typeof Body>;
@@ -74,6 +72,6 @@ export namespace PackageReleaseModel.UploadReleaseAssetForArch {
     export const FileInput = z.object({
         file: z.file().min(1).max(1024 * 1024 * 1024), // Max 1 GB
     });
-        
+
 
 }

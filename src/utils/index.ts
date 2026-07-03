@@ -44,6 +44,10 @@ export class Utils {
         }
     }
 
+    static asExact<Shape>() {
+        return <T extends Shape>(obj: T & Utils.DeepExact<Shape, T>): T => obj;
+    }
+
 }
 
 export namespace Utils {
@@ -53,4 +57,37 @@ export namespace Utils {
             ? First & MergeArray<Rest extends object[] ? Rest : []>
             : {};
 
+    export type CreateError<DoError extends boolean, T = symbol> = DoError extends true ? CreateError<DoError> : T;
+    
+    export type SameType<A, B> = CreateError<
+        (<T>() => T extends A ? 1 : 2) extends
+        (<T>() => T extends B ? 1 : 2)
+            ? false
+            : true,
+        A
+    >;
+
+    export type DeepExact<Shape, T> = 
+        // 1. Bypass functions early
+        Shape extends (...args: any[]) => any 
+            ? T 
+        // 2. Handle Arrays/Tuples using Mapped Types
+        : Shape extends readonly any[] 
+            ? T extends readonly any[]
+                ? { [I in keyof T]: DeepExact<Shape[number], T[I]> }
+                : never
+        // 3. Handle Objects
+        : Shape extends object
+            ? T extends object
+                ? {
+                    [K in keyof T]: K extends keyof Shape
+                        ? DeepExact<Shape[K], T[K]>
+                        : never;
+                  }
+                : never
+        // 4. Handle Primitives
+        : T;
+
+
 }
+

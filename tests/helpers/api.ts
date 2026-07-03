@@ -5,7 +5,7 @@ import { Logger } from "../../src/utils/logger";
 
 type HeadersInit = RequestInit["headers"];
 
-export async function makeAPIRequest<ReturnBody = null>(
+export async function makeAPIRequest<ReturnBody = any>(
     path: string,
     opts: {
         method?: "GET" | "POST" | "PUT" | "DELETE",
@@ -44,8 +44,23 @@ export async function makeAPIRequest<ReturnBody = null>(
     const res = await API.getApp().request(path, options);
 
     if (!expectedCode) {
-        expect(res.status).toBeOneOf([200, 201, 202, 204]);
+
+        const successStatusCodes = [200, 201, 202, 204];
+
+        if (!successStatusCodes.includes(res.status)) {
+            const errorText = await res.text();
+            Logger.error(`Expected status 2xx but got ${res.status}. Response body: ${errorText}`);
+        }
+
+        expect(res.status).toBeOneOf(successStatusCodes);
+
     } else {
+
+        if (res.status !== expectedCode) {
+            const errorText = await res.text();
+            Logger.error(`Expected status ${expectedCode} but got ${res.status}. Response body: ${errorText}`);
+        }
+
         expect(res.status).toBe(expectedCode);
     }
 

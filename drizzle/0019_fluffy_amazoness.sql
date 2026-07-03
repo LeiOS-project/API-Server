@@ -1,0 +1,2 @@
+DROP VIEW `packages_full_view`;--> statement-breakpoint
+CREATE VIEW `packages_full_view` AS select "packages"."id", "packages"."publisher_id", "packages"."name", "publishers"."name" || '.' || "packages"."name" as "fullname", "packages"."topLevelAlias", "packages"."display_name", "packages"."description", "packages"."homepage_url", "packages"."flags", "packages"."requires_patching", "packages"."created_at", "packages"."latest_stable_release", "packages"."latest_testing_release" from "packages" left join "publishers" on "packages"."publisher_id" = "publishers"."id";

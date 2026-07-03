@@ -1,23 +1,42 @@
 import { Logger } from "../utils/logger";
-import { authMiddleware } from "./middleware/auth";
 import { Hono } from "hono";
 import { prettyJSON } from "hono/pretty-json";
-import { setupDocs } from "./docs";
 import { cors } from "hono/cors";
 import { HTTPException } from 'hono/http-exception'
+import type { APIVersionRouter } from "./utils/apiVersionRouter";
+import { APIv1Router } from "./versions/v1";
+import { openAPIRouteHandler } from "hono-openapi";
+import { Scalar } from "@scalar/hono-api-reference";
 
 export class API {
 
 	protected static server: Bun.Server<undefined>;
 	protected static app: Hono;
 
-	protected static routers = [
-		(import('./routes/public')),
-		(import('./routes/auth')),
-		(import('./routes/account')),
-		(import('./routes/developer')),
-		(import('./routes/admin')),
-	];
+	protected static latestVersion: number | null = null;
+
+	protected static registerVersion(versionRouter: APIVersionRouter, disableDocs: boolean = false) {
+
+		this.app.route(`/v${versionRouter.version}`, versionRouter.router);
+
+		if (!this.latestVersion || versionRouter.version > this.latestVersion) {
+			this.latestVersion = versionRouter.version;
+		}
+
+		if (!disableDocs) {
+
+			this.app.get(
+				`/docs/v${versionRouter.version}/openapi`,
+				openAPIRouteHandler(versionRouter.router, versionRouter.openAPIConfig),
+			);
+
+			this.app.get(
+				`/docs/v${versionRouter.version}`,
+				Scalar({ url: `/docs/v${versionRouter.version}/openapi` })
+			);
+
+		}
+	}
 
 	static async init(
 		frontendUrls: string[] = [],
@@ -38,47 +57,66 @@ export class API {
 
 		this.app.onError(async (err, c) => {
 			if (err instanceof HTTPException) {
-				const res = err.getResponse();
-				let body: any;
-
-				try {
-					// Hono puts zod issues into the response body
-					body = JSON.parse(await res.text())
-				} catch {
-					body = { error: 'Invalid input' }
-				}
-
+				// Return only safe error metadata — never leak Zod validation details
 				return c.json({
 					success: false,
+					code: err.status,
 					message: 'Your input is invalid',
-					details: body
 				}, err.status)
 			}
 
+			// this would potentially leak sensitive information, so we catch it here and return a generic error message instead of the default Hono error response which includes the error message and stack trace in development mode.
+			// if (err instanceof HTTPException) {
+			// 	const res = err.getResponse();
+			// 	let body: any;
+
+			// 	try {
+			// 		// Hono puts zod issues into the response body
+			// 		body = JSON.parse(await res.text())
+			// 	} catch {
+			// 		body = { error: 'Invalid input' }
+			// 	}
+
+			// 	return c.json({
+			// 		success: false,
+			// 		code: res.status,
+			// 		message: 'Your input is invalid',
+			// 		data: body
+			// 	}, err.status)
+			// }
+
 			Logger.error("API Error:", err);
-			return c.json({ success: false, message: 'Internal Server Error' }, 500);
+			return c.json({ success: false, code: 500, message: 'Internal Server Error' }, 500);
 		});
 
 
-		// Apply global auth middleware
-		this.app.use(authMiddleware);
+		this.registerVersion(new APIv1Router, disableDocs);
 
-		for (const router of this.routers) {
-			this.app.route("/", (await router).router);
-		}
 
 		this.app.get("/health", (c) => {
-			return c.json({ status: "LeiOS API is running" });
+			return c.json({
+				success: true,
+				code: 200,
+				message: "LeiOS API is running",
+				data: null
+			});
 		});
 
 		if (!disableDocs) {
+
 			this.app.get("/", (c) => {
-				return c.redirect("/docs");
+				return c.redirect(`/docs/v${this.latestVersion}`);
 			});
-			setupDocs(this.app);
+
 		} else {
+
 			this.app.get("/", (c) => {
-				return c.json({ message: "LeiOS API is running. Documentation is disabled." });
+				return c.json({
+					success: true,
+					code: 200,
+					message: "LeiOS API is running. Documentation is disabled.",
+					data: null
+				});
 			});
 		}
 

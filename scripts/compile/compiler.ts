@@ -11,6 +11,7 @@ class CompilerCommand {
 
     public sourcemap = true;
     public minify = true;
+    public bytecode = true;
     public entrypoint = "./scripts/entrypoint.ts";
     public outfile = "./build/bin/leios-api";
     public platform: PlatformArg = "auto";
@@ -28,6 +29,7 @@ class CompilerCommand {
             this.baseCommand,
             (this.sourcemap ? "--sourcemap" : ""),
             (this.minify ? "--minify" : ""),
+            (this.bytecode ? "--bytecode" : ""),
             this.entrypoint,
             "--outfile", this.outfile,
             (this.platform === "auto" ? "" : `--target=${Platforms[this.platform]}`),

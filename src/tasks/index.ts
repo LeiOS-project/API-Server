@@ -14,6 +14,25 @@ type AdditionalTaskMeta = {
 };
 type TaskData = TaskHandler.BaseTaskData<AdditionalTaskMeta>;
 
+function buildPendingTaskData(
+	fn: TaskData["fn"],
+	args: TaskData["args"],
+	additionalMeta: AdditionalTaskMeta,
+	execOpts?: TaskHandler.TaskExecOptions,
+): Omit<TaskData, "id"> {
+	return {
+		...additionalMeta,
+		fn,
+		args,
+		execOptions: execOpts ?? null,
+		status: "pending",
+		created_at: Date.now(),
+		finished_at: null,
+		result: null,
+		message: null,
+	};
+}
+
 export class TaskStorage extends TaskHandler.AbstractStorageDriver<TaskData, AdditionalTaskMeta> {
 
 	private transportToDBFormat(task: TaskData, withID?: true): DB.Models.ScheduledTask;
@@ -53,8 +72,8 @@ export class TaskStorage extends TaskHandler.AbstractStorageDriver<TaskData, Add
 	}
 
 	async loadTask(id: number): Promise<TaskData | null> {
-		const data = DB.instance().select().from(DB.Schema.scheduled_tasks).where(
-			eq(DB.Schema.scheduled_tasks.id, id)
+		const data = DB.instance().select().from(DB.Tables.scheduled_tasks).where(
+			eq(DB.Tables.scheduled_tasks.id, id)
 		).get();
 		if (!data)
 			return null;
@@ -62,52 +81,52 @@ export class TaskStorage extends TaskHandler.AbstractStorageDriver<TaskData, Add
 	}
 
 	async createTask(data: Omit<TaskData, "id">): Promise<number> {
-		const result = DB.instance().insert(DB.Schema.scheduled_tasks).values(
+		const result = DB.instance().insert(DB.Tables.scheduled_tasks).values(
 			this.transportToDBFormat(data as any, false)
 		).returning().get();
 		return result.id;
 	}
 
 	async updateTask(data: TaskData): Promise<void> {
-		await DB.instance().update(DB.Schema.scheduled_tasks).set(
+		await DB.instance().update(DB.Tables.scheduled_tasks).set(
 			this.transportToDBFormat(data, false)
 		).where(
-			eq(DB.Schema.scheduled_tasks.id, data.id!)
+			eq(DB.Tables.scheduled_tasks.id, data.id!)
 		);
 	}
 
 	async deleteTask(id: number): Promise<void> {
-		await DB.instance().delete(DB.Schema.scheduled_tasks).where(
-			eq(DB.Schema.scheduled_tasks.id, id)
+		await DB.instance().delete(DB.Tables.scheduled_tasks).where(
+			eq(DB.Tables.scheduled_tasks.id, id)
 		);
 	}
 
 	async loadPausedOrPendingTasks(): Promise<TaskData[]> {
-		const rows = DB.instance().select().from(DB.Schema.scheduled_tasks).where(
+		const rows = DB.instance().select().from(DB.Tables.scheduled_tasks).where(
 			or(
-				eq(DB.Schema.scheduled_tasks.status, "paused"),
-				eq(DB.Schema.scheduled_tasks.status, "pending")
+				eq(DB.Tables.scheduled_tasks.status, "paused"),
+				eq(DB.Tables.scheduled_tasks.status, "pending")
 			)
 			// tasks ordered by creation time. oldest first
-		).orderBy(asc(DB.Schema.scheduled_tasks.created_at)).all();
+		).orderBy(asc(DB.Tables.scheduled_tasks.created_at)).all();
 
 		return rows.map(row => this.transportFromDBFormat(row));
 	}
 
 	async loadFinishedTasksWithAutoDelete(): Promise<TaskData[]> {
-		const rows = DB.instance().select().from(DB.Schema.scheduled_tasks).where(
+		const rows = DB.instance().select().from(DB.Tables.scheduled_tasks).where(
 			and(
-				eq(DB.Schema.scheduled_tasks.status, "completed"),
-				eq(DB.Schema.scheduled_tasks.autoDelete, true)
+				eq(DB.Tables.scheduled_tasks.status, "completed"),
+				eq(DB.Tables.scheduled_tasks.autoDelete, true)
 			)
-		).orderBy(asc(DB.Schema.scheduled_tasks.finished_at)).all();
+		).orderBy(asc(DB.Tables.scheduled_tasks.finished_at)).all();
 		return rows.map(row => this.transportFromDBFormat(row));
 	}
 
 
 	async loadPausedTaskState(taskID: number): Promise<TaskHandler.TempPausedTaskState | null> {
-		const row = DB.instance().select().from(DB.Schema.scheduled_tasks_paused_state).where(
-			eq(DB.Schema.scheduled_tasks_paused_state.task_id, taskID)
+		const row = DB.instance().select().from(DB.Tables.scheduled_tasks_paused_state).where(
+			eq(DB.Tables.scheduled_tasks_paused_state.task_id, taskID)
 		).get();
 		if (!row)
 			return null;
@@ -118,18 +137,18 @@ export class TaskStorage extends TaskHandler.AbstractStorageDriver<TaskData, Add
 	}
 
 	async savePausedTaskState(taskID: number, pausedState: TaskHandler.TempPausedTaskState): Promise<void> {
-		const existing = DB.instance().select().from(DB.Schema.scheduled_tasks_paused_state).where(
-			eq(DB.Schema.scheduled_tasks_paused_state.task_id, taskID)
+		const existing = DB.instance().select().from(DB.Tables.scheduled_tasks_paused_state).where(
+			eq(DB.Tables.scheduled_tasks_paused_state.task_id, taskID)
 		).get();
 		if (existing) {
-			await DB.instance().update(DB.Schema.scheduled_tasks_paused_state).set({
+			await DB.instance().update(DB.Tables.scheduled_tasks_paused_state).set({
 				next_step_to_execute: pausedState.nextStepToExecute,
 				data: pausedState.data
 			}).where(
-				eq(DB.Schema.scheduled_tasks_paused_state.task_id, taskID)
+				eq(DB.Tables.scheduled_tasks_paused_state.task_id, taskID)
 			);
 		} else {
-			await DB.instance().insert(DB.Schema.scheduled_tasks_paused_state).values({
+			await DB.instance().insert(DB.Tables.scheduled_tasks_paused_state).values({
 				task_id: taskID,
 				next_step_to_execute: pausedState.nextStepToExecute,
 				data: pausedState.data
@@ -138,8 +157,8 @@ export class TaskStorage extends TaskHandler.AbstractStorageDriver<TaskData, Add
 	}
 
 	async deletePausedTaskState(taskID: number): Promise<void> {
-		await DB.instance().delete(DB.Schema.scheduled_tasks_paused_state).where(
-			eq(DB.Schema.scheduled_tasks_paused_state.task_id, taskID)
+		await DB.instance().delete(DB.Tables.scheduled_tasks_paused_state).where(
+			eq(DB.Tables.scheduled_tasks_paused_state.task_id, taskID)
 		);
 	}
 
@@ -191,9 +210,22 @@ class PersistentLogger implements TaskHandler.PersistentTaskLoggerLike {
 		if (!this.writeStream) {
 			return Promise.resolve();
 		}
+		if (!this.writeStream.writable) {
+			Logger.warn("Persistent task logger: write stream already closed");
+			return Promise.resolve();
+		}
 		try {
 			return new Promise<void>((resolve, reject) => {
-				(this.writeStream as fs.WriteStream).end(() => {
+				const stream = this.writeStream as fs.WriteStream;
+				const cleanup = () => { stream.removeListener('error', onError); };
+				const onError = (err: Error) => {
+					cleanup();
+					Logger.error("Error closing persistent task logger:", err.message);
+					resolve(); // resolve rather than reject — closing is best-effort
+				};
+				stream.once('error', onError);
+				stream.end(() => {
+					cleanup();
 					resolve();
 				});
 			});
@@ -225,9 +257,40 @@ const Registry = new TaskHandler.TaskFNRegistry()
 .register(OsReleaseTask)
 .register(UpdateTestingRepoTask);
 
+const taskStorage = new TaskStorage();
+
 export const TaskScheduler = new TaskHandler<typeof Registry["registry"], InstanceType<typeof TaskStorage>, TaskData, AdditionalTaskMeta>({
-	storage: new TaskStorage(),
+	storage: taskStorage,
 	defaultLogger: Logger,
 	persistentLogger: PersistentLogger
 }, Registry);
 
+export class TaskQueueUtils {
+
+	static async createPendingTaskRecord(
+		fn: TaskData["fn"],
+		args: TaskData["args"],
+		additionalMeta: AdditionalTaskMeta,
+		execOpts?: TaskHandler.TaskExecOptions,
+	) {
+		return await taskStorage.createTask(buildPendingTaskData(fn, args, additionalMeta, execOpts));
+	}
+
+	static async activatePendingTask(taskID: number) {
+		const task = await taskStorage.loadTask(taskID);
+		if (!task) {
+			throw new Error(`Task ${taskID} not found after creation.`);
+		}
+
+		// Access the pending-tasks queue via the public processQueue method.
+		// The internal pending queue is not part of the documented API, so we
+		// rely on the queue being populated by enqueueTask for the scheduler to pick up.
+		(TaskScheduler as any).pendingTasks.push(task);
+		void TaskScheduler.processQueue();
+	}
+
+	static async deleteTaskRecord(taskID: number) {
+		await taskStorage.deleteTask(taskID);
+	}
+
+}

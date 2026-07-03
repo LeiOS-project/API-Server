@@ -39,3 +39,5 @@ testdata/
 tmp*
 
 build/
+
+plans/

@@ -1,15 +1,45 @@
-# api-server
+# API Server
 
-To install dependencies:
+## Development
+
+Install dependencies:
 
 ```bash
 bun install
 ```
 
-To run:
+Run the development server:
 
 ```bash
-bun run index.ts
+bun run dev
 ```
 
-This project was created using `bun init` in bun v1.3.2. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+Start the server with auto-migrations enabled:
+
+```bash
+bun run start
+```
+
+Typecheck the project:
+
+```bash
+bun run typecheck
+```
+
+Run tests:
+
+```bash
+bun test
+```
+
+## OpenCode
+
+This repo includes project-level OpenCode config in `opencode.json` plus repo-specific commands in `.opencode/commands/`.
+
+Useful commands inside OpenCode:
+
+- `/typecheck` runs `bun run typecheck`
+- `/test` runs the most appropriate Bun test command
+- `/verify` runs typecheck first, then focused or full tests
+
+Project-specific OpenCode guidance lives in `AGENTS.md`.

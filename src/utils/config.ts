@@ -74,7 +74,8 @@ class ConfigSchema<T extends ConfigSchemaSettings = {}> {
                     (result[key] as any) = value.toLowerCase() === "true" ? true : false;
                     continue;
                 }
-                if (!(settings.type as string[]).includes(value.toLowerCase())) {
+                // Case-insensitive comparison for string enum values
+                if (!(settings.type as string[]).some(t => t.toLowerCase() === value.toLowerCase())) {
                     Logger.error(`The environment variable ${key} has to be one of the following: ${settings.type.join(", ")}`);
                     process.exit(1);
                 }
@@ -131,6 +132,13 @@ export class ConfigHandler {
         .add("LRA_S3_PREFIX", false)
         .add("LRA_S3_ACCESS_KEY_ID", true)
         .add("LRA_S3_SECRET_ACCESS_KEY", true)
+
+        .add("LRA_SMTP_HOST", false)
+        .add("LRA_SMTP_PORT", false)
+        .add("LRA_SMTP_USERNAME", false)
+        .add("LRA_SMTP_PASSWORD", false)
+        .add("LRA_SMTP_FROM", false)
+        .add("LRA_SMTP_SECURE", false, [true, false])
     ;
 
 

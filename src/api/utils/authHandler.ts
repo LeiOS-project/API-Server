@@ -6,7 +6,7 @@ import type { UserAccountSettings } from "./shared-models/accountData";
 export class AuthUtils {
 
     static async getUserRole(userID: number) {
-        const user = DB.instance().select().from(DB.Schema.users).where(eq(DB.Schema.users.id, userID)).get();
+        const user = DB.instance().select().from(DB.Tables.users).where(eq(DB.Tables.users.id, userID)).get();
         if (!user) {
             return null;
         }
@@ -79,7 +79,7 @@ export class SessionHandler {
             tokenBase
         );
 
-        const result = await DB.instance().insert(DB.Schema.sessions).values({
+        const result = await DB.instance().insert(DB.Tables.sessions).values({
             id: tokenID,
             hashed_token: await AuthUtils.hashTokenBase(tokenBase),
             user_id: userID,
@@ -102,8 +102,8 @@ export class SessionHandler {
             return null;
         }
 
-        const session = DB.instance().select().from(DB.Schema.sessions).where(
-            eq(DB.Schema.sessions.id, tokenParts.id)
+        const session = DB.instance().select().from(DB.Tables.sessions).where(
+            eq(DB.Tables.sessions.id, tokenParts.id)
         ).get();
         if (!session) {
             return null;
@@ -123,7 +123,7 @@ export class SessionHandler {
 
         if (session.expires_at < Date.now()) {
             // Delete expired session
-            await DB.instance().delete(DB.Schema.sessions).where(eq(DB.Schema.sessions.id, session.id));
+            await DB.instance().delete(DB.Tables.sessions).where(eq(DB.Tables.sessions.id, session.id));
 
             return false;
         }
@@ -132,18 +132,18 @@ export class SessionHandler {
     }
         
     static async inValidateAllSessionsForUser(userID: number) {
-        await DB.instance().delete(DB.Schema.sessions).where(eq(DB.Schema.sessions.user_id, userID));
+        await DB.instance().delete(DB.Tables.sessions).where(eq(DB.Tables.sessions.user_id, userID));
     }
 
     static async inValidateSession(tokenID: string) {
-        await DB.instance().delete(DB.Schema.sessions).where(eq(DB.Schema.sessions.id, tokenID));
+        await DB.instance().delete(DB.Tables.sessions).where(eq(DB.Tables.sessions.id, tokenID));
     }
 
     static async changeUserRoleInSessions(userID: number, newRole: UserAccountSettings.Role) {
-        await DB.instance().update(DB.Schema.sessions).set({
+        await DB.instance().update(DB.Tables.sessions).set({
             user_role: newRole
         }).where(
-            eq(DB.Schema.sessions.user_id, userID)
+            eq(DB.Tables.sessions.user_id, userID)
         )
     }
 
@@ -165,7 +165,7 @@ export class APIKeyHandler {
             tokenBase
         );
 
-        const result = await DB.instance().insert(DB.Schema.apiKeys).values({
+        const result = await DB.instance().insert(DB.Tables.apiKeys).values({
             id: tokenID,
             hashed_token: await AuthUtils.hashTokenBase(tokenBase),
             user_id: userID,
@@ -190,8 +190,8 @@ export class APIKeyHandler {
             return null;
         }
 
-        const key = DB.instance().select().from(DB.Schema.apiKeys).where(
-            eq(DB.Schema.apiKeys.id, tokenParts.id)
+        const key = DB.instance().select().from(DB.Tables.apiKeys).where(
+            eq(DB.Tables.apiKeys.id, tokenParts.id)
         ).get();
 
         if (!key) {
@@ -218,18 +218,18 @@ export class APIKeyHandler {
     }
 
     static async deleteAllApiKeysForUser(userID: number) {
-        await DB.instance().delete(DB.Schema.apiKeys).where(eq(DB.Schema.apiKeys.user_id, userID));
+        await DB.instance().delete(DB.Tables.apiKeys).where(eq(DB.Tables.apiKeys.user_id, userID));
     }
 
     static async deleteApiKey(apiKeyID: string) {
-        await DB.instance().delete(DB.Schema.apiKeys).where(eq(DB.Schema.apiKeys.id, apiKeyID));
+        await DB.instance().delete(DB.Tables.apiKeys).where(eq(DB.Tables.apiKeys.id, apiKeyID));
     }
 
     static async changeUserRoleInApiKeys(userID: number, newRole: UserAccountSettings.Role) {
-        await DB.instance().update(DB.Schema.apiKeys).set({
+        await DB.instance().update(DB.Tables.apiKeys).set({
             user_role: newRole
         }).where(
-            eq(DB.Schema.apiKeys.user_id, userID)
+            eq(DB.Tables.apiKeys.user_id, userID)
         );
     }
 }
@@ -246,7 +246,7 @@ export class AuthHandler {
         }
     }
 
-    static async getAuthContext(fullToken: string): Promise<AuthHandler.AuthContext | null> {
+    static async getAuthContext(fullToken: string): Promise<AuthHandler.AuthenticatedAuthContext | null> {
 
         const tokenParts = AuthUtils.getTokenParts(fullToken);
         if (!tokenParts) {
@@ -279,7 +279,7 @@ export class AuthHandler {
 
     }
 
-    static async isValidAuthContext(authContext: AuthHandler.AuthContext): Promise<boolean> {
+    static async isValidAuthContext(authContext: AuthHandler.AuthenticatedAuthContext): Promise<boolean> {
         switch (authContext.type) {
             case 'session':
                 return await SessionHandler.isValidSession(authContext);
@@ -290,7 +290,7 @@ export class AuthHandler {
         }
     }
 
-    static async invalidateAuthContext(authContext: AuthHandler.AuthContext): Promise<void> {
+    static async invalidateAuthContext(authContext: AuthHandler.AuthenticatedAuthContext): Promise<void> {
         switch (authContext.type) {
             case 'session':
                 await SessionHandler.inValidateSession(authContext.id);
@@ -321,7 +321,8 @@ export namespace AuthHandler {
 
     export type TOKEN_PREFIX = typeof SessionHandler.SESSION_TOKEN_PREFIX | typeof APIKeyHandler.API_KEY_PREFIX;
 
-    export type AuthContext = SessionAuthContext | ApiKeyAuthContext;
+    export type AuthenticatedAuthContext = SessionAuthContext | ApiKeyAuthContext;
+    export type AuthContext = AuthenticatedAuthContext | UnauthenticatedAuthContext;
 
     export interface SessionAuthContext extends DB.Models.Session {
         readonly type: 'session';
@@ -329,6 +330,10 @@ export namespace AuthHandler {
 
     export interface ApiKeyAuthContext extends DB.Models.ApiKey {
         readonly type: 'apiKey';
+    }
+
+    export interface UnauthenticatedAuthContext {
+        readonly type: 'unauthenticated';
     }
 
     export interface TokenParts {

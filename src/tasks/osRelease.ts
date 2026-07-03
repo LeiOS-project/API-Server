@@ -2,6 +2,7 @@ import { TaskHandler } from "@cleverjs/utils";
 import { DB } from "../db";
 import { eq } from "drizzle-orm";
 import { AptlyAPI } from "../aptly/api";
+import { RuntimeMetadata } from "../api/utils/metadata";
 
 interface Payload {
     pkgReleasesToIncludeByID: number[];
@@ -37,51 +38,49 @@ OsReleaseTask.addStep("Move packages from archive to local stable repo", async (
             const pkgReleaseID = payload.pkgReleasesToIncludeByID[state.nextPackageIndexToMove];
 
             if (!pkgReleaseID) {
-                logger.error("Invalid package release ID at index", state.nextPackageIndexToMove, ", skipping.");
-                continue;
+                return { success: false, message: `Invalid package release ID at index ${state.nextPackageIndexToMove}.` };
             }
 
-            const result = await DB.instance().transaction(async (tx) => {
+            await DB.instance().transaction(async (tx) => {
 
-                const release = tx.select().from(DB.Schema.packageReleases).where(
-                    eq(DB.Schema.packageReleases.id, pkgReleaseID)
+                const release = tx.select().from(DB.Tables.packageReleases).where(
+                    eq(DB.Tables.packageReleases.id, pkgReleaseID)
                 ).get();
 
                 if (!release) {
-                    logger.error(`Package release with ID ${pkgReleaseID} not found, skipping.`);
-                    tx.rollback()
-                    return false;
+                    throw new Error(`Package release with ID ${pkgReleaseID} not found.`);
                 }
 
-                const packageData = tx.select().from(DB.Schema.packages).where(
-                    eq(DB.Schema.packages.id, release.package_id)
+                const packageData = tx.select().from(DB.Tables.packages).where(
+                    eq(DB.Tables.packages.id, release.package_id)
                 ).get();
 
                 if (!packageData?.name) {
-                    logger.error(`Package with ID ${release.package_id} not found for release ID ${pkgReleaseID}, skipping.`);
-                    tx.rollback()
-                    return false;
+                    throw new Error(`Package with ID ${release.package_id} not found for release ID ${pkgReleaseID}.`);
                 }
 
                 pkgName = packageData.name;
-                pkgReleaseVersion = release.versionWithLeiosPatch;
+                pkgReleaseVersion = release.version_with_leios_patch;
+
+                const hasUploadedArtifacts = release.architectures.is_all || release.architectures.amd64 || release.architectures.arm64;
+                if (!hasUploadedArtifacts) {
+                    throw new Error(`Package ${packageData.name} version ${release.version_with_leios_patch} has no uploaded artifacts.`);
+                }
 
                 if (release.architectures.is_all) {
 
                     if (!release.architectures.amd64 || !release.architectures.arm64) {
-                        logger.error(`Release ID ${pkgReleaseID} marked as 'all' architectures but missing specific architectures, skipping.`);
-                        tx.rollback()
-                        return false;
+                        throw new Error(`Release ID ${pkgReleaseID} is marked as 'all' architectures but is missing specific architecture flags.`);
                     }
 
                     // delete in stable for this package first
                     await AptlyAPI.Packages.deleteInRepo("leios-stable", packageData.name);
 
-                    await AptlyAPI.Packages.copyIntoRepo("leios-stable", packageData.name, release.versionWithLeiosPatch, "all");
+                    await AptlyAPI.Packages.copyIntoRepo("leios-stable", packageData.name, release.version_with_leios_patch, "all");
 
                     packageData.latest_stable_release = {
-                        amd64: release.versionWithLeiosPatch,
-                        arm64: release.versionWithLeiosPatch
+                        amd64: release.version_with_leios_patch,
+                        arm64: release.version_with_leios_patch
                     };
 
                 } else {
@@ -91,39 +90,40 @@ OsReleaseTask.addStep("Move packages from archive to local stable repo", async (
                         // delete in stable for this package first but ensure we only delete for this architecture
                         await AptlyAPI.Packages.deleteInRepo("leios-stable", packageData.name, undefined, "amd64");
 
-                        await AptlyAPI.Packages.copyIntoRepo("leios-stable", packageData.name, release.versionWithLeiosPatch, "amd64");
+                        await AptlyAPI.Packages.copyIntoRepo("leios-stable", packageData.name, release.version_with_leios_patch, "amd64");
 
-                        packageData.latest_stable_release.amd64 = release.versionWithLeiosPatch;
+                        packageData.latest_stable_release.amd64 = release.version_with_leios_patch;
                     }
                     if (release.architectures.arm64) {
 
                         // delete in stable for this package first but ensure we only delete for this architecture
                         await AptlyAPI.Packages.deleteInRepo("leios-stable", packageData.name, undefined, "arm64");
 
-                        await AptlyAPI.Packages.copyIntoRepo("leios-stable", packageData.name, release.versionWithLeiosPatch, "arm64");
+                        await AptlyAPI.Packages.copyIntoRepo("leios-stable", packageData.name, release.version_with_leios_patch, "arm64");
 
-                        packageData.latest_stable_release.arm64 = release.versionWithLeiosPatch;
+                        packageData.latest_stable_release.arm64 = release.version_with_leios_patch;
                     }
 
                 }
 
-                await tx.update(DB.Schema.packages).set({
+                await tx.update(DB.Tables.packages).set({
                     latest_stable_release: packageData.latest_stable_release
                 }).where(
-                    eq(DB.Schema.packages.id, packageData.id)
+                    eq(DB.Tables.packages.id, packageData.id)
                 );
-
-                return true;
             });
-
-            if (!result) {
-                continue;
-            }
 
             logger.info(`Successfully moved package ${pkgName} version ${pkgReleaseVersion} to local stable repo.`);
 
         } catch (err) {
             logger.error("Error moving package release ID", payload.pkgReleasesToIncludeByID[state.nextPackageIndexToMove], ":", err);
+
+            return {
+                success: false,
+                message: Error.isError(err)
+                    ? err.message
+                    : `Failed to move package release ID ${payload.pkgReleasesToIncludeByID[state.nextPackageIndexToMove]}`
+            };
         }
     }
 
@@ -135,7 +135,7 @@ OsReleaseTask.addStep("Move packages from archive to local stable repo", async (
 
 //     try {
 
-//         await DB.instance().insert(DB.Schema.os_releases).values({
+//         await DB.instance().insert(DB.Tables.os_releases).values({
 //             version: payload.version,
 //             // @TODO: link task ID properly
 //         });
@@ -193,6 +193,8 @@ OsReleaseTask.addStep("Publish OS release snapshot to S3", async (payload, logge
 });
 
 OsReleaseTask.addStep("Finalize OS release", async (payload, logger) => {
+
+	await RuntimeMetadata.removeOSReleasePendingPackagesIfExist(payload.pkgReleasesToIncludeByID);
 
     logger.info("OS release process completed successfully for version", payload.version);
 

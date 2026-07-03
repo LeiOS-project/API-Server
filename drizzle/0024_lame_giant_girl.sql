@@ -1,0 +1,1 @@
+ALTER TABLE `publisher_members` ADD `is_publicly_hidden` integer DEFAULT 0 NOT NULL;

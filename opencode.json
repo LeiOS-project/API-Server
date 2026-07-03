@@ -1,0 +1,19 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    "AGENTS.md"
+  ],
+  "lsp": true,
+  "watcher": {
+    "ignore": [
+      "node_modules/**",
+      ".git/**",
+      "data/**",
+      "build/**",
+      "coverage/**",
+      "dist/**",
+      "out/**",
+      "tmp*/**"
+    ]
+  }
+}
