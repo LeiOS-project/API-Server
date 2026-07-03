@@ -61,7 +61,6 @@ router.post('/',
         responses: APIResponseSpec.describeWithWrongInputs(
             APIResponseSpec.badRequest("Invalid reset token"),
             APIResponseSpec.unauthorized("You are already authenticated"),
-            APIResponseSpec.serverError("User for reset token not found"),
             APIResponseSpec.successNoData("Password has been reset successfully")
         ),
     }),
