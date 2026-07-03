@@ -100,7 +100,7 @@ router.post('/',
         ).get();
 
         if (!user) {
-            return APIResponse.serverError(c, "User for reset token not found");
+            throw new Error("User for reset token not found");
         }
 
         const newPasswordHash = await Bun.password.hash(resetData.new_password);
