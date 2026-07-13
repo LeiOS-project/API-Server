@@ -8,6 +8,7 @@ import { ConfigHandler } from '../utils/config';
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
 import { mkdir as fs_mkdir } from 'fs/promises';
 import { dirname as path_dirname } from 'path';
+import { PermissionHelper } from '../utils/permission-helper';
 
 export class DB {
 
@@ -28,7 +29,8 @@ export class DB {
             Logger.info("Database migrations completed.");
         }
 
-        await this.createInitialAdminUserIfNeeded(configBaseDir);
+        const admin_user_id = await this.createInitialAdminUserIfNeeded(configBaseDir);
+        await this.createInitialLeiOSPublisherIfNeeded(admin_user_id || 1);
         await this.createInitialOSReleasesMetaIfNeeded();
 
         Logger.info(`Database initialized at ${path}`);
@@ -67,6 +69,8 @@ export class DB {
             `You can set the password under ${DASHBOARD_URL}/auth/reset-password?token=${passwordResetToken}\n` +
             `The url is also safed at ${configBaseDir}/initial_admin_password_reset_token.txt\n`
         );
+
+        return admin_user_id;
     }
 
     static async createInitialOSReleasesMetaIfNeeded() {
@@ -101,6 +105,48 @@ export class DB {
         // );
     }
 
+    static async createInitialLeiOSPublisherIfNeeded(admin_user_id: number) {
+
+        const publisherExists = await this.db.select().from(DB.Tables.publishers).where(
+            eq(DB.Tables.publishers.name, "leios")
+        ).get();
+
+        if (publisherExists) {
+            Logger.info("LeiOS Project publisher already exists. Skipping creation.");
+            return;
+        }
+
+        const adminUserExists = await this.db.select().from(DB.Tables.users).where(
+            eq(DB.Tables.users.id, admin_user_id)
+        ).get();
+
+        if (!adminUserExists) {
+            throw new Error(`Admin user with ID ${admin_user_id} does not exist. Cannot create initial LeiOS publisher.`);
+        }
+
+        await this.db.transaction(async (tx) => {
+
+            const publisherID = await tx.insert(DB.Tables.publishers).values({
+                name: "leios",
+
+                display_name: "LeiOS Project",
+                description: "Official LeiOS Project Publisher",
+                homepage_url: "https://www.leios.dev",
+
+                owner_user_id: admin_user_id
+            }).returning().get().id;
+
+            await tx.insert(DB.Tables.publisherMembers).values({
+                publisher_id: publisherID,
+                role: PermissionHelper.OrgRoles.ADMIN,
+                user_id: admin_user_id
+            });
+
+            Logger.info("Created initial LeiOS Project publisher and assigned admin user.");
+        });
+
+    }
+
     static instance() {
         if (!this.db) {
             throw new Error('Database not initialized. Call DB.init() first.');
@@ -110,7 +156,7 @@ export class DB {
 
     static async close() {
         if (!this.db) return;
-        
+
         Logger.info("Database connection closed.");
         this.db.$client.close();
         await Bun.sleep(100);
