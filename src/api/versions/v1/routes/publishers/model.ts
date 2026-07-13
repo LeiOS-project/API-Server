@@ -111,6 +111,9 @@ export namespace PublisherModel.CreatePublisher {
         description: z.string().min(1, "Description is required").max(500, "Description cannot exceed 500 characters."),
         homepage_url: z.url("Homepage URL must be a valid URL.").max(500, "Homepage URL cannot exceed 500 characters."),
 
+        maintainer_contact_name: z.string().min(1, "Maintainer contact name is required").max(254, "Maintainer contact name cannot exceed 200 characters."),
+        maintainer_contact_email: z.email("Maintainer contact email must be a valid email address.").max(254, "Maintainer contact email cannot exceed 200 characters."),
+
     }).omit({
         id: true,
         created_at: true,

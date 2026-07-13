@@ -93,7 +93,10 @@ export const publishers = sqliteTable('publishers', {
     // db query to delete user while owning should fail
     // user has to transfer ownership first or delete before deleting their account
     owner_user_id: integer().notNull().references(() => users.id, { onDelete: 'restrict' }),
-    created_at: SQLUtils.getCreatedAtColumn()
+    created_at: SQLUtils.getCreatedAtColumn(),
+
+    maintainer_contact_name: text().notNull(),
+    maintainer_contact_email: text().notNull(),
 });
 
 

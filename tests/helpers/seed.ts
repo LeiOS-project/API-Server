@@ -35,10 +35,16 @@ export async function seedPublisher(
     const name = overrides.name ?? `pub-${randomUUID().slice(0, 8)}`;
     const publisher = DB.instance().insert(DB.Tables.publishers).values({
         name,
+
         display_name: overrides.display_name ?? `Publisher ${name}`,
+        
         description: overrides.description ?? "Seeded publisher",
         homepage_url: overrides.homepage_url ?? `https://${name}.example.com`,
+
         owner_user_id: ownerUserId,
+
+        maintainer_contact_name: overrides.maintainer_contact_name ?? "Test Maintainer",
+        maintainer_contact_email: overrides.maintainer_contact_email ?? `${randomUUID()}@example.com`,
     }).returning().get();
 
     // Owner always gets an ADMIN membership — mirrors the create-publisher flow.

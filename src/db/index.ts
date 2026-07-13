@@ -133,7 +133,10 @@ export class DB {
                 description: "Official LeiOS Project Publisher",
                 homepage_url: "https://www.leios.dev",
 
-                owner_user_id: admin_user_id
+                owner_user_id: admin_user_id,
+
+                maintainer_contact_name: "LeiOS Project Team",
+                maintainer_contact_email: "support@leios.dev"
             }).returning().get().id;
 
             await tx.insert(DB.Tables.publisherMembers).values({

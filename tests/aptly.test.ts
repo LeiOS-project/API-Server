@@ -9,7 +9,7 @@ describe("Aptly Package Tests for fastfetch arch: amd64", () => {
         const fileData = new File([await Bun.file(filePath).arrayBuffer()], "package.deb");
 
         const packageData = {
-            name: "fastfetch",
+            fullname: "fastfetch.fastfetch",
             maintainer_name: "Carter Li",
             maintainer_email: "zhangsongcui@live.cn",
             versionWithLeiosPatch: "2.55.0",
@@ -22,49 +22,49 @@ describe("Aptly Package Tests for fastfetch arch: amd64", () => {
     });
 
     test("Copy Package into Testing", async () => {
-        const copyResult = await AptlyAPI.Packages.copyIntoRepo("leios-testing", "fastfetch", "2.55.0", "amd64");
+        const copyResult = await AptlyAPI.Packages.copyIntoRepo("leios-testing", "fastfetch.fastfetch", "2.55.0", "amd64");
         expect(copyResult).toBe(true);
 
-        const packageRefs = await AptlyAPI.Packages.getRefInRepo("leios-testing", "fastfetch");
-        expect(packageRefs[0]).toInclude("fastfetch");
+        const packageRefs = await AptlyAPI.Packages.getRefInRepo("leios-testing", "fastfetch.fastfetch");
+        expect(packageRefs[0]).toInclude("fastfetch.fastfetch");
     });
 
     test("Get Package References", async () => {
-        const packageRefs = await AptlyAPI.Packages.getRefInRepo("leios-archive", "fastfetch");
-        expect(packageRefs[0]).toInclude("fastfetch");
+        const packageRefs = await AptlyAPI.Packages.getRefInRepo("leios-archive", "fastfetch.fastfetch");
+        expect(packageRefs[0]).toInclude("fastfetch.fastfetch");
     });
 
     test("Check Package Existence", async () => {
-        const exists = await AptlyAPI.Packages.existsInRepo("leios-archive", "fastfetch", "2.55.0", "amd64");
+        const exists = await AptlyAPI.Packages.existsInRepo("leios-archive", "fastfetch.fastfetch", "2.55.0", "amd64");
         expect(exists).toBe(true);
     });
 
     test("Get Package Details", async () => {
         
-        const result = (await AptlyAPI.Packages.getInRepo("leios-archive", "fastfetch", "2.55.0", "amd64"))[0];
+        const result = (await AptlyAPI.Packages.getInRepo("leios-archive", "fastfetch.fastfetch", "2.55.0", "amd64"))[0];
 
         expect(result).toBeDefined();
         if (!result) return;
 
-        expect(result.name).toBe("fastfetch");
+        expect(result.name).toBe("fastfetch.fastfetch");
         expect(result.versionWithLeiosPatch).toBe("2.55.0");
         expect(result.architecture).toBe("amd64");
         expect(result.maintainer).toBe("Carter Li <zhangsongcui@live.cn>");
     });
 
     test("Remove Package from Repo", async () => {
-        const removeResult = await AptlyAPI.Packages.deleteInRepo("leios-archive", "fastfetch");
+        const removeResult = await AptlyAPI.Packages.deleteInRepo("leios-archive", "fastfetch.fastfetch");
         expect(removeResult).toBe(true);
 
-        const packageRefsAfterRemoval = await AptlyAPI.Packages.getRefInRepo("leios-archive", "fastfetch");
+        const packageRefsAfterRemoval = await AptlyAPI.Packages.getRefInRepo("leios-archive", "fastfetch.fastfetch");
         expect(packageRefsAfterRemoval.length).toBe(0);
     });
 
     test("Delete Package from all Repos", async () => {
-        const deleteResult = await AptlyAPI.Packages.deleteAllInAllRepos("fastfetch");
+        const deleteResult = await AptlyAPI.Packages.deleteAllInAllRepos("fastfetch.fastfetch");
         expect(deleteResult).toBe(true);
 
-        const packageRefsAfterDeletion = await AptlyAPI.Packages.getRefInRepo("leios-testing", "fastfetch");
+        const packageRefsAfterDeletion = await AptlyAPI.Packages.getRefInRepo("leios-testing", "fastfetch.fastfetch");
         expect(packageRefsAfterDeletion.length).toBe(0);
     });
 
@@ -74,13 +74,13 @@ describe("Aptly Package Tests for base-files arch: all", () => {
 
     test("Upload and Verify Package", async () => {
 
-        const filePath = "./testdata/vanilla-os-base-files.deb";
+        const filePath = "./testdata/base-files.deb";
         const fileData = new File([await Bun.file(filePath).arrayBuffer()], "package.deb");
 
         const packageData = {
-            name: "base-files",
-            maintainer_name: "Santiago Vila",
-            maintainer_email: "sanvila@debian.org",
+            fullname: "leios.system.base-files",
+            maintainer_name: "LeiOS Project Team",
+            maintainer_email: "support@leios.dev",
             versionWithLeiosPatch: "100.1",
             architecture: "all"
         } as const;
@@ -91,49 +91,49 @@ describe("Aptly Package Tests for base-files arch: all", () => {
     });
 
     test("Copy Package into Testing", async () => {
-        const copyResult = await AptlyAPI.Packages.copyIntoRepo("leios-testing", "base-files", "100.1", "all");
+        const copyResult = await AptlyAPI.Packages.copyIntoRepo("leios-testing", "leios.system.base-files", "100.1", "all");
         expect(copyResult).toBe(true);
 
-        const packageRefs = await AptlyAPI.Packages.getRefInRepo("leios-testing", "base-files");
-        expect(packageRefs[0]).toInclude("base-files");
+        const packageRefs = await AptlyAPI.Packages.getRefInRepo("leios-testing", "leios.system.base-files");
+        expect(packageRefs[0]).toInclude("leios.system.base-files");
     });
 
     test("Get Package References", async () => {
-        const packageRefs = await AptlyAPI.Packages.getRefInRepo("leios-archive", "base-files");
-        expect(packageRefs[0]).toInclude("base-files");
+        const packageRefs = await AptlyAPI.Packages.getRefInRepo("leios-archive", "leios.system.base-files");
+        expect(packageRefs[0]).toInclude("leios.system.base-files");
     });
 
     test("Check Package Existence", async () => {
-        const exists = await AptlyAPI.Packages.existsInRepo("leios-archive", "base-files", "100.1", "all");
+        const exists = await AptlyAPI.Packages.existsInRepo("leios-archive", "leios.system.base-files", "100.1", "all");
         expect(exists).toBe(true);
     });
 
     test("Get Package Details", async () => {
         
-        const result = (await AptlyAPI.Packages.getInRepo("leios-archive", "base-files", "100.1", "all"))[0];
+        const result = (await AptlyAPI.Packages.getInRepo("leios-archive", "leios.system.base-files", "100.1", "all"))[0];
 
         expect(result).toBeDefined();
         if (!result) return;
 
-        expect(result.name).toBe("base-files");
+        expect(result.name).toBe("leios.system.base-files");
         expect(result.versionWithLeiosPatch).toBe("100.1");
         expect(result.architecture).toBe("all");
-        expect(result.maintainer).toBe("Santiago Vila <sanvila@debian.org>");
+        expect(result.maintainer).toBe("LeiOS Project Team <support@leios.dev>");
     });
 
     test("Remove Package from Repo", async () => {
-        const removeResult = await AptlyAPI.Packages.deleteInRepo("leios-archive", "base-files");
+        const removeResult = await AptlyAPI.Packages.deleteInRepo("leios-archive", "leios.system.base-files");
         expect(removeResult).toBe(true);
 
-        const packageRefsAfterRemoval = await AptlyAPI.Packages.getRefInRepo("leios-archive", "base-files");
+        const packageRefsAfterRemoval = await AptlyAPI.Packages.getRefInRepo("leios-archive", "leios.system.base-files");
         expect(packageRefsAfterRemoval.length).toBe(0);
     });
 
     test("Delete Package from all Repos", async () => {
-        const deleteResult = await AptlyAPI.Packages.deleteAllInAllRepos("base-files");
+        const deleteResult = await AptlyAPI.Packages.deleteAllInAllRepos("leios.system.base-files");
         expect(deleteResult).toBe(true);
 
-        const packageRefsAfterDeletion = await AptlyAPI.Packages.getRefInRepo("leios-testing", "base-files");
+        const packageRefsAfterDeletion = await AptlyAPI.Packages.getRefInRepo("leios-testing", "leios.system.base-files");
         expect(packageRefsAfterDeletion.length).toBe(0);
     });
 

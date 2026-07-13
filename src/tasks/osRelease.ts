@@ -25,7 +25,7 @@ OsReleaseTask.addStep("Move packages from archive to local stable repo", async (
 
     for (; state.nextPackageIndexToMove < payload.pkgReleasesToIncludeByID.length; state.nextPackageIndexToMove++) {
 
-        let pkgName = "UNKNOWN";
+        let pkgFullName = "UNKNOWN";
         let pkgReleaseVersion = "UNKNOWN";
 
         try {
@@ -51,20 +51,20 @@ OsReleaseTask.addStep("Move packages from archive to local stable repo", async (
                     throw new Error(`Package release with ID ${pkgReleaseID} not found.`);
                 }
 
-                const packageData = tx.select().from(DB.Tables.packages).where(
-                    eq(DB.Tables.packages.id, release.package_id)
+                const packageData = tx.select().from(DB.Tables.packagesFullView).where(
+                    eq(DB.Tables.packagesFullView.id, release.package_id)
                 ).get();
 
                 if (!packageData?.name) {
                     throw new Error(`Package with ID ${release.package_id} not found for release ID ${pkgReleaseID}.`);
                 }
 
-                pkgName = packageData.name;
+                pkgFullName = packageData.fullname;
                 pkgReleaseVersion = release.version_with_leios_patch;
 
                 const hasUploadedArtifacts = release.architectures.is_all || release.architectures.amd64 || release.architectures.arm64;
                 if (!hasUploadedArtifacts) {
-                    throw new Error(`Package ${packageData.name} version ${release.version_with_leios_patch} has no uploaded artifacts.`);
+                    throw new Error(`Package ${packageData.fullname} version ${release.version_with_leios_patch} has no uploaded artifacts.`);
                 }
 
                 if (release.architectures.is_all) {
@@ -74,9 +74,9 @@ OsReleaseTask.addStep("Move packages from archive to local stable repo", async (
                     }
 
                     // delete in stable for this package first
-                    await AptlyAPI.Packages.deleteInRepo("leios-stable", packageData.name);
+                    await AptlyAPI.Packages.deleteInRepo("leios-stable", packageData.fullname);
 
-                    await AptlyAPI.Packages.copyIntoRepo("leios-stable", packageData.name, release.version_with_leios_patch, "all");
+                    await AptlyAPI.Packages.copyIntoRepo("leios-stable", packageData.fullname, release.version_with_leios_patch, "all");
 
                     packageData.latest_stable_release = {
                         amd64: release.version_with_leios_patch,
@@ -88,18 +88,18 @@ OsReleaseTask.addStep("Move packages from archive to local stable repo", async (
                     if (release.architectures.amd64) {
 
                         // delete in stable for this package first but ensure we only delete for this architecture
-                        await AptlyAPI.Packages.deleteInRepo("leios-stable", packageData.name, undefined, "amd64");
+                        await AptlyAPI.Packages.deleteInRepo("leios-stable", packageData.fullname, undefined, "amd64");
 
-                        await AptlyAPI.Packages.copyIntoRepo("leios-stable", packageData.name, release.version_with_leios_patch, "amd64");
+                        await AptlyAPI.Packages.copyIntoRepo("leios-stable", packageData.fullname, release.version_with_leios_patch, "amd64");
 
                         packageData.latest_stable_release.amd64 = release.version_with_leios_patch;
                     }
                     if (release.architectures.arm64) {
 
                         // delete in stable for this package first but ensure we only delete for this architecture
-                        await AptlyAPI.Packages.deleteInRepo("leios-stable", packageData.name, undefined, "arm64");
+                        await AptlyAPI.Packages.deleteInRepo("leios-stable", packageData.fullname, undefined, "arm64");
 
-                        await AptlyAPI.Packages.copyIntoRepo("leios-stable", packageData.name, release.version_with_leios_patch, "arm64");
+                        await AptlyAPI.Packages.copyIntoRepo("leios-stable", packageData.fullname, release.version_with_leios_patch, "arm64");
 
                         packageData.latest_stable_release.arm64 = release.version_with_leios_patch;
                     }
@@ -113,7 +113,7 @@ OsReleaseTask.addStep("Move packages from archive to local stable repo", async (
                 );
             });
 
-            logger.info(`Successfully moved package ${pkgName} version ${pkgReleaseVersion} to local stable repo.`);
+            logger.info(`Successfully moved package ${pkgFullName} version ${pkgReleaseVersion} to local stable repo.`);
 
         } catch (err) {
             logger.error("Error moving package release ID", payload.pkgReleasesToIncludeByID[state.nextPackageIndexToMove], ":", err);

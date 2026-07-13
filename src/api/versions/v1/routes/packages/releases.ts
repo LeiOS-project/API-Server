@@ -246,18 +246,12 @@ router.post('/:version_with_leios_patch/:arch',
             return APIResponse.forbidden(c, "You do not have permission to publish releases for this package");
         }
 
-        // Look up publisher owner to act as maintainer (the schema doesn't track created_by_user_id per package anymore).
+        // Look up publisher to get maintainer contact info for Aptly upload
         const publisher = await DB.instance().select().from(DB.Tables.publishers).where(
             eq(DB.Tables.publishers.id, pkg.publisher_id)
         ).get();
         if (!publisher) {
             return APIResponse.serverError(c, "Publisher not found for this package");
-        }
-        const maintainer = await DB.instance().select().from(DB.Tables.users).where(
-            eq(DB.Tables.users.id, publisher.owner_user_id)
-        ).get();
-        if (!maintainer) {
-            return APIResponse.serverError(c, "Publisher owner not found in database");
         }
 
         const existingArchForRelease = arch === "all" ? release.architectures.is_all : release.architectures[arch];
@@ -266,18 +260,15 @@ router.post('/:version_with_leios_patch/:arch',
             return APIResponse.conflict(c, "Package release already contains a release for this architecture");
         }
 
-        const isSiteAdmin = authContext.type !== 'unauthenticated' && authContext.user_role === 'admin';
-
         try {
             const result = await AptlyAPI.Packages.uploadAndVerifyIntoArchiveRepo({
-                    name: pkg.name,
+                    fullname: pkg.fullname,
                     versionWithLeiosPatch: release.version_with_leios_patch,
                     architecture: arch,
-                    maintainer_name: maintainer.display_name,
-                    maintainer_email: maintainer.email
+                    maintainer_name: publisher.maintainer_contact_name,
+                    maintainer_email: publisher.maintainer_contact_email
                 },
-                file,
-                isSiteAdmin
+                file
             );
 
             if (!result) {
@@ -287,15 +278,15 @@ router.post('/:version_with_leios_patch/:arch',
             let cleanupResult: boolean;
 
             if (arch === "all") {
-                cleanupResult = await AptlyAPI.Packages.deleteInRepo("leios-testing", pkg.name, undefined);
+                cleanupResult = await AptlyAPI.Packages.deleteInRepo("leios-testing", pkg.fullname, undefined);
             } else {
-                cleanupResult = await AptlyAPI.Packages.deleteInRepo("leios-testing", pkg.name, undefined, arch);
+                cleanupResult = await AptlyAPI.Packages.deleteInRepo("leios-testing", pkg.fullname, undefined, arch);
             }
             if (!cleanupResult) {
                 return APIResponse.serverError(c, "Failed to clean up existing package releases in testing repository");
             }
 
-            const copyResult = await AptlyAPI.Packages.copyIntoRepo("leios-testing", pkg.name, release.version_with_leios_patch, arch);
+            const copyResult = await AptlyAPI.Packages.copyIntoRepo("leios-testing", pkg.fullname, release.version_with_leios_patch, arch);
             if (!copyResult) {
                 return APIResponse.serverError(c, "Failed to copy package release into testing repository");
             }

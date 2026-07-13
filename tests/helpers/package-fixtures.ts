@@ -5,7 +5,7 @@ const TESTDATA_DIR = path.join(process.cwd(), "testdata");
 
 export const TEST_PACKAGE_FIXTURES = {
     fastfetchAmd64: path.join(TESTDATA_DIR, "fastfetch_2.55.0_amd64.deb"),
-    baseFilesAll: path.join(TESTDATA_DIR, "vanilla-os-base-files.deb")
+    baseFilesAll: path.join(TESTDATA_DIR, "base-files.deb")
 } as const;
 
 type PackageFixture = {
@@ -68,7 +68,7 @@ export async function ensureTestPackageFixtures() {
     await Promise.all([
         buildPackage({
             outputPath: TEST_PACKAGE_FIXTURES.fastfetchAmd64,
-            packageName: "fastfetch",
+            packageName: "fastfetch.fastfetch",
             version: "2.55.0",
             architecture: "amd64",
             maintainer: "Carter Li <zhangsongcui@live.cn>",
@@ -78,10 +78,10 @@ export async function ensureTestPackageFixtures() {
         }),
         buildPackage({
             outputPath: TEST_PACKAGE_FIXTURES.baseFilesAll,
-            packageName: "base-files",
+            packageName: "leios.system.base-files",
             version: "100.1",
             architecture: "all",
-            maintainer: "Santiago Vila <sanvila@debian.org>",
+            maintainer: "LeiOS Project Team <support@leios.dev>",
             description: "Base files test fixture package",
             payloadFile: "usr/share/base-files/release-info.txt",
             payloadContents: "base-files fixture\n"

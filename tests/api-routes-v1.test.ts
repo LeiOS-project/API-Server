@@ -19,7 +19,7 @@ import { TEST_PACKAGE_FIXTURES } from "./helpers/package-fixtures";
 // type Arch = AptlyAPI.Utils.Architectures;
 
 // const PACKAGE_FILE_PATH = "./testdata/fastfetch_2.55.0_amd64.deb";
-// const PACKAGE_NAME = "fastfetch";
+// const PACKAGE_NAME = "fastfetch.fastfetch";
 // const PACKAGE_VERSION = "2.55.0";
 // const PACKAGE_ARCH: Arch = "amd64";  
 // const PACKAGE_MAINTAINER_NAME = "Carter Li";
@@ -53,7 +53,10 @@ async function seedPublisherWithOwner(ownerUserId: number, overrides: Partial<DB
         display_name: overrides.display_name ?? `Publisher ${name}`,
         description: overrides.description ?? "Seeded publisher",
         homepage_url: overrides.homepage_url ?? `https://${name}.example.com`,
-        owner_user_id: ownerUserId
+        owner_user_id: ownerUserId,
+
+        maintainer_contact_name: overrides.maintainer_contact_name ?? "Test Maintainer",
+        maintainer_contact_email: overrides.maintainer_contact_email ?? `${randomUUID()}@example.com`,
     }).returning().get();
 }
 
@@ -467,9 +470,14 @@ describe("Account routes", async () => {
         const tempPublisher = await DB.instance().insert(DB.Tables.publishers).values({
             name: "temp-account-pub",
             display_name: "Temp Publisher",
+
             description: "Temporary publisher",
             homepage_url: "https://temp.example.com",
-            owner_user_id: testUser.id
+
+            owner_user_id: testUser.id,
+
+            maintainer_contact_name: "Temp Maintainer",
+            maintainer_contact_email: `${randomUUID()}@example.com`
         }).returning().get();
 
         await makeAPIRequest("/v1/account", {
@@ -505,10 +513,15 @@ describe("Package list route", () => {
 
         const tempPublisher = await DB.instance().insert(DB.Tables.publishers).values({
             name: "public-pub",
+
             display_name: "Public Publisher",
             description: "Publisher for public package test",
             homepage_url: "https://public.example.com",
-            owner_user_id: testDeveloper.id
+
+            owner_user_id: testDeveloper.id,
+
+            maintainer_contact_name: "Public Maintainer",
+            maintainer_contact_email: `${randomUUID()}@example.com`
         }).returning().get();
 
         const tempPkg = await DB.instance().insert(DB.Tables.packages).values({
@@ -762,7 +775,10 @@ describe("Publisher and member routes", async () => {
                 name: `pub-${randomUUID().slice(0, 8)}`,
                 display_name: "Coverage Publisher",
                 description: "Publisher route coverage",
-                homepage_url: "https://publisher.example.com"
+                homepage_url: "https://publisher.example.com",
+
+                maintainer_contact_name: "Test Maintainer",
+                maintainer_contact_email: `${randomUUID()}@example.com`
             }
         }, 401);
     });
@@ -2538,15 +2554,18 @@ describe("Task queue execution coverage", async () => {
 
     afterAll(async () => {
         await RuntimeMetadata.clearOSReleasePendingPackages();
-        await AptlyAPI.Packages.deleteAllInAllRepos("fastfetch").catch(() => null);
-        await AptlyAPI.Packages.deleteAllInAllRepos("base-files").catch(() => null);
+        await AptlyAPI.Packages.deleteAllInAllRepos("fastfetch.fastfetch").catch(() => null);
+        await AptlyAPI.Packages.deleteAllInAllRepos("leios.system.base-files").catch(() => null);
         await TaskScheduler.stopProcessing();
     });
 
     test("release upload executes testing-repo:update task to completion", async () => {
         const owner = await seedUser("user");
         const publisher = await seedPublisherWithOwner(owner.id, {
-            name: `queue-pub-${randomUUID().slice(0, 8)}`
+            name: `fastfetch`,
+
+            maintainer_contact_email: "zhangsongcui@live.cn",
+            maintainer_contact_name: "Carter Li"
         });
 
         const pkg = await seedPackageForPublisher(publisher.id, {
@@ -2597,19 +2616,21 @@ describe("Task queue execution coverage", async () => {
             arm64: null
         });
 
-        expect(await AptlyAPI.Packages.existsInRepo("leios-testing", "fastfetch", "2.55.0", "amd64")).toBe(true);
+        expect(await AptlyAPI.Packages.existsInRepo("leios-testing", "fastfetch.fastfetch", "2.55.0", "amd64")).toBe(true);
+    
+        await AptlyAPI.Packages.deleteAllInAllRepos("fastfetch.fastfetch").catch(() => null);
+
+        await DB.instance().delete(DB.Tables.publishers).where(
+            eq(DB.Tables.publishers.id, publisher.id)
+        ).run();
     });
 
     test("os-release route executes async release task to completion", async () => {
         await RuntimeMetadata.clearOSReleasePendingPackages();
 
-        const owner = await seedUser("user");
-        const publisher = await seedPublisherWithOwner(owner.id, {
-            name: `queue-os-pub-${randomUUID().slice(0, 8)}`
-        });
 
-        const pkg = await seedPackageForPublisher(publisher.id, {
-            name: "base-files",
+        const pkg = await seedPackageForPublisher(1, {
+            name: "system.base-files",
             display_name: "Base Files Queue Coverage",
             description: "OS release queue coverage package"
         });
@@ -2621,13 +2642,13 @@ describe("Task queue execution coverage", async () => {
 
         const fileData = new File([
             await Bun.file(TEST_PACKAGE_FIXTURES.baseFilesAll).arrayBuffer()
-        ], "vanilla-os-base-files.deb");
+        ], "base-files.deb");
         const formData = new FormData();
         formData.set("file", fileData);
 
         const uploadTaskStartTime = Date.now();
 
-        await makeAPIRequest(`/v1/packages/${publisher.name}.${pkg.name}/releases/${release.version_with_leios_patch}/all`, {
+        await makeAPIRequest(`/v1/packages/leios.${pkg.name}/releases/${release.version_with_leios_patch}/all`, {
             method: "POST",
             authToken: siteAdminSessionToken,
             additionalOptions: {
@@ -2670,7 +2691,7 @@ describe("Task queue execution coverage", async () => {
             arm64: "100.1"
         });
 
-        expect(await AptlyAPI.Packages.existsInRepo("leios-stable", "base-files", "100.1", "all")).toBe(true);
+        expect(await AptlyAPI.Packages.existsInRepo("leios-stable", 'leios.system.base-files', "100.1", "all")).toBe(true);
 
         const releaseStatus = await makeAPIRequest(`/v1/admin/os-releases/${created.version}`, {
             authToken: siteAdminSessionToken
@@ -2681,6 +2702,8 @@ describe("Task queue execution coverage", async () => {
             authToken: siteAdminSessionToken
         }, 200);
         expect(logs.logs).toContain("OS release process completed successfully");
+
+        await AptlyAPI.Packages.deleteAllInAllRepos("leios.system.base-files").catch(() => null);
     });
 });
 

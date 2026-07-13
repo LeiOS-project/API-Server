@@ -50,6 +50,9 @@ router.get('/',
                 homepage_url: DB.Tables.publishers.homepage_url,
 
                 created_at: DB.Tables.publishers.created_at,
+
+                maintainer_contact_name: DB.Tables.publishers.maintainer_contact_name,
+                maintainer_contact_email: DB.Tables.publishers.maintainer_contact_email
             })
             .from(DB.Tables.publishers)
             .$dynamic();
@@ -130,7 +133,10 @@ router.post('/',
                 description: publisherData.description,
                 homepage_url: publisherData.homepage_url,
 
-                owner_user_id: authContext.user_id
+                owner_user_id: authContext.user_id,
+
+                maintainer_contact_name: publisherData.maintainer_contact_name,
+                maintainer_contact_email: publisherData.maintainer_contact_email
             }).returning().get();
 
             await tx.insert(DB.Tables.publisherMembers).values({
@@ -203,6 +209,9 @@ router.get('/:publisherName',
             homepage_url: publisher.homepage_url,
 
             created_at: publisher.created_at,
+
+            maintainer_contact_name: publisher.maintainer_contact_name,
+            maintainer_contact_email: publisher.maintainer_contact_email
         };
 
         return APIResponse.success(c, "Publisher retrieved successfully", Utils.asExact<PublisherModel.GetPublisherByName.Response>()(returnPublisher));

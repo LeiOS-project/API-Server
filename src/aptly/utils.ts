@@ -261,15 +261,15 @@ export class AptlyUtils {
         return version;
     }
 
-    static getPackageIdentifier(packageName: string, fullPackageVersion: string, architecture: string): string;
-    static getPackageIdentifier(packageName: string, packageVersion: string, leios_patch: string | null | undefined, architecture: string): string;
-    static getPackageIdentifier(packageName: string, versionOrFullVersion: string, leios_patchOrArch: string | null | undefined, architectureOpt?: string) {
+    static getPackageIdentifier(packageFullName: string, fullPackageVersion: string, architecture: string): string;
+    static getPackageIdentifier(packageFullName: string, packageVersion: string, leios_patch: string | null | undefined, architecture: string): string;
+    static getPackageIdentifier(packageFullName: string, versionOrFullVersion: string, leios_patchOrArch: string | null | undefined, architectureOpt?: string) {
         const fullPackageVersion = architectureOpt
             ? this.buildVersionWithLeiOSSuffix(versionOrFullVersion, leios_patchOrArch)
             : versionOrFullVersion;
 
         const architecture = architectureOpt ? architectureOpt : leios_patchOrArch!;
-        return `${packageName}_${fullPackageVersion}_${architecture}`;
+        return `${packageFullName}_${fullPackageVersion}_${architecture}`;
     }
 
     static async waitForAptlyReady(baseUrl: string, timeoutMs = 10_000, pollMs = 300) {
