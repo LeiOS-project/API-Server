@@ -24,7 +24,7 @@
         "s3rver": "^3.7.1",
       },
       "peerDependencies": {
-        "typescript": "^6.0.3",
+        "typescript": "^6.0.3 || ^7.0.0",
       },
     },
   },
