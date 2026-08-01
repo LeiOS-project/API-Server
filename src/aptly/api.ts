@@ -2,6 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 import { AptlyAPIServer } from "./server";
 import { AptlyUtils } from "./utils";
+import { Logger } from "../utils/logger";
 import z from "zod";
 
 export namespace AptlyAPI.Utils {
@@ -236,6 +237,73 @@ export namespace AptlyAPI.Packages {
 
             shouldCleanup = false;
             return true;
+        } finally {
+            if (shouldCleanup) {
+                await fs.rm(uploadDir, { recursive: true, force: true });
+            }
+        }
+    }
+
+    /**
+     * Uploads a locally built Debian package into the leios-archive repository.
+     * Unlike {@link uploadAndVerifyIntoArchiveRepo}, this variant accepts a
+     * filesystem path instead of a web {@link File} and reads metadata from the
+     * package itself.
+     *
+     * @param debPath - Absolute path to the .deb file.
+     * @returns Package metadata once it has been added to the archive repo.
+     */
+    export async function uploadLocalDebIntoArchiveRepo(debPath: string) {
+        const dpkgInfo = await Bun.$`dpkg-deb -f ${debPath}`.text();
+
+        const parseField = (name: string): string => {
+            const match = dpkgInfo.match(new RegExp(`^${name}: (.*)$`, "m"));
+            return match?.[1]?.trim() || "";
+        };
+
+        const packageName = parseField("Package");
+        const packageVersion = parseField("Version");
+        const packageArchitecture = parseField("Architecture") as AptlyAPI.Utils.Architectures;
+
+        if (!packageName || !packageVersion || !packageArchitecture) {
+            throw new Error(`Could not extract required metadata from ${debPath}`);
+        }
+
+        const existsPackage = await existsInRepo("leios-archive", packageName, packageVersion, packageArchitecture);
+        if (existsPackage) {
+            Logger.info(`Package ${packageName} ${packageVersion} ${packageArchitecture} already exists in archive repo; skipping upload.`);
+            return { name: packageName, version: packageVersion, architecture: packageArchitecture };
+        }
+
+        const uploadSubDir = Bun.randomUUIDv7();
+        const fileName = path.basename(debPath);
+        const uploadDir = path.join(AptlyAPIServer.aptlyUploadDir, uploadSubDir);
+        const fullFilePath = path.join(uploadDir, fileName);
+
+        let shouldCleanup = true;
+
+        await AptlyUtils.ensureDirExists(uploadDir);
+
+        try {
+            await fs.copyFile(debPath, fullFilePath);
+
+            const addingResult = await AptlyAPIServer.getClient().postApiReposByNameFileByDirByFile({
+                path: {
+                    name: "leios-archive",
+                    dir: uploadSubDir,
+                    file: fileName
+                }
+            });
+
+            const parsedResult = (addingResult.data as any as { "Report": { "Added": string[] } })?.["Report"]?.["Added"]?.[0] || "";
+
+            if (addingResult.error || !parsedResult.includes("added")) {
+                throw new Error("Failed to add package to repository: " + addingResult.error);
+            }
+
+            shouldCleanup = false;
+            Logger.info(`Uploaded ${packageName} ${packageVersion} ${packageArchitecture} into archive repo.`);
+            return { name: packageName, version: packageVersion, architecture: packageArchitecture };
         } finally {
             if (shouldCleanup) {
                 await fs.rm(uploadDir, { recursive: true, force: true });

@@ -2,12 +2,14 @@ import { TaskHandler } from "@cleverjs/utils";
 import { DB } from "../db";
 import { eq } from "drizzle-orm";
 import { AptlyAPI } from "../aptly/api";
+import { BrandingBuilder } from "../utils/branding-builder";
 import { RuntimeMetadata } from "../api/utils/metadata";
 
 interface Payload {
     pkgReleasesToIncludeByID: number[];
     version: string;
     timestamp: number;
+    changelogLines?: string[];
 }
 interface StepState {
     nextPackageIndexToMove: number;
@@ -19,6 +21,46 @@ export const OsReleaseTask = new TaskHandler.StepBasedTaskFn("os-release:create"
     state.nextPackageIndexToMove = 0;
 
     return { success: true };
+});
+
+OsReleaseTask.addStep("Build and add LeiOS branding package to stable repo", async (payload, logger) => {
+
+    try {
+        logger.info(`Building leios.system.branding-meta-files for stable release ${payload.version}...`);
+
+        const debPath = await BrandingBuilder.buildBrandingPackage({
+            version: payload.version,
+            distribution: "stable",
+            changelogLines: payload.changelogLines,
+        });
+
+        logger.info(`Uploading branding package to archive repo: ${debPath}`);
+        const brandingPackage = await AptlyAPI.Packages.uploadLocalDebIntoArchiveRepo(debPath);
+
+        const existsInStable = await AptlyAPI.Packages.existsInRepo(
+            "leios-stable",
+            brandingPackage.name,
+            brandingPackage.version,
+            brandingPackage.architecture
+        );
+
+        if (!existsInStable) {
+            logger.info(`Copying ${brandingPackage.name} ${brandingPackage.version} into stable repo`);
+            await AptlyAPI.Packages.copyIntoRepo("leios-stable", brandingPackage.name, brandingPackage.version, brandingPackage.architecture);
+        } else {
+            logger.info(`Branding package already exists in stable repo, skipping copy`);
+        }
+
+        return { success: true };
+
+    } catch (err) {
+        logger.error("Error building or adding branding package to stable repo:", err);
+        return {
+            success: false,
+            message: Error.isError(err) ? err.message : "Unknown error"
+        };
+    }
+
 });
 
 OsReleaseTask.addStep("Move packages from archive to local stable repo", async (payload, logger, state, isPaused) => {

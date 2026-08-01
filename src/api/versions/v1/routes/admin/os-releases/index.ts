@@ -90,6 +90,8 @@ router.post('/',
 			pkgReleasesToIncludeByID: await RuntimeMetadata.getOSReleasePendingPackages(),
 			version,
 			timestamp: now.getTime(),
+			changelog: newReleaseData.changelog,
+			changelogLines: newReleaseData.changelog.split("\n").filter(line => line.trim().length > 0),
 		};
 
 		const taskID = await TaskQueueUtils.createPendingTaskRecord("os-release:create", taskArgs, {

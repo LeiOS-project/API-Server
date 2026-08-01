@@ -29,6 +29,8 @@ function setTestEnv(rootDir: string) {
         // 0 lets Aptly bind to a random free port from the dynamic range.
         LRA_APTLY_PORT: "0",
 
+        LRA_BRANDING_META_REPO: "",
+
         LRA_CONFIG_BASE_DIR: rootDir,
         LRA_PRIVATE_KEY_PATH: path.join(rootDir, "keys", "private-key.gpg"),
         LRA_PUBLIC_KEY_PATH: path.join(rootDir, "keys", "public-key.gpg"),
