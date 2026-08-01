@@ -1,5 +1,6 @@
-import { randomBytes as crypto_randomBytes } from 'crypto';
+import { randomBytes as crypto_randomBytes, randomInt as crypto_randomInt } from 'crypto';
 import { mkdir, mkdirSync } from 'fs';
+import net from 'net';
 
 export class Utils {
 
@@ -9,6 +10,31 @@ export class Utils {
         const randomComponent = crypto_randomBytes(4).readUInt32BE(0);
 
         return (timeComponent + randomComponent) % 0x100000000;
+    }
+
+    /**
+     * Find a free TCP port in the given range by briefly binding to it.
+     * Defaults to the IANA dynamic/private port range (49152–65535).
+     */
+    static async findFreePort(
+        min = 49152,
+        max = 65535,
+        host = "127.0.0.1",
+        maxAttempts = 100
+    ): Promise<number> {
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            const port = crypto_randomInt(min, max + 1);
+            const isFree = await new Promise<boolean>((resolve) => {
+                const server = net.createServer();
+                server.once("error", () => resolve(false));
+                server.once("listening", () => {
+                    server.close((err) => resolve(err === undefined));
+                });
+                server.listen(port, host);
+            });
+            if (isFree) return port;
+        }
+        throw new Error(`Unable to find a free TCP port on ${host} in range ${min}-${max} after ${maxAttempts} attempts`);
     }
 
     static splitNTimes(str: string, delim: string, count: number) {

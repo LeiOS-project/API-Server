@@ -4,11 +4,13 @@ import z from "zod";
 import { client } from "./api-client/client.gen";
 import * as apiClient from "./api-client";
 import { Logger } from "../utils/logger";
+import { Utils } from "../utils";
 import { AptlyUtils } from "./utils";
 
 const AptlyAPISettingsSchema = z.object({
     aptlyRoot: z.string().min(1),
-    aptlyPort: z.number().int().positive(),
+    // Port 0 means "assign a random free port from the dynamic range".
+    aptlyPort: z.number().int().min(0).max(65535),
     s3Settings: z.object({
         endpoint: z.string().min(1),
         region: z.string().min(1),
@@ -85,6 +87,11 @@ export class AptlyAPIServer {
     static async start() {
         if (!this.isInitialized) {
             throw new Error("AptlyAPIServer not initialized. Call init before start.");
+        }
+
+        if (this.settings.aptlyPort === 0) {
+            this.settings.aptlyPort = await Utils.findFreePort();
+            Logger.info(`Assigned Aptly a random dynamic port: ${this.settings.aptlyPort}`);
         }
 
         this.aptlyProcess = Bun.spawn({

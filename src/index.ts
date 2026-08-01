@@ -40,7 +40,8 @@ export class Main {
 
         await AptlyAPIServer.init({
             aptlyRoot: config.LRA_APTLY_ROOT ?? "./data/aptly",
-            aptlyPort: parseInt(config.LRA_APTLY_PORT ?? "12150"),
+            // Port 0 lets Aptly pick a random free port from the dynamic range.
+            aptlyPort: config.LRA_APTLY_PORT ? parseInt(config.LRA_APTLY_PORT) : 0,
             s3Settings: {
                 endpoint: config.LRA_S3_ENDPOINT,
                 region: config.LRA_S3_REGION,

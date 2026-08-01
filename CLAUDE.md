@@ -92,7 +92,7 @@ src/
 ## Testing Gotchas
 
 - `bunfig.toml` preloads `tests/helpers/preload.ts` for every test run
-- Preload builds a self-contained test env: temp DB, generated GPG keys, local `s3rver`, then starts Aptly/API on fixed ports **12150** and **12151**
+- Preload builds a self-contained test env: temp DB, generated GPG keys, local `s3rver`, then starts the Hono API on port **12151** and Aptly on a random free dynamic port
 - Tests are **integration-heavy** (DB + Aptly + S3-style publish config + generated local GPG keys), not pure unit tests
 - The test preload does **not** start `TaskScheduler.processQueue()` — routes that enqueue tasks only create DB task records unless a test starts the scheduler explicitly
 - `tests/aptly.test.ts` needs `.deb` fixtures under `testdata/`

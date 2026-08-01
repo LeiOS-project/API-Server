@@ -26,8 +26,9 @@ function setTestEnv(rootDir: string) {
         LRA_DB_AUTO_MIGRATE: true,
 
         LRA_APTLY_ROOT: path.join(rootDir, "aptly"),
-        LRA_APTLY_PORT: "12150",
-        
+        // 0 lets Aptly bind to a random free port from the dynamic range.
+        LRA_APTLY_PORT: "0",
+
         LRA_CONFIG_BASE_DIR: rootDir,
         LRA_PRIVATE_KEY_PATH: path.join(rootDir, "keys", "private-key.gpg"),
         LRA_PUBLIC_KEY_PATH: path.join(rootDir, "keys", "public-key.gpg"),
@@ -175,7 +176,7 @@ beforeAll(async () => {
 
     await AptlyAPIServer.init({
         aptlyRoot: path.join(TMP_ROOT, "aptly"),
-        aptlyPort: 12150,
+        aptlyPort: config.LRA_APTLY_PORT ? parseInt(config.LRA_APTLY_PORT) : 0,
         s3Settings: {
             endpoint: config.LRA_S3_ENDPOINT,
             region: config.LRA_S3_REGION,
