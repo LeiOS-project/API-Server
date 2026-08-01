@@ -78,7 +78,8 @@ router.post('/',
         responses: APIResponseSpec.describeWithWrongInputs(
             APIResponseSpec.created("Stable promotion request submitted", StablePromotionRequestsModel.Create.Response),
             APIResponseSpec.forbidden("You do not have permission to request stable promotions for this package"),
-            APIResponseSpec.conflict("A request already exists for this release or the release is already stable")
+            APIResponseSpec.conflict("A request already exists for this release or the release is already stable"),
+            APIResponseSpec.badRequest("The release must have at least one uploaded .deb package before requesting stable promotion")
         )
     }),
 
@@ -101,6 +102,11 @@ router.post('/',
 
         if (!allowed) {
             return APIResponse.forbidden(c, "You do not have permission to request stable promotions for this package");
+        }
+
+        const architectures = release.architectures;
+        if (!architectures.amd64 && !architectures.arm64 && !architectures.is_all) {
+            return APIResponse.badRequest(c, "The release must have at least one uploaded .deb package before requesting stable promotion");
         }
 
         const alreadyExists = await DB.instance().select({ id: DB.Tables.stablePromotionRequests.id }).from(DB.Tables.stablePromotionRequests).where(

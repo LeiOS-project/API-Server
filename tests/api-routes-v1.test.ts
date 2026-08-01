@@ -1056,7 +1056,28 @@ describe("Package sub-routes coverage", async () => {
         }, 403);
     });
 
-    test("POST /packages/:fullPackageName/releases/:version_with_leios_patch/stable-promotion-requests creates request", async () => {
+    test("POST /packages/:fullPackageName/releases/:version_with_leios_patch/stable-promotion-requests rejects empty release", async () => {
+        await makeAPIRequest(`/v1/packages/${fullPackageName}/releases/1.0.0/stable-promotion-requests`, {
+            method: "POST",
+            authToken: ownerSessionToken,
+            body: {}
+        }, 400);
+    });
+
+
+    test("POST /packages/:fullPackageName/releases/:version_with_leios_patch/stable-promotion-requests creates request with seeded architecture", async () => {
+        // Simulate a release that has an uploaded all-architecture package.
+        const release = DB.instance().select().from(DB.Tables.packageReleases).where(and(
+            eq(DB.Tables.packageReleases.package_id, packageID),
+            eq(DB.Tables.packageReleases.version_with_leios_patch, "1.0.0")
+        )).get();
+
+        if (release) {
+            DB.instance().update(DB.Tables.packageReleases).set({
+                architectures: { amd64: true, arm64: true, is_all: true }
+            }).where(eq(DB.Tables.packageReleases.id, release.id)).run();
+        }
+
         const created = await makeAPIRequest(`/v1/packages/${fullPackageName}/releases/1.0.0/stable-promotion-requests`, {
             method: "POST",
             authToken: ownerSessionToken,
@@ -1847,6 +1868,21 @@ describe("Publisher package-route permission matrix", async () => {
         }
     });
 
+    test("POST /packages/:fullPackageName/releases/:version_with_leios_patch/stable-promotion-requests requires uploaded deb", async () => {
+        const pkg = await seedPackageForPublisher(publisher.id, {
+            name: `pkg-stable-no-deb-${randomUUID().slice(0, 8)}`,
+        });
+        const release = await seedPackageRelease(pkg.id, {
+            version_with_leios_patch: `5.0.${Math.floor(Math.random() * 9000) + 1000}`,
+        });
+
+        await makeAPIRequest(`/v1/packages/${publisher.name}.${pkg.name}/releases/${release.version_with_leios_patch}/stable-promotion-requests`, {
+            method: "POST",
+            authToken: ownerSessionToken,
+            body: {}
+        }, 400);
+    });
+
     test("POST /packages/:fullPackageName/releases/:version_with_leios_patch/stable-promotion-requests enforces requestStable permissions", async () => {
         const cases: Array<{ label: string; token?: string; code: number; }> = [
             { label: "unauth", code: 403 },
@@ -1865,6 +1901,7 @@ describe("Publisher package-route permission matrix", async () => {
             });
             const release = await seedPackageRelease(pkg.id, {
                 version_with_leios_patch: `5.0.${Math.floor(Math.random() * 9000) + 1000}`,
+                architectures: { amd64: true, arm64: false, is_all: false }
             });
 
             const created = await makeAPIRequest(`/v1/packages/${publisher.name}.${pkg.name}/releases/${release.version_with_leios_patch}/stable-promotion-requests`, {
