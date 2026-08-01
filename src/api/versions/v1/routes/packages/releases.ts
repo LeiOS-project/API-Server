@@ -12,6 +12,7 @@ import { TaskScheduler } from "../../../../../tasks";
 import { RuntimeMetadata } from "../../../../utils/metadata";
 import { Logger } from "../../../../../utils/logger";
 import { DOCS_TAGS } from "../../docs";
+import { router as stableRequestsRouter } from "./releases/stable-promotion-requests";
 
 export const router = new Hono().basePath('/releases');
 
@@ -132,6 +133,8 @@ router.use('/:version_with_leios_patch/*',
         return await next();
     }
 );
+
+router.route('/:version_with_leios_patch', stableRequestsRouter);
 
 
 router.get('/:version_with_leios_patch',

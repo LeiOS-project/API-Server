@@ -1,4 +1,4 @@
-import { createInsertSchema, createSelectSchema } from "drizzle-zod";
+import { createSelectSchema } from "drizzle-zod";
 import z from "zod";
 import { DB } from "../../../db";
 
@@ -66,14 +66,7 @@ export namespace StablePromotionRequestsModel.GetAll {
 
 export namespace StablePromotionRequestsModel.Create {
 
-    export const Body = createInsertSchema(DB.Tables.stablePromotionRequests).omit({
-        id: true,
-        created_at: true,
-        package_id: true,
-        // package_release_id: true,
-        status: true,
-        admin_note: true
-    });
+    export const Body = z.object({}).strict();
 
     export const Response = z.object({
         id: z.number()

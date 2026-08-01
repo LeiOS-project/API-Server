@@ -3,16 +3,14 @@ import { StablePromotionRequestsModel } from "../src/api/utils/shared-models/sta
 import { AdminStablePromotionRequestModel } from "../src/api/versions/v1/routes/admin/stable-promotion-requests/model";
 
 describe("StableRequestModel schemas", () => {
-	test("accepts valid create payload", () => {
-		const parsed = StablePromotionRequestsModel.Create.Body.parse({
-			package_release_id: 42,
-		});
+	test("accepts empty create payload", () => {
+		const parsed = StablePromotionRequestsModel.Create.Body.parse({});
 
-		expect(parsed.package_release_id).toBe(42);
+		expect(parsed).toEqual({});
 	});
 
-	test("rejects missing package_release_id", () => {
-		expect(() => StablePromotionRequestsModel.Create.Body.parse({} as any)).toThrow();
+	test("rejects extra fields in create payload", () => {
+		expect(() => StablePromotionRequestsModel.Create.Body.parse({ package_release_id: 42 } as any)).toThrow();
 	});
 
 	test("rejects invalid architecture for copy body", () => {

@@ -1056,31 +1056,29 @@ describe("Package sub-routes coverage", async () => {
         }, 403);
     });
 
-    test("POST /packages/:fullPackageName/stable-promotion-requests creates request", async () => {
-        const created = await makeAPIRequest(`/v1/packages/${fullPackageName}/stable-promotion-requests`, {
+    test("POST /packages/:fullPackageName/releases/:version_with_leios_patch/stable-promotion-requests creates request", async () => {
+        const created = await makeAPIRequest(`/v1/packages/${fullPackageName}/releases/1.0.0/stable-promotion-requests`, {
             method: "POST",
             authToken: ownerSessionToken,
-            body: {
-                package_release_id: releaseID
-            }
+            body: {}
         }, 201);
 
         stablePromotionRequestID = created.id;
         expect(created.id).toBeNumber();
     });
 
-    test("GET /packages/:fullPackageName/stable-promotion-requests lists requests", async () => {
-        const list = await makeAPIRequest(`/v1/packages/${fullPackageName}/stable-promotion-requests`, {}, 200);
+    test("GET /packages/:fullPackageName/releases/:version_with_leios_patch/stable-promotion-requests lists requests", async () => {
+        const list = await makeAPIRequest(`/v1/packages/${fullPackageName}/releases/1.0.0/stable-promotion-requests`, {}, 200);
         expect(list.some((item: any) => item.id === stablePromotionRequestID)).toBe(true);
     });
 
-    test("GET /packages/:fullPackageName/stable-promotion-requests/:stablePromotionRequestID returns request", async () => {
-        const item = await makeAPIRequest(`/v1/packages/${fullPackageName}/stable-promotion-requests/${stablePromotionRequestID}`, {}, 200);
+    test("GET /packages/:fullPackageName/releases/:version_with_leios_patch/stable-promotion-requests/:stablePromotionRequestID returns request", async () => {
+        const item = await makeAPIRequest(`/v1/packages/${fullPackageName}/releases/1.0.0/stable-promotion-requests/${stablePromotionRequestID}`, {}, 200);
         expect(item.id).toBe(stablePromotionRequestID);
     });
 
-    test("DELETE /packages/:fullPackageName/stable-promotion-requests/:stablePromotionRequestID removes request", async () => {
-        await makeAPIRequest(`/v1/packages/${fullPackageName}/stable-promotion-requests/${stablePromotionRequestID}`, {
+    test("DELETE /packages/:fullPackageName/releases/:version_with_leios_patch/stable-promotion-requests/:stablePromotionRequestID removes request", async () => {
+        await makeAPIRequest(`/v1/packages/${fullPackageName}/releases/1.0.0/stable-promotion-requests/${stablePromotionRequestID}`, {
             method: "DELETE",
             authToken: ownerSessionToken
         }, 200);
@@ -1849,7 +1847,7 @@ describe("Publisher package-route permission matrix", async () => {
         }
     });
 
-    test("POST /packages/:fullPackageName/stable-promotion-requests enforces requestStable permissions", async () => {
+    test("POST /packages/:fullPackageName/releases/:version_with_leios_patch/stable-promotion-requests enforces requestStable permissions", async () => {
         const cases: Array<{ label: string; token?: string; code: number; }> = [
             { label: "unauth", code: 403 },
             { label: "outsider", token: outsiderSessionToken, code: 403 },
@@ -1869,12 +1867,10 @@ describe("Publisher package-route permission matrix", async () => {
                 version_with_leios_patch: `5.0.${Math.floor(Math.random() * 9000) + 1000}`,
             });
 
-            const created = await makeAPIRequest(`/v1/packages/${publisher.name}.${pkg.name}/stable-promotion-requests`, {
+            const created = await makeAPIRequest(`/v1/packages/${publisher.name}.${pkg.name}/releases/${release.version_with_leios_patch}/stable-promotion-requests`, {
                 method: "POST",
                 authToken: current.token,
-                body: {
-                    package_release_id: release.id
-                }
+                body: {}
             }, current.code);
 
             if (current.code === 201) {
@@ -1883,7 +1879,7 @@ describe("Publisher package-route permission matrix", async () => {
         }
     });
 
-    test("DELETE /packages/:fullPackageName/stable-promotion-requests/:id enforces requestStable permissions", async () => {
+    test("DELETE /packages/:fullPackageName/releases/:version_with_leios_patch/stable-promotion-requests/:id enforces requestStable permissions", async () => {
         const cases: Array<{ token?: string; code: number; }> = [
             { code: 403 },
             { token: outsiderSessionToken, code: 403 },
@@ -1904,7 +1900,7 @@ describe("Publisher package-route permission matrix", async () => {
             });
             const request = await seedStablePromotionRequest(pkg.id, release.id);
 
-            await makeAPIRequest(`/v1/packages/${publisher.name}.${pkg.name}/stable-promotion-requests/${request.id}`, {
+            await makeAPIRequest(`/v1/packages/${publisher.name}.${pkg.name}/releases/${release.version_with_leios_patch}/stable-promotion-requests/${request.id}`, {
                 method: "DELETE",
                 authToken: current.token,
             }, current.code);

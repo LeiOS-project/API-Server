@@ -12,7 +12,6 @@ import { TaskScheduler } from "../../../../../tasks";
 import { RuntimeMetadata } from "../../../../utils/metadata";
 import { DOCS_TAGS } from "../../docs";
 import { router as releasesRouter } from "./releases";
-import { router as stableRequestsRouter } from "./stable-promotion-requests";
 import { router as roleAssignmentsRouter } from "./role-assignments";
 import { Utils } from "../../../../../utils";
 
@@ -322,5 +321,4 @@ router.delete('/:fullPackageName',
 );
 
 router.route('/:fullPackageName', releasesRouter);
-router.route('/:fullPackageName', stableRequestsRouter);
 router.route('/:fullPackageName', roleAssignmentsRouter);
