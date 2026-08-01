@@ -181,6 +181,12 @@ export class AptlyAPIServer {
         if (!this.isInitialized) {
             throw new Error("AptlyAPI not initialized. Call AptlyAPI.init before accessing the client.");
         }
+        // Re-assert the generated client's baseUrl on every access. Test runners
+        // may re-evaluate modules between files, which resets the singleton
+        // client config and produces path-only URLs.
+        client.setConfig({
+            baseUrl: this.baseUrl
+        });
         return apiClient;
     }
 

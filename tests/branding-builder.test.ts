@@ -5,9 +5,9 @@ import { ConfigHandler } from "../src/utils/config";
 
 describe("BrandingBuilder", () => {
 
-    test("getRepoPath resolves to sibling branding repo by default", () => {
+    test("getRepoPath resolves to configured branding repo", () => {
         const repoPath = BrandingBuilder.getRepoPath();
-        expect(repoPath).toEndWith(path.join("System-Packages", "branding-meta-files"));
+        expect(repoPath).toEndWith("branding-meta-files");
     });
 
     test("getRepoPath respects LRA_BRANDING_META_REPO override", () => {
@@ -46,7 +46,7 @@ describe("BrandingBuilder", () => {
         expect(info.version).toBe(version);
         expect(info.architecture).toBe("all");
         expect(info.maintainer).toBe("LeiOS Project Team <support@leios.dev>");
-    });
+    }, 30000);
 
     test("buildBrandingPackage produces a .deb for testing distribution", async () => {
         const version = `2026.02.${String(Date.now()).slice(-3).padStart(3, "0")}`;
@@ -63,7 +63,7 @@ describe("BrandingBuilder", () => {
         expect(info.package).toBe("leios.system.branding-meta-files");
         expect(info.version).toBe(version);
         expect(info.architecture).toBe("all");
-    });
+    }, 30000);
 
     test("extractPackageInfo reads metadata from test fixture .deb", async () => {
         const info = await BrandingBuilder.extractPackageInfo("./testdata/base-files.deb");

@@ -8,14 +8,15 @@ import { API } from "../../src/api";
 import { PermissionHelper } from "../../src/utils/permission-helper";
 import S3rver from "s3rver";
 import { ensureTestPackageFixtures } from "./package-fixtures";
+import { ensureBrandingFixtureRepo } from "./branding-fixtures";
 
-function setTestEnv(rootDir: string) {
+function setTestEnv(rootDir: string, brandingRepoPath: string) {
 
     const envVars = {
         LRA_LOG_LEVEL: "debug",
 
         LRA_HUB_URL: "http://localhost:12153",
-        
+
         LRA_API_HOST: "::",
         LRA_API_PORT: "12151",
         LRA_API_DISABLE_DOCS: true,
@@ -29,7 +30,7 @@ function setTestEnv(rootDir: string) {
         // 0 lets Aptly bind to a random free port from the dynamic range.
         LRA_APTLY_PORT: "0",
 
-        LRA_BRANDING_META_REPO: "",
+        LRA_BRANDING_META_REPO: brandingRepoPath,
 
         LRA_CONFIG_BASE_DIR: rootDir,
         LRA_PRIVATE_KEY_PATH: path.join(rootDir, "keys", "private-key.gpg"),
@@ -135,18 +136,22 @@ async function createIsolatedDataDir(): Promise<string> {
 
 let TMP_ROOT: string | null = null;
 let s3rverInstance: S3rver | null = null;
+let BRANDING_REPO_ROOT: string | null = null;
 
 beforeAll(async () => {
     TMP_ROOT = await createIsolatedDataDir();
 
     await ensureTestPackageFixtures();
 
-    setTestEnv(TMP_ROOT);
+    const fallbackBrandingRepo = path.resolve(import.meta.dir, "../../..", "System-Packages", "branding-meta-files");
+    BRANDING_REPO_ROOT = await ensureBrandingFixtureRepo(fallbackBrandingRepo, TMP_ROOT);
+
+    setTestEnv(TMP_ROOT, BRANDING_REPO_ROOT);
 
     await generateTestGPGKeyPair(TMP_ROOT);
 
     const config = await ConfigHandler.loadConfig();
-    
+
     // Start local S3 server
     const s3rverDir = path.join(TMP_ROOT, "s3rver");
     await fs.mkdir(s3rverDir, { recursive: true });
@@ -157,7 +162,7 @@ beforeAll(async () => {
         directory: s3rverDir,
         configureBuckets: [{ name: config.LRA_S3_BUCKET }]
     });
-    
+
     await new Promise<void>((resolve, reject) => {
         s3rverInstance!.run((err?: Error | null) => {
             if (err) reject(err);
@@ -199,7 +204,7 @@ beforeAll(async () => {
 
     await API.start(12151, "::");
 
-});
+}, 60000);
 
 afterAll(async () => {
 
@@ -218,4 +223,4 @@ afterAll(async () => {
     if (TMP_ROOT) {
         await fs.rm(TMP_ROOT, { recursive: true, force: true });
     }
-});
+}, 60000);

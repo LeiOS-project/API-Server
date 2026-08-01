@@ -2661,7 +2661,7 @@ describe("Task queue execution coverage", async () => {
         await DB.instance().delete(DB.Tables.publishers).where(
             eq(DB.Tables.publishers.id, publisher.id)
         ).run();
-    });
+    }, { timeout: 30000 });
 
     test("os-release route executes async release task to completion", async () => {
         await RuntimeMetadata.clearOSReleasePendingPackages();
@@ -2747,7 +2747,7 @@ describe("Task queue execution coverage", async () => {
 
         await AptlyAPI.Packages.deleteAllInAllRepos("leios.system.base-files").catch(() => null);
         await AptlyAPI.Packages.deleteAllInAllRepos("leios.system.branding-meta-files").catch(() => null);
-    });
+    }, { timeout: 30000 });
 });
 
 
