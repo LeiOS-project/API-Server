@@ -60,8 +60,8 @@ export class BrandingBuilder {
             throw new Error(`Failed to build branding meta files package: ${stderr}`);
         }
 
-        // The build script writes artifacts to ./build/
-        const buildDir = path.join(repoPath, "build");
+        // The build script writes artifacts to ./deb-build/
+        const buildDir = path.join(repoPath, "deb-build");
         const entries = await fs.readdir(buildDir).catch(() => [] as string[]);
         const debFile = entries.find(entry => entry.endsWith(".deb") && entry.includes(options.version));
 

@@ -90,7 +90,6 @@ router.post('/',
 			pkgReleasesToIncludeByID: await RuntimeMetadata.getOSReleasePendingPackages(),
 			version,
 			timestamp: now.getTime(),
-			changelog: newReleaseData.changelog,
 			changelogLines: newReleaseData.changelog.split("\n").filter(line => line.trim().length > 0),
 		};
 
