@@ -2650,8 +2650,13 @@ describe("Task queue execution coverage", async () => {
         });
 
         expect(await AptlyAPI.Packages.existsInRepo("leios-testing", "fastfetch.fastfetch", "2.55.0", "amd64")).toBe(true);
-    
+
+        // The testing-repo:update task also builds and copies the branding package.
+        const testingBrandingRefs = await AptlyAPI.Packages.getRefInRepo("leios-testing", "leios.system.branding-meta-files");
+        expect(testingBrandingRefs.length).toBeGreaterThan(0);
+
         await AptlyAPI.Packages.deleteAllInAllRepos("fastfetch.fastfetch").catch(() => null);
+        await AptlyAPI.Packages.deleteAllInAllRepos("leios.system.branding-meta-files").catch(() => null);
 
         await DB.instance().delete(DB.Tables.publishers).where(
             eq(DB.Tables.publishers.id, publisher.id)
@@ -2726,6 +2731,10 @@ describe("Task queue execution coverage", async () => {
 
         expect(await AptlyAPI.Packages.existsInRepo("leios-stable", 'leios.system.base-files', "100.1", "all")).toBe(true);
 
+        // The os-release:create task also builds and copies the branding package into stable.
+        const stableBrandingRefs = await AptlyAPI.Packages.getRefInRepo("leios-stable", "leios.system.branding-meta-files");
+        expect(stableBrandingRefs.length).toBeGreaterThan(0);
+
         const releaseStatus = await makeAPIRequest(`/v1/admin/os-releases/${created.version}`, {
             authToken: siteAdminSessionToken
         }, 200);
@@ -2737,6 +2746,7 @@ describe("Task queue execution coverage", async () => {
         expect(logs.logs).toContain("OS release process completed successfully");
 
         await AptlyAPI.Packages.deleteAllInAllRepos("leios.system.base-files").catch(() => null);
+        await AptlyAPI.Packages.deleteAllInAllRepos("leios.system.branding-meta-files").catch(() => null);
     });
 });
 

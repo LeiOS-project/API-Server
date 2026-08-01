@@ -8,7 +8,7 @@ interface Payload {
 
 export const UpdateTestingRepoTask = new TaskHandler.BasicTaskFn("testing-repo:update", async (payload: Payload, logger) => {
 
-    const version = new Date().toISOString().replace(/[-:T.Z]/g, "").slice(0, 12);
+    const version = new Date().toISOString().replace(/[-:T.Z]/g, "").slice(0, 14);
     const distribution = "testing";
 
     logger.info(`Building leios.system.branding-meta-files for testing repo (version ${version})...`);

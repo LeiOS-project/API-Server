@@ -138,3 +138,42 @@ describe("Aptly Package Tests for base-files arch: all", () => {
     });
 
 });
+
+describe("Aptly Package Tests for local .deb upload", () => {
+
+    test("Upload local .deb into archive repo", async () => {
+        const filePath = "./testdata/base-files.deb";
+
+        const result = await AptlyAPI.Packages.uploadLocalDebIntoArchiveRepo(filePath);
+
+        expect(result.name).toBe("leios.system.base-files");
+        expect(result.version).toBe("100.1");
+        expect(result.architecture).toBe("all");
+
+        const exists = await AptlyAPI.Packages.existsInRepo("leios-archive", "leios.system.base-files", "100.1", "all");
+        expect(exists).toBe(true);
+    });
+
+    test("Upload local .deb is idempotent", async () => {
+        const filePath = "./testdata/base-files.deb";
+
+        const firstResult = await AptlyAPI.Packages.uploadLocalDebIntoArchiveRepo(filePath);
+        const secondResult = await AptlyAPI.Packages.uploadLocalDebIntoArchiveRepo(filePath);
+
+        expect(secondResult.name).toBe(firstResult.name);
+        expect(secondResult.version).toBe(firstResult.version);
+        expect(secondResult.architecture).toBe(firstResult.architecture);
+
+        const refs = await AptlyAPI.Packages.getRefInRepo("leios-archive", "leios.system.base-files", "100.1", "all");
+        expect(refs.length).toBe(1);
+    });
+
+    test("Delete locally uploaded package from all repos", async () => {
+        const deleteResult = await AptlyAPI.Packages.deleteAllInAllRepos("leios.system.base-files");
+        expect(deleteResult).toBe(true);
+
+        const packageRefsAfterDeletion = await AptlyAPI.Packages.getRefInRepo("leios-testing", "leios.system.base-files");
+        expect(packageRefsAfterDeletion.length).toBe(0);
+    });
+
+});
