@@ -6,6 +6,7 @@ import { BrandingBuilder } from "../src/utils/branding-builder";
 describe("BrandingBuilder", () => {
 
     test("getRepoPath resolves to managed repo path", () => {
+        BrandingBuilder["managedRepoPath"] = "./data/branding-meta-files/repo";
         const repoPath = BrandingBuilder.getRepoPath();
         expect(repoPath).toEndWith("branding-meta-files");
     });
