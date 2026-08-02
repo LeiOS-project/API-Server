@@ -9,8 +9,9 @@ import { PermissionHelper } from "../../src/utils/permission-helper";
 import S3rver from "s3rver";
 import { ensureTestPackageFixtures } from "./package-fixtures";
 import { ensureBrandingFixtureRepo } from "./branding-fixtures";
+import { BrandingBuilder } from "../../src/utils/branding-builder";
 
-function setTestEnv(rootDir: string, brandingRepoPath: string) {
+function setTestEnv(rootDir: string) {
 
     const envVars = {
         LRA_LOG_LEVEL: "debug",
@@ -30,7 +31,7 @@ function setTestEnv(rootDir: string, brandingRepoPath: string) {
         // 0 lets Aptly bind to a random free port from the dynamic range.
         LRA_APTLY_PORT: "0",
 
-        LRA_BRANDING_META_REPO: brandingRepoPath,
+        LRA_BRANDING_META_FILES_DATA_PATH: path.join(rootDir, "branding-meta-files"),
 
         LRA_CONFIG_BASE_DIR: rootDir,
         LRA_PRIVATE_KEY_PATH: path.join(rootDir, "keys", "private-key.gpg"),
@@ -136,17 +137,13 @@ async function createIsolatedDataDir(): Promise<string> {
 
 let TMP_ROOT: string | null = null;
 let s3rverInstance: S3rver | null = null;
-let BRANDING_REPO_ROOT: string | null = null;
 
 beforeAll(async () => {
     TMP_ROOT = await createIsolatedDataDir();
 
     await ensureTestPackageFixtures();
 
-    const fallbackBrandingRepo = path.resolve(import.meta.dir, "../../..", "System-Packages", "branding-meta-files");
-    BRANDING_REPO_ROOT = await ensureBrandingFixtureRepo(fallbackBrandingRepo, TMP_ROOT);
-
-    setTestEnv(TMP_ROOT, BRANDING_REPO_ROOT);
+    setTestEnv(TMP_ROOT);
 
     await generateTestGPGKeyPair(TMP_ROOT);
 
@@ -169,6 +166,8 @@ beforeAll(async () => {
             else resolve();
         });
     });
+
+    await BrandingBuilder.ensureRepo(path.join(TMP_ROOT, "branding-meta-files"));
 
     await DB.init(
         path.join(TMP_ROOT, "db.sqlite"),

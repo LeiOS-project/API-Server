@@ -1,32 +1,13 @@
 import { describe, expect, test } from "bun:test";
+import fs from "fs/promises";
 import path from "path";
 import { BrandingBuilder } from "../src/utils/branding-builder";
-import { ConfigHandler } from "../src/utils/config";
 
 describe("BrandingBuilder", () => {
 
-    test("getRepoPath resolves to configured branding repo", () => {
+    test("getRepoPath resolves to managed repo path", () => {
         const repoPath = BrandingBuilder.getRepoPath();
         expect(repoPath).toEndWith("branding-meta-files");
-    });
-
-    test("getRepoPath respects LRA_BRANDING_META_REPO override", () => {
-        const original = ConfigHandler.getConfig()?.LRA_BRANDING_META_REPO;
-
-        // Reset the cached config so loadConfig re-parses the environment.
-        (ConfigHandler as any).config = null;
-        process.env.LRA_BRANDING_META_REPO = "/tmp/override-branding";
-        ConfigHandler.loadConfig();
-
-        expect(BrandingBuilder.getRepoPath()).toBe("/tmp/override-branding");
-
-        (ConfigHandler as any).config = null;
-        if (original) {
-            process.env.LRA_BRANDING_META_REPO = original;
-        } else {
-            delete process.env.LRA_BRANDING_META_REPO;
-        }
-        ConfigHandler.loadConfig();
     });
 
     test("buildBrandingPackage produces a .deb for stable distribution", async () => {
@@ -77,5 +58,24 @@ describe("BrandingBuilder", () => {
     test("extractPackageInfo throws on missing required metadata", async () => {
         await expect(BrandingBuilder.extractPackageInfo("./testdata/old_schema.ts")).rejects.toThrow();
     });
+
+    test("ensureRepo clones from hardcoded GitLab URL when no local repo exists", async () => {
+        const dataDir = await fs.mkdtemp(path.join(process.cwd(), "tmp-branding-clone-"));
+
+        const previousManaged = (BrandingBuilder as any).managedRepoPath;
+        const previousUrl = (BrandingBuilder as any).GITLAB_REPO_URL;
+        (BrandingBuilder as any).managedRepoPath = null;
+
+        // Use an invalid URL so the clone fails deterministically without network.
+        (BrandingBuilder as any).GITLAB_REPO_URL = "https://invalid-host.example.com/nonexistent-repo.git";
+
+        try {
+            await expect(BrandingBuilder.ensureRepo(dataDir)).rejects.toThrow("Failed to clone branding meta files repository");
+        } finally {
+            (BrandingBuilder as any).GITLAB_REPO_URL = previousUrl;
+            (BrandingBuilder as any).managedRepoPath = previousManaged;
+            await fs.rm(dataDir, { recursive: true, force: true });
+        }
+    }, 30000);
 
 });

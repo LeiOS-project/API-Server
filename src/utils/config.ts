@@ -122,7 +122,7 @@ export class ConfigHandler {
         .add("LRA_APTLY_ROOT", false)
         .add("LRA_APTLY_PORT", false)
 
-        .add("LRA_BRANDING_META_REPO", false)
+        .add("LRA_BRANDING_META_FILES_DATA_PATH", false)
 
         .add("LRA_CONFIG_BASE_DIR", false)
         .add("LRA_PRIVATE_KEY_PATH", true)

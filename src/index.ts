@@ -8,6 +8,7 @@ import { LiveRepoUtils } from "./utils/live-repo";
 import { Utils } from "./utils";
 import { PermissionHelper } from "./utils/permission-helper";
 import { EmailService } from "./api/utils/email";
+import { BrandingBuilder } from "./utils/branding-builder";
 
 export class Main {
 
@@ -34,6 +35,11 @@ export class Main {
         EmailService.init();
 
         await Utils.ensureDirectoryExists(config.LRA_LOG_DIR ?? "./data/logs");
+
+        // Ensure the branding meta files repository is available. It is cloned
+        // once into the data directory on first startup and synced with git
+        // pull on subsequent starts (failures are logged but non-fatal).
+        await BrandingBuilder.ensureRepo(config.LRA_BRANDING_META_FILES_DATA_PATH ?? "./data/branding-meta-files");
 
         // start task scheduler
         await TaskScheduler.processQueue();

@@ -1,7 +1,6 @@
 import fs from "fs/promises";
 import path from "path";
 import { Logger } from "./logger";
-import { ConfigHandler } from "./config";
 
 export interface BuildBrandingPackageOptions {
     version: string;
@@ -11,14 +10,17 @@ export interface BuildBrandingPackageOptions {
 
 export class BrandingBuilder {
 
+    private static readonly GITLAB_REPO_URL = "https://git.leicraftmc.de/LeiOS/System-Packages/Branding-Meta-Files";
+
+    private static managedRepoPath: string | null = null;
+
     /**
      * Resolves the path to the leios.system.branding-meta-files repository.
-     * It first checks the optional environment variable `LRA_BRANDING_META_REPO`,
-     * then falls back to a sibling location next to the API-Server checkout.
+     *
+     * Returns the managed repo path once {@link ensureRepo} has been called.
      */
     static getRepoPath(): string {
-        const envPath = ConfigHandler.getConfig()?.LRA_BRANDING_META_REPO;
-        if (envPath) return envPath;
+        if (this.managedRepoPath) return this.managedRepoPath;
 
         // Default: ../../System-Packages/branding-meta-files relative to this file
         // (src/utils/branding-builder.ts -> project root -> sibling System-Packages)
@@ -26,8 +28,47 @@ export class BrandingBuilder {
     }
 
     /**
+     * Ensures the branding meta files repository is available at the given data
+     * directory location.
+     *
+     * The repository is cloned from the hardcoded GitLab URL into
+     * `<dataDir>/branding-meta-files`. On subsequent calls, a `git pull` is
+     * attempted to sync the latest changes, but failures are logged and ignored.
+     *
+     * @param dataDir - Root data directory where the cloned repo should live.
+     */
+    static async ensureRepo(dataDir: string): Promise<string> {
+        const gitlabUrl = this.GITLAB_REPO_URL;
+        const repoDir = path.resolve(dataDir, "repo");
+        const exists = await fs.access(repoDir).then(() => true).catch(() => false);
+
+        if (exists) {
+            Logger.info(`Syncing branding meta files repository at ${repoDir}`);
+            const pullResult = await Bun.$`git pull`.cwd(repoDir).nothrow().quiet();
+            if (pullResult.exitCode !== 0) {
+                const stderr = await new Response(pullResult.stderr).text();
+                Logger.warn(`Git pull for branding meta files failed (continuing with existing copy): ${stderr.trim()}`);
+            } else {
+                Logger.info(`Branding meta files repository synced successfully.`);
+            }
+        } else {
+            await fs.mkdir(dataDir, { recursive: true });
+            Logger.info(`Cloning branding meta files repository from ${gitlabUrl} into ${repoDir}`);
+            const cloneResult = await Bun.$`git clone ${gitlabUrl} ${repoDir}`.nothrow().quiet();
+            if (cloneResult.exitCode !== 0) {
+                const stderr = await new Response(cloneResult.stderr).text();
+                throw new Error(`Failed to clone branding meta files repository: ${stderr.trim()}`);
+            }
+            Logger.info(`Branding meta files repository cloned successfully.`);
+        }
+
+        this.managedRepoPath = repoDir;
+        return repoDir;
+    }
+
+    /**
      * Builds the leios.system.branding-meta-files Debian package for the given
-     * version and distribution.
+     * version and distribution. Ensures the repository is available first.
      *
      * @returns The absolute path to the generated .deb file.
      */
@@ -37,7 +78,7 @@ export class BrandingBuilder {
 
         const repoExists = await fs.access(repoPath).then(() => true).catch(() => false);
         if (!repoExists) {
-            throw new Error(`Branding meta files repository not found at ${repoPath}. Set LRA_BRANDING_META_REPO if it lives elsewhere.`);
+            throw new Error(`Branding meta files repository not found at ${repoPath}. Call ensureRepo() first.`);
         }
 
         const scriptExists = await fs.access(buildScript).then(() => true).catch(() => false);
