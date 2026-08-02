@@ -18,7 +18,7 @@ default:
       - node_modules/
   before_script:
     - apt-get update
-    - DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends bzip2 dpkg gnupg unzip
+    - DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends git bzip2 dpkg gnupg unzip
     - rm -rf /var/lib/apt/lists/*
     - bun install --frozen-lockfile
 
