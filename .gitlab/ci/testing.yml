@@ -18,7 +18,7 @@ default:
       - node_modules/
   before_script:
     - apt-get update
-    - DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends git bzip2 dpkg gnupg unzip ca-certificates curl
+    - DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends git bzip2 dpkg gnupg unzip ca-certificates curl debhelper-compat
     - rm -rf /var/lib/apt/lists/*
     - bun install --frozen-lockfile
 
