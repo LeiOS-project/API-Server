@@ -12,19 +12,15 @@ export class BrandingBuilder {
 
     private static readonly GITLAB_REPO_URL = "https://git.leicraftmc.de/LeiOS/System-Packages/Branding-Meta-Files";
 
-    private static managedRepoPath: string | null = null;
+    private static managedRepoPath: string;
 
     /**
      * Resolves the path to the leios.system.branding-meta-files repository.
      *
      * Returns the managed repo path once {@link ensureRepo} has been called.
      */
-    static getRepoPath(): string {
-        if (this.managedRepoPath) return this.managedRepoPath;
-
-        // Default: ../../System-Packages/branding-meta-files relative to this file
-        // (src/utils/branding-builder.ts -> project root -> sibling System-Packages)
-        return path.resolve(import.meta.dir, "../../..", "System-Packages", "branding-meta-files");
+    static getRepoPath() {
+        return this.managedRepoPath;
     }
 
     /**
