@@ -77,6 +77,16 @@ export class BrandingBuilder {
             throw new Error(`Branding meta files repository not found at ${repoPath}. Call ensureRepo() first.`);
         }
 
+        // Sync the repo with the latest changes before building. Failures are
+        // logged and ignored so a transient network issue never blocks a build.
+        const pullResult = await Bun.$`git pull`.cwd(repoPath).nothrow().quiet();
+        if (pullResult.exitCode !== 0) {
+            const stderr = await new Response(pullResult.stderr).text();
+            Logger.warn(`Git pull for branding meta files failed (building with existing copy): ${stderr.trim()}`);
+        } else {
+            Logger.info(`Branding meta files repository synced successfully before build.`);
+        }
+
         const scriptExists = await fs.access(buildScript).then(() => true).catch(() => false);
         if (!scriptExists) {
             throw new Error(`Branding build script not found at ${buildScript}`);

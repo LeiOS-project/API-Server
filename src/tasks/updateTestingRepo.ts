@@ -22,19 +22,13 @@ export const UpdateTestingRepoTask = new TaskHandler.BasicTaskFn("testing-repo:u
     logger.info(`Uploading branding package to archive repo: ${debPath}`);
     const brandingPackage = await AptlyAPI.Packages.uploadLocalDebIntoArchiveRepo(debPath);
 
-    const existsInTesting = await AptlyAPI.Packages.existsInRepo(
-        "leios-testing",
-        brandingPackage.name,
-        brandingPackage.version,
-        brandingPackage.architecture
-    );
+    // Remove any previous branding package versions from testing so only the
+    // newly built one remains (matching how normal package releases are replaced).
+    logger.info(`Removing previous branding package versions from testing repo`);
+    await AptlyAPI.Packages.deleteInRepo("leios-testing", brandingPackage.name);
 
-    if (!existsInTesting) {
-        logger.info(`Copying ${brandingPackage.name} ${brandingPackage.version} into testing repo`);
-        await AptlyAPI.Packages.copyIntoRepo("leios-testing", brandingPackage.name, brandingPackage.version, brandingPackage.architecture);
-    } else {
-        logger.info(`Branding package already exists in testing repo, skipping copy`);
-    }
+    logger.info(`Copying ${brandingPackage.name} ${brandingPackage.version} into testing repo`);
+    await AptlyAPI.Packages.copyIntoRepo("leios-testing", brandingPackage.name, brandingPackage.version, brandingPackage.architecture);
 
     await AptlyAPI.Publishing.updateLiveTestingRepo();
 

@@ -37,19 +37,13 @@ OsReleaseTask.addStep("Build and add LeiOS branding package to stable repo", asy
         logger.info(`Uploading branding package to archive repo: ${debPath}`);
         const brandingPackage = await AptlyAPI.Packages.uploadLocalDebIntoArchiveRepo(debPath);
 
-        const existsInStable = await AptlyAPI.Packages.existsInRepo(
-            "leios-stable",
-            brandingPackage.name,
-            brandingPackage.version,
-            brandingPackage.architecture
-        );
+        // Remove any previous branding package versions from stable so only the
+        // newly built one remains (matching how normal package releases are replaced).
+        logger.info(`Removing previous branding package versions from stable repo`);
+        await AptlyAPI.Packages.deleteInRepo("leios-stable", brandingPackage.name);
 
-        if (!existsInStable) {
-            logger.info(`Copying ${brandingPackage.name} ${brandingPackage.version} into stable repo`);
-            await AptlyAPI.Packages.copyIntoRepo("leios-stable", brandingPackage.name, brandingPackage.version, brandingPackage.architecture);
-        } else {
-            logger.info(`Branding package already exists in stable repo, skipping copy`);
-        }
+        logger.info(`Copying ${brandingPackage.name} ${brandingPackage.version} into stable repo`);
+        await AptlyAPI.Packages.copyIntoRepo("leios-stable", brandingPackage.name, brandingPackage.version, brandingPackage.architecture);
 
         return { success: true };
 
