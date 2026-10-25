@@ -8,6 +8,15 @@ interface Payload {
 
 export const UpdateTestingRepoTask = new TaskHandler.BasicTaskFn("testing-repo:update", async (payload: Payload, logger) => {
 
+    // Every upload and deletion queues this task. A later one that is already
+    // queued publishes this change as well, so batches publish once.
+    // (Imported here because ./index imports this module.)
+    const { TaskQueueUtils } = await import("./index");
+    if (!payload.changelogLines?.length && TaskQueueUtils.hasQueuedTask("testing-repo:update")) {
+        logger.info("A later testing repo update is queued already; skipping this one.");
+        return { success: true, message: "Superseded by a later queued testing repo update." };
+    }
+
     const version = new Date().toISOString().replace(/[-:T.Z]/g, "").slice(0, 14);
     const distribution = "testing";
 
@@ -31,6 +40,12 @@ export const UpdateTestingRepoTask = new TaskHandler.BasicTaskFn("testing-repo:u
     await AptlyAPI.Packages.copyIntoRepo("leios-testing", brandingPackage.name, brandingPackage.version, brandingPackage.architecture);
 
     await AptlyAPI.Publishing.updateLiveTestingRepo();
+
+    // Drop packages that nothing references any more (e.g. after deletions).
+    // Done once here rather than after every change.
+    if (!await AptlyAPI.DB.cleanup()) {
+        logger.warn("aptly db cleanup failed; unreferenced packages stay until the next testing repo update.");
+    }
 
     logger.info("Testing repository updated successfully.");
 

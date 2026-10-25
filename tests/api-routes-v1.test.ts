@@ -2663,6 +2663,28 @@ describe("Task queue execution coverage", async () => {
         ).run();
     }, { timeout: 30000 });
 
+    test("queued testing-repo:update tasks publish once", async () => {
+        await TaskScheduler.stopProcessing();
+
+        const firstID = await TaskScheduler.enqueueTask("testing-repo:update", {}, { created_by_user_id: null });
+        const secondID = await TaskScheduler.enqueueTask("testing-repo:update", {}, { created_by_user_id: null });
+
+        await TaskScheduler.resumeProcessing();
+
+        const first = await waitForTaskById(firstID);
+        const second = await waitForTaskById(secondID);
+
+        expect(first.status).toBe("completed");
+        expect(first.message).toBe("Superseded by a later queued testing repo update.");
+        expect(second.status).toBe("completed");
+        expect(second.message).toBeNull();
+
+        const testingBrandingRefs = await AptlyAPI.Packages.getRefInRepo("leios-testing", "leios.system.branding-meta-files");
+        expect(testingBrandingRefs.length).toBe(1);
+
+        await AptlyAPI.Packages.deleteAllInAllRepos("leios.system.branding-meta-files").catch(() => null);
+    }, { timeout: 30000 });
+
     test("os-release route executes async release task to completion", async () => {
         await RuntimeMetadata.clearOSReleasePendingPackages();
 

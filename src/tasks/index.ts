@@ -293,4 +293,11 @@ export class TaskQueueUtils {
 		await taskStorage.deleteTask(taskID);
 	}
 
+	/** Whether a task of this function is queued and has not started yet. */
+	static hasQueuedTask(fn: TaskData["fn"]) {
+		// The scheduler's internal queue (see activatePendingTask); tasks leave
+		// it when they start running.
+		return ((TaskScheduler as any).pendingTasks as TaskData[]).some(task => task.fn === fn);
+	}
+
 }

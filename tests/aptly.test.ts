@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { AptlyAPI } from "../src/aptly/api";
+import { AptlyAPIServer } from "../src/aptly/server";
 
 describe("Aptly Package Tests for fastfetch arch: amd64", () => {
 
@@ -174,6 +175,48 @@ describe("Aptly Package Tests for local .deb upload", () => {
 
         const packageRefsAfterDeletion = await AptlyAPI.Packages.getRefInRepo("leios-testing", "leios.system.base-files");
         expect(packageRefsAfterDeletion.length).toBe(0);
+    });
+
+});
+describe("Aptly task runner", () => {
+
+    test("Returns the task's value and removes the finished task from aptly", async () => {
+        const result = await AptlyAPI.Tasks.run("clean up db", (query) =>
+            AptlyAPIServer.getClient().postApiDbCleanup({ query })
+        );
+        expect(result.error).toBeNull();
+
+        const tasks = await AptlyAPIServer.getClient().getApiTasks();
+        expect(tasks.data ?? []).toEqual([]);
+    });
+
+    test("Returns the error of a task that fails", async () => {
+        const snapshotName = `task-runner-test-${Date.now()}`;
+
+        expect(await AptlyAPI.Snapshots.createSnapshotOfRepo("leios-stable", snapshotName)).toBe(true);
+
+        const duplicate = await AptlyAPI.Tasks.run("create duplicate snapshot", (query) =>
+            AptlyAPIServer.getClient().postApiReposByNameSnapshots({
+                path: { name: "leios-stable" },
+                body: { Name: snapshotName },
+                query
+            })
+        );
+        expect(duplicate.error).toContain("already exists");
+
+        await AptlyAPIServer.getClient().deleteApiSnapshotsByName({ path: { name: snapshotName } });
+    });
+
+    test("Runs one aptly task at a time", async () => {
+        const events: string[] = [];
+        const cleanup = (label: string) => AptlyAPI.Tasks.run(label, (query) => {
+            events.push(`start ${label}`);
+            return AptlyAPIServer.getClient().postApiDbCleanup({ query });
+        }).then(() => events.push(`end ${label}`));
+
+        await Promise.all([cleanup("first"), cleanup("second")]);
+
+        expect(events).toEqual(["start first", "end first", "start second", "end second"]);
     });
 
 });

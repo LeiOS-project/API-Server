@@ -39,12 +39,136 @@ export namespace AptlyAPI.Response {
 
 }
 
+/**
+ * Runs aptly operations that create aptly tasks (everything that changes a
+ * repository, the database or a publish) one at a time and waits for each
+ * with a time limit.
+ *
+ * The calls are made with `_async=true`, so aptly returns the task at once
+ * and we poll it: a task that never finishes becomes an error instead of a
+ * request that blocks forever. Running one task at a time also avoids two
+ * problems of aptly's task queue (1.6.3): a running `db cleanup` does not
+ * hold back tasks started after it, and tasks have been seen waiting forever
+ * with no task running.
+ */
+export namespace AptlyAPI.Tasks {
+
+    // aptly's task.State values
+    const STATE_IDLE = 0;
+    const STATE_RUNNING = 1;
+    const STATE_SUCCEEDED = 2;
+    const STATE_FAILED = 3;
+
+    const POLL_INTERVAL_MS = 250;
+    const REQUEST_TIMEOUT_MS = 30_000;
+    /** Upper limit for one task, publishing to S3 included. */
+    export const TASK_TIMEOUT_MS = 30 * 60_000;
+    /**
+     * aptly only starts a waiting task when another task finishes. A task
+     * that waits this long while no task runs will never start.
+     */
+    export const STUCK_TIMEOUT_MS = 30_000;
+
+    const StartedTask = z.object({ ID: z.number() });
+    const ReturnValue = z.object({ Code: z.number(), Value: z.unknown() }).nullable();
+
+    let lastTask: Promise<unknown> = Promise.resolve();
+
+    function exclusive<T>(fn: () => Promise<T>): Promise<T> {
+        const result = lastTask.then(fn, fn);
+        lastTask = result.catch(() => undefined);
+        return result;
+    }
+
+    function describeError(error: unknown) {
+        if (typeof error === "object" && error !== null && "error" in error) {
+            return String(error.error);
+        }
+        return String(error);
+    }
+
+    async function waitUntilFinished(id: number, name: string) {
+        const client = AptlyAPIServer.getClient();
+        const deadline = Date.now() + TASK_TIMEOUT_MS;
+        let waitingAloneSince: number | null = null;
+
+        while (true) {
+            const task = await client.getApiTasksById({ path: { id }, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+            const state = task.data?.State;
+            if (state === undefined) {
+                throw new Error(`Lost track of aptly task #${id} (${name}): ${describeError(task.error)}`);
+            }
+            if (state === STATE_SUCCEEDED || state === STATE_FAILED) {
+                return state;
+            }
+
+            if (state === STATE_IDLE) {
+                const tasks = await client.getApiTasks({ signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+                const anyRunning = tasks.data?.some(t => t.State === STATE_RUNNING) ?? true;
+                if (anyRunning) {
+                    waitingAloneSince = null;
+                } else {
+                    waitingAloneSince ??= Date.now();
+                    if (Date.now() - waitingAloneSince >= STUCK_TIMEOUT_MS) {
+                        throw new Error(`aptly task #${id} (${name}) is waiting for a lock that no running task holds, so aptly's task queue is stuck. Restart the API to restart aptly.`);
+                    }
+                }
+            } else {
+                waitingAloneSince = null;
+            }
+
+            if (Date.now() >= deadline) {
+                throw new Error(`aptly task #${id} (${name}) did not finish within ${TASK_TIMEOUT_MS / 60_000} minutes.`);
+            }
+            await Bun.sleep(POLL_INTERVAL_MS);
+        }
+    }
+
+    /**
+     * Starts an aptly task with `start` (which must pass `query` on to the
+     * aptly call) and returns the task's return value, or its error message.
+     * Throws if the task does not finish in time.
+     */
+    export function run<T = unknown>(
+        name: string,
+        start: (query: { _async: true }) => Promise<{ data?: unknown; error?: unknown }>
+    ): Promise<AptlyAPI.Response.Combined<T | null, string>> {
+        return exclusive(async () => {
+            const client = AptlyAPIServer.getClient();
+
+            const started = await start({ _async: true });
+            const task = StartedTask.safeParse(started.data);
+            if (started.error || !task.success) {
+                return AptlyAPI.Response.err(`${name}: ${describeError(started.error ?? "aptly did not return a task")}`);
+            }
+            const id = task.data.ID;
+
+            const state = await waitUntilFinished(id, name);
+            try {
+                if (state === STATE_FAILED) {
+                    const output = await client.getApiTasksByIdOutput({ path: { id }, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+                    const lastLine = String(output.data ?? "").trim().split("\n").pop() || "failed";
+                    return AptlyAPI.Response.err(`${name}: ${lastLine}`);
+                }
+                const returnValue = await client.getApiTasksByIdReturnValue({ path: { id }, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+                const value = ReturnValue.parse(returnValue.data ?? null)?.Value ?? null;
+                return AptlyAPI.Response.success(value as T | null);
+            } finally {
+                // aptly keeps finished tasks until they are deleted.
+                await client.deleteApiTasksById({ path: { id }, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) }).catch(() => null);
+            }
+        });
+    }
+
+}
+
 export namespace AptlyAPI.DB {
 
     export async function cleanup() {
-        const result = await AptlyAPIServer.getClient().postApiDbCleanup();
-        if (result.error) return false;
-        return true;
+        const result = await AptlyAPI.Tasks.run("clean up db", (query) =>
+            AptlyAPIServer.getClient().postApiDbCleanup({ query })
+        );
+        return result.error === null;
     }
 
 }
@@ -221,13 +345,16 @@ export namespace AptlyAPI.Packages {
                 throw new Error(failedValidation.description);
             }
 
-            const addingResult = await AptlyAPIServer.getClient().postApiReposByNameFileByDirByFile({
-                path: {
-                    name: "leios-archive",
-                    dir: uploadSubDir,
-                    file: fileName
-                }
-            });
+            const addingResult = await AptlyAPI.Tasks.run(`add ${fileName} to leios-archive`, (query) =>
+                AptlyAPIServer.getClient().postApiReposByNameFileByDirByFile({
+                    path: {
+                        name: "leios-archive",
+                        dir: uploadSubDir,
+                        file: fileName
+                    },
+                    query
+                })
+            );
 
             const parsedResult = (addingResult.data as any as { "Report": { "Added": string[] } })?.["Report"]?.["Added"]?.[0] || "";
 
@@ -287,13 +414,16 @@ export namespace AptlyAPI.Packages {
         try {
             await fs.copyFile(debPath, fullFilePath);
 
-            const addingResult = await AptlyAPIServer.getClient().postApiReposByNameFileByDirByFile({
-                path: {
-                    name: "leios-archive",
-                    dir: uploadSubDir,
-                    file: fileName
-                }
-            });
+            const addingResult = await AptlyAPI.Tasks.run(`add ${fileName} to leios-archive`, (query) =>
+                AptlyAPIServer.getClient().postApiReposByNameFileByDirByFile({
+                    path: {
+                        name: "leios-archive",
+                        dir: uploadSubDir,
+                        file: fileName
+                    },
+                    query
+                })
+            );
 
             const parsedResult = (addingResult.data as any as { "Report": { "Added": string[] } })?.["Report"]?.["Added"]?.[0] || "";
 
@@ -312,15 +442,19 @@ export namespace AptlyAPI.Packages {
     }
 
     export async function copyIntoRepo(targetRepo: "leios-stable" | "leios-testing", packageFullName: string, packageVersionWithLeiosPatch: string, packageArch: AptlyAPI.Utils.Architectures) {
-        
-        const result = await AptlyAPIServer.getClient().postApiReposByNameCopyBySrcByFile({
-            path: {
-                name: targetRepo,
-                src: "leios-archive",
-                file: AptlyUtils.getPackageIdentifier(packageFullName, packageVersionWithLeiosPatch, packageArch)
-            }
-        });
-        const parsedResult = (result.data as any as { "Report": { "Added": string[] } })["Report"]["Added"][0] || "error";
+        const packageIdentifier = AptlyUtils.getPackageIdentifier(packageFullName, packageVersionWithLeiosPatch, packageArch);
+
+        const result = await AptlyAPI.Tasks.run(`copy ${packageIdentifier} to ${targetRepo}`, (query) =>
+            AptlyAPIServer.getClient().postApiReposByNameCopyBySrcByFile({
+                path: {
+                    name: targetRepo,
+                    src: "leios-archive",
+                    file: packageIdentifier
+                },
+                query
+            })
+        );
+        const parsedResult = (result.data as any as { "Report": { "Added": string[] } } | null)?.["Report"]?.["Added"]?.[0] || "error";
 
         if (result.error || !parsedResult.includes("added")) {
             throw new Error("Failed to copy package into repository: " + result.error);
@@ -328,20 +462,28 @@ export namespace AptlyAPI.Packages {
         return true;
     }
 
-    export async function deleteInRepo(repoName: AptlyAPI.Utils.Repos, packageFullName: string, packageVersionWithLeiosPatch?: string, packageArch?: AptlyAPI.Utils.Architectures, doCleanup = true) {
+    /**
+     * Removes packages from a repository. Packages nothing references any
+     * more stay in aptly's database until the db cleanup at the end of the
+     * next testing-repo:update task.
+     */
+    export async function deleteInRepo(repoName: AptlyAPI.Utils.Repos, packageFullName: string, packageVersionWithLeiosPatch?: string, packageArch?: AptlyAPI.Utils.Architectures) {
         const refs = await getRefInRepo(repoName, packageFullName, packageVersionWithLeiosPatch, packageArch);
-        const result = await AptlyAPIServer.getClient().deleteApiReposByNamePackages({
-            body: {
-                PackageRefs: refs
-            },
-            path: {
-                name: repoName
-            }
-        });
-
-        if (doCleanup) {
-            await AptlyAPI.DB.cleanup();
+        if (refs.length === 0) {
+            return true;
         }
+
+        const result = await AptlyAPI.Tasks.run(`remove ${packageFullName} from ${repoName}`, (query) =>
+            AptlyAPIServer.getClient().deleteApiReposByNamePackages({
+                body: {
+                    PackageRefs: refs
+                },
+                path: {
+                    name: repoName
+                },
+                query
+            })
+        );
 
         return (result.data && !result.error) ? true : false;
     }
@@ -349,9 +491,8 @@ export namespace AptlyAPI.Packages {
     export async function deleteAllInAllRepos(packageFullName: string, packageVersionWithLeiosPatch?: string, packageArch?: AptlyAPI.Utils.Architectures) {
         let result = true;
         for (const repo of AptlyAPI.Utils.REPOS) {
-            result = await deleteInRepo(repo, packageFullName, packageVersionWithLeiosPatch, packageArch, false) && result;
+            result = await deleteInRepo(repo, packageFullName, packageVersionWithLeiosPatch, packageArch) && result;
         }
-        await AptlyAPI.DB.cleanup();
         return result;
     }
 
@@ -360,16 +501,19 @@ export namespace AptlyAPI.Packages {
 export namespace AptlyAPI.Snapshots {
 
     export async function createSnapshotOfRepo(repoName: AptlyAPI.Utils.Repos, snapshotName: string, description?: string) {
-        const snapshotResult = await AptlyAPIServer.getClient().postApiReposByNameSnapshots({
-            path: {
-                name: "leios-stable"
-            },
-            body: {
-                Name: snapshotName,
-                Description: description || `Snapshot of ${repoName} created at ${new Date().toISOString()}`,
-            }
-        });
-        return snapshotResult.data !== null;
+        const snapshotResult = await AptlyAPI.Tasks.run(`create snapshot ${snapshotName}`, (query) =>
+            AptlyAPIServer.getClient().postApiReposByNameSnapshots({
+                path: {
+                    name: "leios-stable"
+                },
+                body: {
+                    Name: snapshotName,
+                    Description: description || `Snapshot of ${repoName} created at ${new Date().toISOString()}`,
+                },
+                query
+            })
+        );
+        return snapshotResult.error === null;
     }
 
     export async function createStableReleaseSnapshot(version: string) {
@@ -383,38 +527,44 @@ export namespace AptlyAPI.Publishing {
 
     // testing repo is updated continuously without snapshots
     export async function updateLiveTestingRepo() {
-        const result = await AptlyAPIServer.getClient().putApiPublishByPrefixByDistribution({
-            path: {
-                prefix: "s3:leios-live-repo:",
-                distribution: "testing"
-            },
-            body: {
-                Signing: AptlyAPIServer.SigningConfig
-            }
-        });
+        const result = await AptlyAPI.Tasks.run("publish testing", (query) =>
+            AptlyAPIServer.getClient().putApiPublishByPrefixByDistribution({
+                path: {
+                    prefix: "s3:leios-live-repo:",
+                    distribution: "testing"
+                },
+                body: {
+                    Signing: AptlyAPIServer.SigningConfig
+                },
+                query
+            })
+        );
 
-        if (!result.data) {
-            throw new Error("Failed to update live testing repository: " + result.error.error);
+        if (result.error !== null) {
+            throw new Error("Failed to update live testing repository: " + result.error);
         }
     }
 
     export async function publishReleaseSnapshotToLiveStable(version: string) {
-        const result = await AptlyAPIServer.getClient().putApiPublishByPrefixByDistribution({
-            path: {
-                prefix: `s3:leios-live-repo:`,
-                distribution: "stable"
-            },
-            body: {
-                Snapshots: [{
-                    Name: `leios-stable-${version}`,
-                    Component: "main"
-                }],
-                Signing: AptlyAPIServer.SigningConfig
-            }
-        });
+        const result = await AptlyAPI.Tasks.run(`publish stable from leios-stable-${version}`, (query) =>
+            AptlyAPIServer.getClient().putApiPublishByPrefixByDistribution({
+                path: {
+                    prefix: `s3:leios-live-repo:`,
+                    distribution: "stable"
+                },
+                body: {
+                    Snapshots: [{
+                        Name: `leios-stable-${version}`,
+                        Component: "main"
+                    }],
+                    Signing: AptlyAPIServer.SigningConfig
+                },
+                query
+            })
+        );
 
-        if (!result.data) {
-            throw new Error("Failed to publish snapshot to S3: " + result.error.error);
+        if (result.error !== null) {
+            throw new Error("Failed to publish snapshot to S3: " + result.error);
         }
 
         return true;
