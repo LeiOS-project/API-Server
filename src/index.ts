@@ -41,9 +41,6 @@ export class Main {
         // pull on subsequent starts (failures are logged but non-fatal).
         await BrandingBuilder.ensureRepo(config.LRA_BRANDING_META_FILES_DATA_PATH ?? "./data/branding-meta-files");
 
-        // start task scheduler
-        await TaskScheduler.processQueue();
-
         await AptlyAPIServer.init({
             aptlyRoot: config.LRA_APTLY_ROOT ?? "./data/aptly",
             // Port 0 lets Aptly pick a random free port from the dynamic range.
@@ -73,6 +70,13 @@ export class Main {
         await API.init([config.LRA_HUB_URL || "https://hub.leios.dev"], config.LRA_API_DISABLE_DOCS === true);
 
         await AptlyAPIServer.start();
+
+        // Resume the task queue only once the aptly server is ready: resumed
+        // tasks like testing-repo updates call aptly directly. Fire-and-forget
+        // so a longer backlog of resumed tasks does not hold up API startup.
+        TaskScheduler.processQueue().catch(err => {
+            Logger.error("Task queue processing failed:", err);
+        });
 
         await API.start(
             parseInt(config.LRA_API_PORT ?? "12151"),

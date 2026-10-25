@@ -29,7 +29,7 @@ class CompilerCommand {
             this.baseCommand,
             (this.sourcemap ? "--sourcemap" : ""),
             (this.minify ? "--minify" : ""),
-            (this.bytecode ? "--bytecode" : ""),
+            (this.bytecode ? "--bytecode --format=esm" : ""),
             this.entrypoint,
             "--outfile", this.outfile,
             (this.platform === "auto" ? "" : `--target=${Platforms[this.platform]}`),
@@ -73,7 +73,7 @@ export class Compiler {
                 `.text();
             console.log(output);
         } catch (err: any) {
-            console.log(`Failed: ${err.message}`);
+            console.log(`Compiling Failed:\n`, err);
         }
     }
 
