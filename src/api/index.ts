@@ -4,17 +4,22 @@ import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import { prettyJSON } from "hono/pretty-json";
 import { openAPIRouteHandler } from "hono-openapi";
+import { AppConstants } from "../utils/constants";
 import { Logger } from "../utils/logger";
 import type { APIVersionRouter } from "./utils/apiVersionRouter";
 import { APIv1Router } from "./versions/v1";
 
 export class API {
-	protected static server: Bun.Server<undefined>;
-	protected static app: Hono;
+	protected static server: Bun.Server<undefined> | null = null;
+	protected static app: Hono | null;
 
 	protected static latestVersion: number | null = null;
 
-	protected static registerVersion(versionRouter: APIVersionRouter, disableDocs: boolean = false) {
+	protected static registerVersion(versionRouter: APIVersionRouter, disableDocs: boolean) {
+		if (!this.app) {
+			throw new Error("API not initialized. Call API.init() first.");
+		}
+
 		this.app.route(`/v${versionRouter.version}`, versionRouter.router);
 
 		if (!this.latestVersion || versionRouter.version > this.latestVersion) {
@@ -29,12 +34,18 @@ export class API {
 
 			this.app.get(
 				`/docs/v${versionRouter.version}`,
-				Scalar({ url: `/docs/v${versionRouter.version}/openapi` }),
+				// Relative, so the docs page also finds its spec when the API is mounted under a prefix.
+				Scalar({ url: `./v${versionRouter.version}/openapi` }),
 			);
 		}
 	}
 
-	static async init(frontendUrls: string[] = [], disableDocs = false) {
+	/**
+	 * Build the Hono app: prettyJSON, CORS (allow the frontend origins), error handler,
+	 * versioned routes, docs, /health, and a `/` redirect to the latest docs. Does NOT
+	 * call Bun.serve — call `start(port, hostname)` for that.
+	 */
+	static async init(frontendUrls: string[], disableDocs: boolean) {
 		this.app = new Hono();
 
 		this.app.use(prettyJSON());
@@ -50,7 +61,7 @@ export class API {
 			}),
 		);
 
-		this.app.onError(async (err, c) => {
+		this.app.onError((err, c) => {
 			if (err instanceof HTTPException) {
 				// Return only safe error metadata — never leak Zod validation details
 				return c.json(
@@ -63,27 +74,7 @@ export class API {
 				);
 			}
 
-			// this would potentially leak sensitive information, so we catch it here and return a generic error message instead of the default Hono error response which includes the error message and stack trace in development mode.
-			// if (err instanceof HTTPException) {
-			// 	const res = err.getResponse();
-			// 	let body: any;
-
-			// 	try {
-			// 		// Hono puts zod issues into the response body
-			// 		body = JSON.parse(await res.text())
-			// 	} catch {
-			// 		body = { error: 'Invalid input' }
-			// 	}
-
-			// 	return c.json({
-			// 		success: false,
-			// 		code: res.status,
-			// 		message: 'Your input is invalid',
-			// 		data: body
-			// 	}, err.status)
-			// }
-
-			Logger.error("API Error:", err);
+			Logger.error("Unhandled API error:", err);
 			return c.json({ success: false, code: 500, message: "Internal Server Error" }, 500);
 		});
 
@@ -93,21 +84,23 @@ export class API {
 			return c.json({
 				success: true,
 				code: 200,
-				message: "LeiOS API is running",
+				message: `${AppConstants.APP_NAME} API is running`,
 				data: null,
 			});
 		});
 
 		if (!disableDocs) {
 			this.app.get("/", (c) => {
-				return c.redirect(`/docs/v${this.latestVersion}`);
+				// Keep any mount prefix (e.g. `/api` in the full-stack template).
+				const base = c.req.path.endsWith("/") ? c.req.path.slice(0, -1) : c.req.path;
+				return c.redirect(`${base}/docs/v${this.latestVersion}`);
 			});
 		} else {
 			this.app.get("/", (c) => {
 				return c.json({
 					success: true,
 					code: 200,
-					message: "LeiOS API is running. Documentation is disabled.",
+					message: `${AppConstants.APP_NAME} API is running. Documentation is disabled.`,
 					data: null,
 				});
 			});
@@ -116,24 +109,30 @@ export class API {
 
 	static async start(port: number, hostname: string) {
 		if (!this.app) {
-			await this.init();
+			throw new Error(`${AppConstants.APP_NAME} API not initialized. Call API.init() first.`);
 		}
 
 		this.server = Bun.serve({ port, hostname, fetch: this.app.fetch });
 
-		Logger.log(`API is running at ${this.server?.hostname}:${this.server?.port}`);
+		const serverHostnameStr = this.server.hostname?.includes(":")
+			? `[${this.server.hostname}]`
+			: this.server.hostname;
+
+		Logger.log(
+			`${AppConstants.APP_NAME} API listening on ${this.server.protocol}://${serverHostnameStr}:${this.server.port}`,
+		);
 	}
 
 	static async stop() {
 		if (this.server) {
 			this.server.stop();
-			Logger.log("API server stopped.");
+			Logger.log(`${AppConstants.APP_NAME} API server stopped.`);
 		}
 	}
 
-	static getApp(): typeof API.app {
+	static getApp(): Hono {
 		if (!this.app) {
-			throw new Error("API not initialized. Call API.init() first.");
+			throw new Error(`${AppConstants.APP_NAME} API not initialized. Call API.init() first.`);
 		}
 		return this.app;
 	}

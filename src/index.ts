@@ -6,6 +6,7 @@ import { TaskScheduler } from "./tasks";
 import { Utils } from "./utils";
 import { BrandingBuilder } from "./utils/branding-builder";
 import { ConfigHandler } from "./utils/config";
+import { AppConstants } from "./utils/constants";
 import { LiveRepoUtils } from "./utils/live-repo";
 import { Logger } from "./utils/logger";
 import { PermissionHelper } from "./utils/permission-helper";
@@ -20,71 +21,66 @@ export class Main {
 
 		const config = await ConfigHandler.loadConfig();
 
-		Logger.setLogLevel(config.LRA_LOG_LEVEL ?? "info");
+		Logger.setLogLevel(config.LOG_LEVEL);
+		Logger.log(`Starting ${AppConstants.APP_NAME} API...`);
 
 		await DB.init(
-			config.LRA_DB_PATH ?? "./data/db.sqlite",
-			config.LRA_DB_AUTO_MIGRATE,
-			config.LRA_CONFIG_BASE_DIR ?? "./config",
+			config.DB_PATH,
+			config.DB_AUTO_MIGRATE,
+			config.CONFIG_BASE_DIR,
+			config.DB_MIGRATION_DIR,
 		);
 
 		await PermissionHelper.init();
 
-		EmailService.init();
+		await Utils.ensureDirectoryExists(config.LOG_DIR);
 
-		await Utils.ensureDirectoryExists(config.LRA_LOG_DIR ?? "./data/logs");
+		await EmailService.init();
 
-		// Ensure the branding meta files repository is available. It is cloned
-		// once into the data directory on first startup and synced with git
-		// pull on subsequent starts (failures are logged but non-fatal).
-		await BrandingBuilder.ensureRepo(
-			config.LRA_BRANDING_META_FILES_DATA_PATH ?? "./data/branding-meta-files",
-		);
+		// The branding meta files repository is cloned into the data directory on first startup and
+		// pulled on later starts (failures are logged but non-fatal).
+		await BrandingBuilder.ensureRepo(config.BRANDING_META_FILES_DATA_PATH);
 
 		await AptlyAPIServer.init({
-			aptlyRoot: config.LRA_APTLY_ROOT ?? "./data/aptly",
-			// Port 0 lets Aptly pick a random free port from the dynamic range.
-			aptlyPort: config.LRA_APTLY_PORT ? parseInt(config.LRA_APTLY_PORT) : 0,
+			aptlyRoot: config.APTLY_ROOT,
+			aptlyPort: config.APTLY_PORT,
 			s3Settings: {
-				endpoint: config.LRA_S3_ENDPOINT,
-				region: config.LRA_S3_REGION,
-				bucket: config.LRA_S3_BUCKET,
-				prefix: config.LRA_S3_PREFIX || "leios/",
-				accessKeyId: config.LRA_S3_ACCESS_KEY_ID,
-				secretAccessKey: config.LRA_S3_SECRET_ACCESS_KEY,
+				endpoint: config.S3_ENDPOINT,
+				region: config.S3_REGION,
+				bucket: config.S3_BUCKET,
+				prefix: config.S3_PREFIX,
+				accessKeyId: config.S3_ACCESS_KEY_ID,
+				secretAccessKey: config.S3_SECRET_ACCESS_KEY,
 			},
 			keySettings: {
-				publicKeyPath: config.LRA_PUBLIC_KEY_PATH ?? "./config/keys/public-key.gpg",
-				privateKeyPath: config.LRA_PRIVATE_KEY_PATH ?? "./config/keys/private-key.gpg",
+				publicKeyPath: config.PUBLIC_KEY_PATH,
+				privateKeyPath: config.PRIVATE_KEY_PATH,
 			},
 		});
 
 		await LiveRepoUtils.uploadAdditionalFilesIfNeeded(
 			{
-				endpoint: config.LRA_S3_ENDPOINT,
-				region: config.LRA_S3_REGION,
-				bucket: config.LRA_S3_BUCKET,
-				accessKeyId: config.LRA_S3_ACCESS_KEY_ID,
-				secretAccessKey: config.LRA_S3_SECRET_ACCESS_KEY,
+				endpoint: config.S3_ENDPOINT,
+				region: config.S3_REGION,
+				bucket: config.S3_BUCKET,
+				accessKeyId: config.S3_ACCESS_KEY_ID,
+				secretAccessKey: config.S3_SECRET_ACCESS_KEY,
 			},
-			config.LRA_PUBLIC_KEY_PATH ?? "./config/keys/public-key.gpg",
+			config.PUBLIC_KEY_PATH,
 		);
 
-		await API.init(
-			[config.LRA_HUB_URL || "https://hub.leios.dev"],
-			config.LRA_API_DISABLE_DOCS === true,
-		);
+		await API.init([config.APP_URL], config.API_DISABLE_DOCS);
 
 		await AptlyAPIServer.start();
 
-		// Resume the task queue only once the aptly server is ready: resumed
-		// tasks like testing-repo updates call aptly directly. Fire-and-forget
-		// so a longer backlog of resumed tasks does not hold up API startup.
+		// Divergence from the style guide's order (task queue right before API.init): resumed tasks
+		// such as testing-repo updates call Aptly directly, so the queue starts once Aptly is up.
+		// Not awaited, so a backlog of resumed tasks does not hold up the API.
 		TaskScheduler.processQueue().catch((err) => {
 			Logger.error("Task queue processing failed:", err);
 		});
 
-		await API.start(parseInt(config.LRA_API_PORT ?? "12151"), config.LRA_API_HOST ?? "::");
+		await API.start(config.API_PORT, config.API_HOST);
 	}
 
 	private static async gracefulShutdown(type: NodeJS.Signals, code: number) {
@@ -92,9 +88,12 @@ export class Main {
 			Logger.log(`Received ${type}, shutting down...`);
 
 			await API.stop();
+
 			await AptlyAPIServer.stop(type);
+
 			await EmailService.reset();
 			await TaskScheduler.stopProcessing();
+
 			await DB.close();
 
 			Logger.log("Shutdown complete, exiting.");
@@ -127,4 +126,7 @@ export class Main {
 	}
 }
 
-Main.main();
+Main.main().catch((err) => {
+	Logger.error("Fatal startup error:", err);
+	process.exit(1);
+});

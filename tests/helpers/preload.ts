@@ -6,7 +6,7 @@ import { API } from "../../src/api";
 import { AptlyAPIServer } from "../../src/aptly/server";
 import { DB } from "../../src/db";
 import { BrandingBuilder } from "../../src/utils/branding-builder";
-import { ConfigHandler, type ParsedConfig } from "../../src/utils/config";
+import { ConfigHandler, type ENVConfigLike } from "../../src/utils/config";
 import { PermissionHelper } from "../../src/utils/permission-helper";
 import { ensureBrandingFixtureRepo } from "./branding-fixtures";
 import { ensureTestPackageFixtures } from "./package-fixtures";
@@ -15,20 +15,21 @@ function setTestEnv(rootDir: string) {
 	const envVars = {
 		LRA_LOG_LEVEL: "debug",
 
-		LRA_HUB_URL: "http://localhost:12153",
+		LRA_APP_URL: "http://localhost:12153",
 
 		LRA_API_HOST: "::",
-		LRA_API_PORT: "12151",
-		LRA_API_DISABLE_DOCS: true,
+		LRA_API_PORT: 12151,
+		LRA_API_DISABLE_DOCS: false,
 
 		LRA_LOG_DIR: path.join(rootDir, "logs"),
 
 		LRA_DB_PATH: path.join(rootDir, "db.sqlite"),
 		LRA_DB_AUTO_MIGRATE: true,
+		LRA_DB_MIGRATION_DIR: "./drizzle/migrations",
 
 		LRA_APTLY_ROOT: path.join(rootDir, "aptly"),
 		// 0 lets Aptly bind to a random free port from the dynamic range.
-		LRA_APTLY_PORT: "0",
+		LRA_APTLY_PORT: 0,
 
 		LRA_BRANDING_META_FILES_DATA_PATH: path.join(rootDir, "branding-meta-files"),
 
@@ -44,12 +45,12 @@ function setTestEnv(rootDir: string) {
 		LRA_S3_SECRET_ACCESS_KEY: "S3RVER",
 
 		LRA_SMTP_HOST: "127.0.0.1",
-		LRA_SMTP_PORT: "12587",
+		LRA_SMTP_PORT: 12587,
 		LRA_SMTP_USERNAME: "",
 		LRA_SMTP_PASSWORD: "",
 		LRA_SMTP_FROM: '"LeiOS Test" <test@leios.local>',
 		LRA_SMTP_SECURE: false,
-	} as const satisfies ParsedConfig;
+	} as const satisfies ENVConfigLike;
 
 	for (const [key, value] of Object.entries(envVars)) {
 		process.env[key] = String(value);
@@ -159,7 +160,7 @@ beforeAll(async () => {
 		address: "localhost",
 		silent: true,
 		directory: s3rverDir,
-		configureBuckets: [{ name: config.LRA_S3_BUCKET }],
+		configureBuckets: [{ name: config.S3_BUCKET }],
 	});
 
 	await new Promise<void>((resolve, reject) => {
@@ -171,7 +172,7 @@ beforeAll(async () => {
 
 	await BrandingBuilder.ensureRepo(path.join(TMP_ROOT, "branding-meta-files"));
 
-	await DB.init(path.join(TMP_ROOT, "db.sqlite"), true, TMP_ROOT);
+	await DB.init(config.DB_PATH, true, TMP_ROOT, config.DB_MIGRATION_DIR);
 
 	await PermissionHelper.init();
 
@@ -179,27 +180,27 @@ beforeAll(async () => {
 	// EmailService.init(mockTransport) in their own beforeAll.
 
 	await AptlyAPIServer.init({
-		aptlyRoot: path.join(TMP_ROOT, "aptly"),
-		aptlyPort: config.LRA_APTLY_PORT ? parseInt(config.LRA_APTLY_PORT) : 0,
+		aptlyRoot: config.APTLY_ROOT,
+		aptlyPort: config.APTLY_PORT,
 		s3Settings: {
-			endpoint: config.LRA_S3_ENDPOINT,
-			region: config.LRA_S3_REGION,
-			bucket: config.LRA_S3_BUCKET,
-			prefix: config.LRA_S3_PREFIX,
-			accessKeyId: config.LRA_S3_ACCESS_KEY_ID,
-			secretAccessKey: config.LRA_S3_SECRET_ACCESS_KEY,
+			endpoint: config.S3_ENDPOINT,
+			region: config.S3_REGION,
+			bucket: config.S3_BUCKET,
+			prefix: config.S3_PREFIX,
+			accessKeyId: config.S3_ACCESS_KEY_ID,
+			secretAccessKey: config.S3_SECRET_ACCESS_KEY,
 		},
 		keySettings: {
-			publicKeyPath: config.LRA_PUBLIC_KEY_PATH,
-			privateKeyPath: config.LRA_PRIVATE_KEY_PATH,
+			publicKeyPath: config.PUBLIC_KEY_PATH,
+			privateKeyPath: config.PRIVATE_KEY_PATH,
 		},
 	});
 
-	await API.init();
+	await API.init([config.APP_URL], config.API_DISABLE_DOCS);
 
 	await AptlyAPIServer.start();
 
-	await API.start(12151, "::");
+	await API.start(config.API_PORT, config.API_HOST);
 }, 60000);
 
 afterAll(async () => {

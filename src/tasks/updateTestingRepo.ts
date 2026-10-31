@@ -12,7 +12,7 @@ export const UpdateTestingRepoTask = new TaskHandler.BasicTaskFn(
 		// Every upload and deletion queues this task. A later one that is already
 		// queued publishes this change as well, so batches publish once.
 		// (Imported here because ./index imports this module.)
-		const { TaskQueueUtils } = await import("./index");
+		const { TaskQueueUtils } = await import(".");
 		if (!payload.changelogLines?.length && TaskQueueUtils.hasQueuedTask("testing-repo:update")) {
 			logger.info("A later testing repo update is queued already; skipping this one.");
 			return { success: true, message: "Superseded by a later queued testing repo update." };

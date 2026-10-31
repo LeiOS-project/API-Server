@@ -1,15 +1,8 @@
-import { randomBytes as crypto_randomBytes, randomInt as crypto_randomInt } from "crypto";
-import { mkdir, mkdirSync } from "fs";
-import net from "net";
+import { randomBytes as crypto_randomBytes, randomInt as crypto_randomInt } from "node:crypto";
+import { mkdir as fs_mkdir } from "node:fs/promises";
+import net from "node:net";
 
 export class Utils {
-	static getRandomU32() {
-		const timeComponent = Date.now() % 0x100000000;
-		const randomComponent = crypto_randomBytes(4).readUInt32BE(0);
-
-		return (timeComponent + randomComponent) % 0x100000000;
-	}
-
 	/**
 	 * Find a free TCP port in the given range by briefly binding to it.
 	 * Defaults to the IANA dynamic/private port range (49152–65535).
@@ -37,6 +30,13 @@ export class Utils {
 		);
 	}
 
+	static getRandomU32() {
+		const timeComponent = Date.now() % 0x100000000;
+		const randomComponent = crypto_randomBytes(4).readUInt32BE(0);
+
+		return (timeComponent + randomComponent) % 0x100000000;
+	}
+
 	static splitNTimes(str: string, delim: string, count: number) {
 		const parts = str.split(delim);
 		const tail = parts.slice(count).join(delim);
@@ -61,9 +61,9 @@ export class Utils {
 		return new Promise<void>((resolve) => setTimeout(() => resolve(), ms));
 	}
 
-	static ensureDirectoryExists(path: string) {
+	static async ensureDirectoryExists(path: string) {
 		try {
-			mkdirSync(path, { recursive: true });
+			await fs_mkdir(path, { recursive: true });
 		} catch (err) {
 			// ignore
 		}

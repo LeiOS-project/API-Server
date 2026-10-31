@@ -1,9 +1,9 @@
-import { createHash as crypto_createHash, randomBytes as crypto_randomBytes } from "crypto";
+import { createHash as crypto_createHash, randomBytes as crypto_randomBytes } from "node:crypto";
+import { mkdir as fs_mkdir } from "node:fs/promises";
+import { dirname as path_dirname, join as path_join } from "node:path";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/bun-sqlite";
 import { migrate } from "drizzle-orm/bun-sqlite/migrator";
-import { mkdir as fs_mkdir } from "fs/promises";
-import { dirname as path_dirname } from "path";
 import { ConfigHandler } from "../utils/config";
 import { Logger } from "../utils/logger";
 import { PermissionHelper } from "../utils/permission-helper";
@@ -11,99 +11,99 @@ import * as TableSchema from "./schema";
 import type { DrizzleDB } from "./utils";
 
 export class DB {
-	protected static db: DrizzleDB;
+	protected static db: DrizzleDB.BunSQLite;
 
-	static async init(path: string, autoMigrate: boolean = false, configBaseDir: string) {
+	static async init(
+		path: string,
+		autoMigrate: boolean,
+		configBaseDir: string,
+		migrationsFolder: string,
+	) {
 		await fs_mkdir(path_dirname(path), { recursive: true });
+		await fs_mkdir(configBaseDir, { recursive: true });
 
 		this.db = drizzle(path);
 		if (autoMigrate) {
 			Logger.info("Running database migrations...");
-			await migrate(this.db, { migrationsFolder: "drizzle/migrations" });
+
+			// `Bun.isStandaloneExecutable` is newer than this repo's bun-types; compiled binaries also
+			// run from the embedded `/$bunfs` file system.
+			const isStandaloneExecutable =
+				(Bun as { isStandaloneExecutable?: boolean }).isStandaloneExecutable ??
+				import.meta.dir.startsWith("/$bunfs");
+
+			if (isStandaloneExecutable) {
+				// `bun build --compile --asset ./drizzle/migrations` embeds the files as `migrations/...`
+				// next to the entry (`/$bunfs/root/migrations` on Linux) — without the `drizzle/` segment.
+				migrationsFolder = path_join(import.meta.dir, "migrations");
+			}
+
+			await migrate(this.db, { migrationsFolder });
+
 			Logger.info("Database migrations completed.");
 		}
 
-		const admin_user_id = await this.createInitialAdminUserIfNeeded(configBaseDir);
-		await this.createInitialLeiOSPublisherIfNeeded(admin_user_id || 1);
-		await this.createInitialOSReleasesMetaIfNeeded();
+		const adminUserID = await this.createInitialAdminUserIfNeeded(configBaseDir);
+		await this.createInitialLeiOSPublisherIfNeeded(adminUserID ?? 1);
 
 		Logger.info(`Database initialized at ${path}`);
 	}
 
-	static async createInitialAdminUserIfNeeded(configBaseDir: string) {
+	private static async createInitialAdminUserIfNeeded(configBaseDir: string) {
 		const usersTableEmpty = (await this.db.select().from(DB.Tables.users).limit(1)).length === 0;
 		if (!usersTableEmpty) return;
 
 		const username = "admin";
-
-		const admin_user_id = await this.db
-			.insert(DB.Tables.users)
-			.values({
-				username,
-				email: "admin@leios.local",
-				password_hash: await Bun.password.hash(crypto_randomBytes(32).toString("hex")),
-				display_name: "Default Administrator",
-				role: "admin",
-			})
-			.returning()
-			.get().id;
-
 		const passwordResetToken = crypto_randomBytes(64).toString("hex");
-		await this.db.insert(DB.Tables.passwordResets).values({
-			token: crypto_createHash("sha256").update(passwordResetToken).digest("hex"),
-			user_id: admin_user_id,
-			expires_at: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 Days
-		});
 
-		const DASHBOARD_URL = ConfigHandler.getConfig()?.LRA_HUB_URL || "https://{DASHBOARD_URL}";
+		let adminUserID: number;
+		try {
+			adminUserID = await this.db.transaction(async (tx) => {
+				const id = tx
+					.insert(DB.Tables.users)
+					.values({
+						username,
+						email: "admin@leios.local",
+						password_hash: await Bun.password.hash(crypto_randomBytes(32).toString("hex")),
+						display_name: "Default Administrator",
+						role: "admin",
+					})
+					.returning()
+					.get().id;
 
-		Bun.write(
-			`${configBaseDir}/initial_admin_password_reset_token.txt`,
-			`${DASHBOARD_URL}/auth/reset-password?token=${passwordResetToken}`,
-			{
-				mode: 0o600,
-				createPath: true,
-			},
-		);
+				tx
+					.insert(DB.Tables.passwordResets)
+					.values({
+						// Same hash as hashResetToken() in routes/auth/reset-password, which consumes it.
+						token: crypto_createHash("sha256").update(passwordResetToken).digest("hex"),
+						user_id: id,
+						expires_at: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 Days
+					})
+					.run();
+
+				return id;
+			});
+		} catch (error) {
+			Logger.critical("Failed to create initial admin user:", error);
+			throw error;
+		}
+
+		const APP_URL = ConfigHandler.getConfig()?.APP_URL ?? "https://<hub-url>";
+		const resetUrl = `${APP_URL}/auth/reset-password?token=${passwordResetToken}`;
+		const tokenFile = `${configBaseDir}/initial_admin_password_reset_token.txt`;
+
+		await Bun.write(tokenFile, resetUrl, { mode: 0o600, createPath: true });
 
 		Logger.info(
 			`Initial admin user created with username: ${username}.\n` +
-				`You can set the password under ${DASHBOARD_URL}/auth/reset-password?token=${passwordResetToken}\n` +
-				`The url is also safed at ${configBaseDir}/initial_admin_password_reset_token.txt\n`,
+				`You can set the password under ${resetUrl}\n` +
+				`The URL is also saved at ${tokenFile}\n`,
 		);
 
-		return admin_user_id;
+		return adminUserID;
 	}
 
-	static async createInitialOSReleasesMetaIfNeeded() {
-		// const initalReleaseExists = await this.db.select().from(DB.Tables.os_releases).where(
-		//     eq(DB.Tables.os_releases.version, "0000.00.000")
-		// ).get();
-		// if (!initalReleaseExists) {
-		//     const taskID = await this.db.insert(DB.Tables.scheduled_tasks).values({
-		//         function: "os-release:create",
-		//         status: "completed",
-		//         created_at: new Date(0).getTime(),
-		//         args: {}
-		//     }).returning().get().id;
-		//     await this.db.insert(DB.Tables.os_releases).values({
-		//         version: "0000.00.000",
-		//         changelog: "Initial placeholder release",
-		//         taskID,
-		//         created_at: new Date(0).getTime(),
-		//     });
-		//     Logger.info("Created initial OS release metadata entry (version 0000.00.000)");
-		// }
-		// no longr used, remove any existing placeholder entries
-		// await this.db.delete(DB.Tables.os_releases).where(
-		//     eq(DB.Tables.os_releases.version, "0000.00.0")
-		// );
-		// await this.db.delete(DB.Tables.os_releases).where(
-		//     eq(DB.Tables.os_releases.version, "0000.00.00")
-		// );
-	}
-
-	static async createInitialLeiOSPublisherIfNeeded(admin_user_id: number) {
+	private static async createInitialLeiOSPublisherIfNeeded(admin_user_id: number) {
 		const publisherExists = await this.db
 			.select()
 			.from(DB.Tables.publishers)
@@ -166,8 +166,12 @@ export class DB {
 		if (!this.db) return;
 
 		Logger.info("Database connection closed.");
-		this.db.$client.close();
-		await Bun.sleep(100);
+		await this.db.$client.close();
+
+		// Release the OS file handle now (unfinalized statements hold it until GC), e.g. for
+		// tests that delete the DB directory right after closing.
+		Bun.gc(true);
+		await Bun.sleep(500);
 	}
 }
 

@@ -3,11 +3,10 @@ import { and, asc, eq, or } from "drizzle-orm";
 import fs from "fs";
 import { dirname } from "path";
 import { DB } from "../db";
-import { Utils } from "../utils";
-import { ConfigHandler } from "../utils/config";
 import { Logger } from "../utils/logger";
 import { OsReleaseTask } from "./osRelease";
 import { UpdateTestingRepoTask } from "./updateTestingRepo";
+import { TaskUtils } from "./utils";
 
 type AdditionalTaskMeta = {
 	created_by_user_id: number | null;
@@ -184,9 +183,8 @@ class PersistentLogger implements TaskHandler.PersistentTaskLoggerLike {
 	private readonly writeStream?: fs.WriteStream;
 	constructor(taskID: number) {
 		try {
-			const filePath =
-				(ConfigHandler.getConfig()?.LRA_LOG_DIR || "./data/logs") + `/tasks/task-${taskID}.log`;
-			Utils.ensureDirectoryExists(dirname(filePath));
+			const filePath = TaskUtils.getTaskLogFilePath(taskID);
+			fs.mkdirSync(dirname(filePath), { recursive: true });
 
 			// this.writeStream = fs.createWriteStream(filePath, { flags: "a" });
 			this.writeStream = fs.createWriteStream(filePath, { flags: "a" });

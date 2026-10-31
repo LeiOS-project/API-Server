@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { HonoBase } from "hono/hono-base";
 import type { GenerateSpecOptions } from "hono-openapi";
+import { Logger } from "../../utils/logger";
 
 export abstract class APIVersionRouter<
 	T extends APIVersionRouter.InitSettings = APIVersionRouter.InitSettings,
@@ -24,7 +25,7 @@ export abstract class APIVersionRouter<
 				} else if ("router" in route && route.router instanceof HonoBase) {
 					this.router.route("/", route.router);
 				} else {
-					console.error(
+					Logger.error(
 						"Invalid route configuration: Each route must be a Hono instance or an object with a 'router' property that is a Hono instance.",
 						route,
 					);

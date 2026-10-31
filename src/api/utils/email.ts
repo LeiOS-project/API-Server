@@ -1,6 +1,7 @@
 import type { Transporter } from "nodemailer";
 import nodemailer from "nodemailer";
 import { ConfigHandler } from "../../utils/config";
+import { AppConstants } from "../../utils/constants";
 import { Logger } from "../../utils/logger";
 
 export interface CapturedEmail {
@@ -12,29 +13,27 @@ export interface CapturedEmail {
 }
 
 export class EmailService {
-	private static transporter: Transporter | null = null;
 	private static enabled = false;
+	private static transporter: Transporter | null = null;
 
-	private static _from: string = '"LeiOS" <noreply@leios.dev>';
+	private static _from: string = AppConstants.DEFAULT_SMTP_FROM;
 
 	/**
 	 * Initialise the email service from the current config.
 	 * Safe to call even when SMTP is unconfigured — logs a warning and disables itself.
 	 *
-	 * When `testTransport` is provided it is used instead of creating a real SMTP
+	 * When `transporter` is provided it is used instead of creating a real SMTP
 	 * transport, making the service testable without a live SMTP server.
 	 */
-	static init(testTransport?: Transporter) {
-		const config = ConfigHandler.getConfig() as NonNullable<
-			ReturnType<typeof ConfigHandler.getConfig>
-		>;
-		const host = config.LRA_SMTP_HOST;
+	static init(transporter?: Transporter) {
+		const config = ConfigHandler.getConfig()!;
+		const host = config.SMTP_HOST;
 
-		if (testTransport) {
-			this.transporter = testTransport;
+		if (transporter) {
+			this.transporter = transporter;
 			this.enabled = true;
-			if (config.LRA_SMTP_FROM) {
-				this._from = config.LRA_SMTP_FROM;
+			if (config.SMTP_FROM) {
+				this._from = config.SMTP_FROM;
 			}
 			Logger.log("Email service initialised (test transport)");
 			return;
@@ -48,32 +47,32 @@ export class EmailService {
 		try {
 			this.transporter = nodemailer.createTransport({
 				host,
-				port: parseInt(config.LRA_SMTP_PORT ?? "587"),
-				secure: config.LRA_SMTP_SECURE === true,
-				auth: config.LRA_SMTP_USERNAME
+				port: config.SMTP_PORT ?? 587,
+				secure: config.SMTP_SECURE === true,
+				auth: config.SMTP_USERNAME
 					? {
-							user: config.LRA_SMTP_USERNAME,
-							pass: config.LRA_SMTP_PASSWORD ?? "",
+							user: config.SMTP_USERNAME,
+							pass: config.SMTP_PASSWORD ?? "",
 						}
 					: undefined,
 			});
 
-			if (config.LRA_SMTP_FROM) {
-				this._from = config.LRA_SMTP_FROM;
+			if (config.SMTP_FROM) {
+				this._from = config.SMTP_FROM;
 			}
 
 			this.enabled = true;
-			Logger.log(`Email service initialised (SMTP ${host}:${config.LRA_SMTP_PORT ?? "587"})`);
+			Logger.log(`Email service initialised (SMTP ${host}:${config.SMTP_PORT ?? 587})`);
 		} catch (err) {
 			Logger.error(`Failed to initialise email service: ${err}`);
 		}
 	}
 
 	/** Reset the service to its unconfigured state (for testing). */
-	static reset() {
+	static async reset() {
 		this.transporter = null;
 		this.enabled = false;
-		this._from = '"LeiOS" <noreply@leios.dev>';
+		this._from = AppConstants.DEFAULT_SMTP_FROM;
 	}
 
 	/** Whether the email service is configured and ready. */
@@ -101,8 +100,8 @@ export class EmailService {
 		const config = ConfigHandler.getConfig() as NonNullable<
 			ReturnType<typeof ConfigHandler.getConfig>
 		>;
-		const hubUrl = (config.LRA_HUB_URL || "https://hub.leios.dev").replace(/\/+$/, "");
-		const resetUrl = `${hubUrl}/auth/reset-password?token=${encodeURIComponent(rawToken)}`;
+		const appUrl = config.APP_URL.replace(/\/+$/, "");
+		const resetUrl = `${appUrl}/auth/reset-password?token=${encodeURIComponent(rawToken)}`;
 
 		const html = [
 			"<!DOCTYPE html>",
@@ -111,7 +110,7 @@ export class EmailService {
 			"",
 			'  <h2 style="color:#1a1a2e">Password Reset Request</h2>',
 			"",
-			"  <p>We received a request to reset the password for your LeiOS account.",
+			`  <p>We received a request to reset the password for your ${AppConstants.APP_NAME} account.`,
 			"  If you made this request, click the button below to set a new password.</p>",
 			"",
 			`  <a href="${resetUrl}" style="display:inline-block;padding:12px 28px;margin:20px 0;background:#2563eb;color:#fff;text-decoration:none;border-radius:6px;font-weight:600">Reset Password</a>`,
@@ -132,7 +131,7 @@ export class EmailService {
 			const info = await this.transporter.sendMail({
 				from: this._from,
 				to,
-				subject: "LeiOS — Password Reset Request",
+				subject: `${AppConstants.APP_NAME} — Password Reset Request`,
 				html,
 			});
 			Logger.log(`Password reset email sent to ${to} (message-id: ${info.messageId})`);
