@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, like, or, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, like, not, or, type SQL, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator as zValidator } from "hono-openapi";
 import { AptlyAPI } from "../../../../../aptly/api";
@@ -7,11 +7,19 @@ import { TaskScheduler } from "../../../../../tasks";
 import { Utils } from "../../../../../utils";
 import { PermissionHelper } from "../../../../../utils/permission-helper";
 import { APIResponse } from "../../../../utils/api-res";
+import { AuditLog } from "../../../../utils/auditLog";
 import { AuthHandler } from "../../../../utils/authHandler";
 import { RuntimeMetadata } from "../../../../utils/metadata";
 import { APIResponseSpec, APIRouteSpec } from "../../../../utils/specHelpers";
 import { DOCS_TAGS } from "../../docs";
 import { PackageModel } from "./model";
+
+export class PackageUtils {
+	/** SQL condition: the package's `flags` JSON array contains `flag`. */
+	static hasFlag(flag: PackageModel.PackageFlags[number]) {
+		return sql`exists (select 1 from json_each(${DB.Tables.packagesFullView.flags}) where value = ${flag})`;
+	}
+}
 
 /** Per-request values loaded by the parameter middlewares (this router's or a parent's). */
 type Variables = {
@@ -36,8 +44,17 @@ router.get(
 	zValidator("query", PackageModel.GetAll.Query),
 
 	async (c) => {
-		const { limit, offset, searchString, publisherID, publisherName, onlyMembershipByMe } =
-			c.req.valid("query");
+		const {
+			limit,
+			offset,
+			searchString,
+			publisherID,
+			publisherName,
+			onlyMembershipByMe,
+			sort,
+			channel,
+			flag,
+		} = c.req.valid("query");
 		const authContext = AuthHandler.AuthContext.get(c);
 
 		const filters: Array<SQL<unknown> | undefined> = [];
@@ -99,13 +116,45 @@ router.get(
 			);
 		}
 
+		// Hidden packages only show up in a member's own list and for site admins.
+		const seesHidden =
+			onlyMembershipByMe ||
+			(authContext.type !== "unauthenticated" && authContext.user_role === "admin");
+		if (!seesHidden) {
+			filters.push(not(PackageUtils.hasFlag("HIDDEN")));
+		}
+
+		if (flag) {
+			filters.push(PackageUtils.hasFlag(flag));
+		}
+
+		if (channel) {
+			const column =
+				channel === "stable"
+					? DB.Tables.packagesFullView.latest_stable_release
+					: DB.Tables.packagesFullView.latest_testing_release;
+			filters.push(
+				sql`(json_extract(${column}, '$.amd64') is not null or json_extract(${column}, '$.arm64') is not null)`,
+			);
+		}
+
 		const where = filters.length > 0 ? and(...filters) : undefined;
+
+		const orderBy = {
+			name: [asc(DB.Tables.packagesFullView.fullname)],
+			newest: [desc(DB.Tables.packagesFullView.created_at), asc(DB.Tables.packagesFullView.fullname)],
+			updated: [
+				sql`${DB.Tables.packagesFullView.last_release_at} is null`,
+				desc(DB.Tables.packagesFullView.last_release_at),
+				asc(DB.Tables.packagesFullView.fullname),
+			],
+		}[sort];
 
 		const items = await DB.instance()
 			.select()
 			.from(DB.Tables.packagesFullView)
 			.where(where)
-			.orderBy(asc(DB.Tables.packagesFullView.fullname))
+			.orderBy(...orderBy)
 			.limit(limit)
 			.offset(offset);
 
@@ -147,7 +196,7 @@ router.post(
 		}
 
 		const publisher = await DB.instance()
-			.select({ id: DB.Tables.publishers.id })
+			.select({ id: DB.Tables.publishers.id, name: DB.Tables.publishers.name })
 			.from(DB.Tables.publishers)
 			.where(eq(DB.Tables.publishers.id, body.publisher_id))
 			.get();
@@ -194,6 +243,14 @@ router.post(
 			.returning()
 			.get();
 
+		await AuditLog.record({
+			actor: authContext,
+			action: "package.create",
+			targetType: "package",
+			targetID: result.id,
+			targetLabel: `${publisher.name}.${body.name}`,
+		});
+
 		return APIResponse.created(c, "Package created successfully", { id: result.id });
 	},
 );
@@ -205,7 +262,7 @@ router.use(
 	zValidator("param", PackageModel.Param),
 
 	async (c, next) => {
-		// @ts-expect-error - hono-openapi\'s validator does not type "param" yet
+		// @ts-expect-error - hono-openapi's validator does not type "param" yet
 		const { fullPackageName } = c.req.valid("param") as { fullPackageName: string };
 
 		const row = await DB.instance()
@@ -214,7 +271,7 @@ router.use(
 			.where(eq(DB.Tables.packagesFullView.fullname, fullPackageName))
 			.get();
 
-		if (!row) {
+		if (!row || !(await PermissionHelper.canViewPackage(AuthHandler.AuthContext.get(c), row))) {
 			return APIResponse.notFound(c, "Package with specified name not found");
 		}
 
@@ -296,6 +353,15 @@ router.put(
 			.set(updateData)
 			.where(eq(DB.Tables.packages.id, pkg.id));
 
+		await AuditLog.record({
+			actor: authContext,
+			action: "package.update",
+			targetType: "package",
+			targetID: pkg.id,
+			targetLabel: pkg.fullname,
+			metadata: { fields: Object.keys(updateData) },
+		});
+
 		return APIResponse.successNoData(c, "Package updated successfully");
 	},
 );
@@ -373,6 +439,14 @@ router.delete(
 		});
 
 		await TaskScheduler.enqueueTask("testing-repo:update", {}, { created_by_user_id: null });
+
+		await AuditLog.record({
+			actor: authContext,
+			action: "package.delete",
+			targetType: "package",
+			targetID: pkg.id,
+			targetLabel: pkg.fullname,
+		});
 
 		return APIResponse.successNoData(c, "Package deleted successfully");
 	},

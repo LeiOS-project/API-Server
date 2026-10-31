@@ -5,6 +5,8 @@ import { DB } from "../../../../../../db";
 import { TaskQueueUtils } from "../../../../../../tasks";
 import { TaskUtils } from "../../../../../../tasks/utils";
 import { APIResponse } from "../../../../../utils/api-res";
+import { AuditLog } from "../../../../../utils/auditLog";
+import { AuthHandler } from "../../../../../utils/authHandler";
 import { RuntimeMetadata } from "../../../../../utils/metadata";
 import { OSReleaseUtils } from "../../../../../utils/os-release-utils";
 import { ApiHelperModels } from "../../../../../utils/shared-models/api-helper-models";
@@ -145,6 +147,14 @@ router.post(
 
 		await TaskQueueUtils.activatePendingTask(taskID);
 
+		await AuditLog.record({
+			actor: AuthHandler.AuthContext.get(c),
+			action: "os_release.create",
+			targetType: "os_release",
+			targetLabel: version,
+			metadata: { task_id: taskID },
+		});
+
 		return APIResponse.accepted(
 			c,
 			"OS release creation task enqueued",
@@ -159,7 +169,7 @@ router.use(
 	zValidator("param", OSReleasesModel.Param),
 
 	async (c, next) => {
-		// @ts-expect-error - hono-openapi\'s validator does not type "param" yet
+		// @ts-expect-error - hono-openapi's validator does not type "param" yet
 		const { version } = c.req.valid("param") as { version: string };
 
 		const release = await DB.instance()
@@ -275,6 +285,14 @@ router.put(
 			.update(DB.Tables.os_releases)
 			.set(updateData)
 			.where(eq(DB.Tables.os_releases.id, release.id));
+
+		await AuditLog.record({
+			actor: AuthHandler.AuthContext.get(c),
+			action: "os_release.update",
+			targetType: "os_release",
+			targetID: release.id,
+			targetLabel: release.version,
+		});
 
 		return APIResponse.successNoData(c, "OS release updated successfully");
 	},

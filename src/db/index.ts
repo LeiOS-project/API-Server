@@ -186,6 +186,7 @@ export namespace DB.Tables {
 	export const users = TableSchema.users;
 	export const sessions = TableSchema.sessions;
 	export const passwordResets = TableSchema.passwordResets;
+	export const emailVerifications = TableSchema.emailVerifications;
 	export const apiKeys = TableSchema.apiKeys;
 
 	export const publishers = TableSchema.publishers;
@@ -205,12 +206,16 @@ export namespace DB.Tables {
 	export const scheduled_tasks_paused_state = TableSchema.scheduled_tasks_paused_state;
 
 	export const metadata = TableSchema.metadata;
+
+	export const auditLog = TableSchema.auditLog;
+	export const reports = TableSchema.reports;
 }
 
 export namespace DB.Models {
 	export type User = typeof DB.Tables.users.$inferSelect;
 	export type Session = typeof DB.Tables.sessions.$inferSelect;
 	export type PasswordReset = typeof DB.Tables.passwordResets.$inferSelect;
+	export type EmailVerification = typeof DB.Tables.emailVerifications.$inferSelect;
 	export type ApiKey = typeof DB.Tables.apiKeys.$inferSelect;
 
 	export type Publisher = typeof DB.Tables.publishers.$inferSelect;
@@ -230,4 +235,7 @@ export namespace DB.Models {
 	export type ScheduledTaskPausedState = typeof DB.Tables.scheduled_tasks_paused_state.$inferSelect;
 
 	export type Metadata = typeof DB.Tables.metadata.$inferSelect;
+
+	export type AuditLogEntry = typeof DB.Tables.auditLog.$inferSelect;
+	export type Report = typeof DB.Tables.reports.$inferSelect;
 }

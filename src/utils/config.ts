@@ -151,6 +151,9 @@ export class ConfigHandler {
 		S3_ACCESS_KEY_ID: CS.string(),
 		S3_SECRET_ACCESS_KEY: CS.string(),
 
+		/** Self-service signup. Stays off while email is not configured (signup needs verification). */
+		SIGNUP_ENABLED: CS.boolean().default(false),
+
 		SMTP_HOST: CS.string().optional(),
 		SMTP_PORT: CS.number().optional(),
 		SMTP_USERNAME: CS.string().optional(),

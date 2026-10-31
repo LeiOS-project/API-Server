@@ -4,6 +4,8 @@ import { validator as zValidator } from "hono-openapi";
 import { z } from "zod";
 import { DB } from "../../../../../../db";
 import { APIResponse } from "../../../../../utils/api-res";
+import { AuditLog } from "../../../../../utils/auditLog";
+import { AuthHandler } from "../../../../../utils/authHandler";
 import { RuntimeMetadata } from "../../../../../utils/metadata";
 import { ApiHelperModels } from "../../../../../utils/shared-models/api-helper-models";
 import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers";
@@ -91,7 +93,7 @@ router.use(
 	),
 
 	async (c, next) => {
-		// @ts-expect-error - hono-openapi\'s validator does not type "param" yet
+		// @ts-expect-error - hono-openapi's validator does not type "param" yet
 		const { stablePromotionRequestID } = c.req.valid("param") as { stablePromotionRequestID: number };
 
 		const request = await DB.instance()
@@ -211,6 +213,15 @@ router.post(
 		if (decision.status === "approved") {
 			await RuntimeMetadata.addOSReleasePendingPackage(request.package_release_id);
 		}
+
+		await AuditLog.record({
+			actor: AuthHandler.AuthContext.get(c),
+			action: "stable_request.decide",
+			targetType: "stable_promotion_request",
+			targetID: request.id,
+			targetLabel: `#${request.id}`,
+			metadata: { status: decision.status, note: decision.admin_note },
+		});
 
 		return APIResponse.successNoData(c, "Decided on stable promotion request successfully");
 	},

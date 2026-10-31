@@ -3,11 +3,10 @@ import { z } from "zod";
 import { DB } from "../../../../../db";
 
 export namespace UsersPublicModel {
-	const SafeUser = createSelectSchema(DB.Tables.users).omit({
-		email: true,
-		password_hash: true,
-		role: true,
-		created_at: true,
+	const SafeUser = createSelectSchema(DB.Tables.users).pick({
+		id: true,
+		username: true,
+		display_name: true,
 	});
 
 	export type SafeUser = z.infer<typeof SafeUser>;

@@ -6,6 +6,7 @@ import { DB } from "../../../../../../db";
 import { Utils } from "../../../../../../utils";
 import { PermissionHelper } from "../../../../../../utils/permission-helper";
 import { APIResponse } from "../../../../../utils/api-res";
+import { AuditLog } from "../../../../../utils/auditLog";
 import { AuthHandler } from "../../../../../utils/authHandler";
 import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers";
 import { DOCS_TAGS } from "../../../docs";
@@ -168,6 +169,15 @@ router.post(
 			.returning()
 			.get();
 
+		await AuditLog.record({
+			actor: authContext,
+			action: "publisher.member_add",
+			targetType: "publisher",
+			targetID: publisher.id,
+			targetLabel: publisher.name,
+			metadata: { user_id: body.user_id, role: body.role },
+		});
+
 		return APIResponse.created(c, "Member added successfully", {
 			id: member.id,
 		} satisfies PublisherMembersModel.Add.Response);
@@ -186,7 +196,7 @@ router.use(
 
 	async (c, next) => {
 		const publisher = c.get("publisher");
-		// @ts-expect-error - hono-openapi\'s validator does not type "param" yet
+		// @ts-expect-error - hono-openapi's validator does not type "param" yet
 		const { userId } = c.req.valid("param") as { userId: number };
 
 		const member: DB.Models.PublisherMember | undefined = await DB.instance()
@@ -347,6 +357,15 @@ router.put(
 			.set(updates)
 			.where(eq(DB.Tables.publisherMembers.id, member.id));
 
+		await AuditLog.record({
+			actor: authContext,
+			action: "publisher.member_update",
+			targetType: "publisher",
+			targetID: publisher.id,
+			targetLabel: publisher.name,
+			metadata: { user_id: member.user_id, ...body },
+		});
+
 		return APIResponse.successNoData(c, "Member updated successfully");
 	},
 );
@@ -399,6 +418,15 @@ router.delete(
 		await DB.instance()
 			.delete(DB.Tables.publisherMembers)
 			.where(eq(DB.Tables.publisherMembers.id, member.id));
+
+		await AuditLog.record({
+			actor: authContext,
+			action: "publisher.member_remove",
+			targetType: "publisher",
+			targetID: publisher.id,
+			targetLabel: publisher.name,
+			metadata: { user_id: member.user_id },
+		});
 
 		return APIResponse.successNoData(c, "Member removed successfully");
 	},

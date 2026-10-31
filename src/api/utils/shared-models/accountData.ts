@@ -35,4 +35,9 @@ export namespace UserAccountSettings {
 	export const Roles = ["admin", "developer", "user"] as const;
 	export const Role = z.enum(Roles);
 	export type Role = z.infer<typeof Role>;
+
+	/** A suspended user cannot sign in; suspending ends all their sessions and API keys. */
+	export const Statuses = ["active", "suspended"] as const;
+	export const Status = z.enum(Statuses);
+	export type Status = z.infer<typeof Status>;
 }

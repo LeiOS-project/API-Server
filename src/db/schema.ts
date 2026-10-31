@@ -13,6 +13,7 @@ import {
 	uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 import { UserAccountSettings } from "../api/utils/shared-models/accountData";
+import { ModerationSettings } from "../api/utils/shared-models/moderation";
 import type { PackageModel } from "../api/versions/v1/routes/packages/model";
 import { PermissionHelper } from "../utils/permission-helper";
 import { SQLUtils } from "./utils";
@@ -34,7 +35,34 @@ export const users = sqliteTable("users", {
 		.default("user")
 		.notNull(),
 
+	// null until the user confirms the address from the verification email
+	email_verified_at: integer(),
+
+	status: text({
+		enum: UserAccountSettings.Statuses,
+	})
+		.default("active")
+		.notNull(),
+	suspended_at: integer(),
+	suspended_reason: text(),
+
 	created_at: SQLUtils.getCreatedAtColumn(),
+});
+
+/**
+ * Email verification tokens: sent on signup and when a user changes their email address.
+ * @deprecated Use DB.Tables.emailVerifications to access this table.
+ */
+export const emailVerifications = sqliteTable("email_verifications", {
+	// sha256 of the token sent by email
+	token: text().primaryKey(),
+	user_id: integer()
+		.notNull()
+		.references(() => users.id, { onDelete: "cascade" }),
+	// the address being verified
+	email: text().notNull(),
+	created_at: SQLUtils.getCreatedAtColumn(),
+	expires_at: integer().notNull(),
 });
 
 /**
@@ -105,6 +133,9 @@ export const publishers = sqliteTable("publishers", {
 
 	maintainer_contact_name: text().notNull(),
 	maintainer_contact_email: text().notNull(),
+
+	// set by an admin for official / trusted publishers
+	verified_at: integer(),
 });
 
 /**
@@ -192,6 +223,8 @@ export const packages = sqliteTable(
 		homepage_url: text().notNull(),
 
 		flags: text({ mode: "json" }).$type<PackageModel.PackageFlags>().notNull().default(sql`'[]'`),
+		// admin-facing reason for the HIDDEN / DEPRECATED flags
+		moderation_note: text(),
 
 		// Requires patching may be controlled by a flag in the flags array in the future.
 		requires_patching: integer({ mode: "boolean" }).notNull().default(sql`0`),
@@ -272,9 +305,18 @@ export const packagesFullView = sqliteView("packages_full_view").as((db) => {
 			homepage_url: packages.homepage_url,
 
 			flags: packages.flags,
+			moderation_note: packages.moderation_note,
 			requires_patching: packages.requires_patching,
 
 			created_at: packages.created_at,
+			last_release_at: sql<
+				number | null
+			>`(select max(${packageReleases.created_at}) from ${packageReleases} where ${packageReleases.package_id} = ${packages.id})`.as(
+				"last_release_at",
+			),
+
+			publisher_display_name: sql<string>`${publishers.display_name}`.as("publisher_display_name"),
+			publisher_verified_at: sql<number | null>`${publishers.verified_at}`.as("publisher_verified_at"),
 
 			latest_stable_release: packages.latest_stable_release,
 			latest_testing_release: packages.latest_testing_release,
@@ -354,3 +396,57 @@ export const metadata = sqliteTable("metadata", {
 	key: text().primaryKey(),
 	data: text({ mode: "json" }).$type<Record<string, any> | Array<any>>().notNull(),
 });
+
+/**
+ * Who did what to which resource — written by admin and publisher-management actions.
+ * @deprecated Use DB.Tables.auditLog to access this table.
+ */
+export const auditLog = sqliteTable(
+	"audit_log",
+	{
+		id: integer().primaryKey({ autoIncrement: true }),
+		// null for system actions and after the actor's account was deleted
+		actor_user_id: integer().references(() => users.id, { onDelete: "set null" }),
+		// dotted verb, e.g. "user.suspend", "package.flags_update"
+		action: text().notNull(),
+		target_type: text({ enum: ModerationSettings.AuditTargetTypes }).notNull(),
+		target_id: text(),
+		// readable name of the target at the time of the action, kept when the target is deleted
+		target_label: text(),
+		metadata: text({ mode: "json" }).$type<Record<string, unknown>>().notNull().default(sql`'{}'`),
+		created_at: SQLUtils.getCreatedAtColumn(),
+	},
+	(table) => [
+		index("audit_log_created_at_idx").on(table.created_at),
+		index("audit_log_target_idx").on(table.target_type, table.target_id),
+	],
+);
+
+/**
+ * User reports about packages and publishers, worked through by admins.
+ * @deprecated Use DB.Tables.reports to access this table.
+ */
+export const reports = sqliteTable(
+	"reports",
+	{
+		id: integer().primaryKey({ autoIncrement: true }),
+		reporter_user_id: integer().references(() => users.id, { onDelete: "set null" }),
+
+		target_type: text({ enum: ModerationSettings.ReportTargetTypes }).notNull(),
+		// package or publisher id; not a foreign key because the target type varies
+		target_id: integer().notNull(),
+		// package fullname / publisher name at report time, kept when the target is deleted
+		target_label: text().notNull(),
+
+		reason: text({ enum: ModerationSettings.ReportReasons }).notNull(),
+		details: text().notNull().default(""),
+
+		status: text({ enum: ModerationSettings.ReportStatuses }).notNull().default("open"),
+		resolution_note: text(),
+		resolved_by_user_id: integer().references(() => users.id, { onDelete: "set null" }),
+		resolved_at: integer(),
+
+		created_at: SQLUtils.getCreatedAtColumn(),
+	},
+	(table) => [index("reports_status_idx").on(table.status)],
+);

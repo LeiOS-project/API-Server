@@ -139,4 +139,60 @@ export class EmailService {
 			Logger.error(`Failed to send password reset email to ${to}: ${err}`);
 		}
 	}
+
+	/**
+	 * Send the "confirm your email address" email, for a new account (`signup`) or a changed
+	 * address (`change`). Fire-and-forget like sendPasswordResetEmail: errors are logged, not thrown.
+	 */
+	static async sendEmailVerificationEmail(to: string, rawToken: string, kind: "signup" | "change") {
+		if (!this.transporter) {
+			Logger.warn("Email service not available — cannot send email verification email");
+			return;
+		}
+
+		const config = ConfigHandler.getConfig() as NonNullable<
+			ReturnType<typeof ConfigHandler.getConfig>
+		>;
+		const appUrl = config.APP_URL.replace(/\/+$/, "");
+		const verifyUrl = `${appUrl}/auth/verify-email?token=${encodeURIComponent(rawToken)}`;
+
+		const intro =
+			kind === "signup"
+				? `Welcome to ${AppConstants.APP_NAME}! Please confirm your email address to finish setting up your account.`
+				: `You changed the email address of your ${AppConstants.APP_NAME} account. Please confirm the new address.`;
+
+		const html = [
+			"<!DOCTYPE html>",
+			'<html><head><meta charset="utf-8"></head><body>',
+			"<div style=\"max-width:560px;margin:0 auto;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif\">",
+			"",
+			'  <h2 style="color:#1a1a2e">Confirm your email address</h2>',
+			"",
+			`  <p>${intro}</p>`,
+			"",
+			`  <a href="${verifyUrl}" style="display:inline-block;padding:12px 28px;margin:20px 0;background:#2563eb;color:#fff;text-decoration:none;border-radius:6px;font-weight:600">Confirm Email Address</a>`,
+			"",
+			'  <p style="color:#666;font-size:14px">This link will expire in <strong>24 hours</strong>.</p>',
+			"",
+			'  <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0">',
+			"",
+			'  <p style="color:#999;font-size:13px">',
+			"  If you did not create an account or change your email address, you can ignore this email.</p>",
+			"",
+			"</div>",
+			"</body></html>",
+		].join("\n");
+
+		try {
+			const info = await this.transporter.sendMail({
+				from: this._from,
+				to,
+				subject: `${AppConstants.APP_NAME} — Confirm your email address`,
+				html,
+			});
+			Logger.log(`Email verification email sent to ${to} (message-id: ${info.messageId})`);
+		} catch (err) {
+			Logger.error(`Failed to send email verification email to ${to}: ${err}`);
+		}
+	}
 }

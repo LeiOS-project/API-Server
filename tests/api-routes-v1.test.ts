@@ -42,6 +42,10 @@ async function seedUser(
 			email: overrides.email ?? `${randomUUID()}@example.com`,
 			password_hash: await Bun.password.hash(password),
 			role,
+			// Seeded accounts count as confirmed unless a test says otherwise.
+			email_verified_at:
+				overrides.email_verified_at === undefined ? Date.now() : overrides.email_verified_at,
+			status: overrides.status ?? "active",
 		} as any)
 		.returning()
 		.get();

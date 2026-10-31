@@ -91,6 +91,30 @@ export class PermissionHelper {
 	}
 
 	/**
+	 * Whether the caller may see a package. Listed packages are public; packages flagged HIDDEN
+	 * stay visible to site admins, the publisher owner and anyone with a publisher or package role.
+	 */
+	static async canViewPackage(
+		authContext: AuthHandler.AuthContext,
+		pkg: { id: number; publisher_id: number; flags: readonly string[] },
+	): Promise<boolean> {
+		if (!pkg.flags.includes("HIDDEN")) return true;
+		if (authContext.type === "unauthenticated") return false;
+		if (authContext.user_role === "admin") return true;
+
+		if (await this.isPublisherOwner({ userId: authContext.user_id, publisherId: pkg.publisher_id })) {
+			return true;
+		}
+
+		const role = await this.getEffectiveRole({
+			userId: authContext.user_id,
+			publisherId: pkg.publisher_id,
+			packageId: pkg.id,
+		});
+		return role !== null;
+	}
+
+	/**
 	 * Resolve the effective role for a user against a publisher (and optionally a
 	 * specific package). Returns the highest of:
 	 *   - publisherMembers.role for (userId, publisherId)

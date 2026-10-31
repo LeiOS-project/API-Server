@@ -4,9 +4,13 @@ import { validator } from "hono-openapi";
 import { DB } from "../../../../../db";
 import { APIResponse } from "../../../../utils/api-res";
 import { AuthHandler } from "../../../../utils/authHandler";
+import { EmailVerificationHandler } from "../../../../utils/emailVerification";
+import { RateLimiter } from "../../../../utils/rateLimiter";
 import { APIResponseSpec, APIRouteSpec } from "../../../../utils/specHelpers";
 import { DOCS_TAGS } from "../../docs";
 import { AccountModel } from "./model";
+
+const verificationResendsPerUser = new RateLimiter(1, 5 * 60 * 1000); // 1 per 5 minutes
 
 export const router = new Hono().basePath("/account");
 
@@ -68,6 +72,8 @@ router.put(
 		responses: APIResponseSpec.describeWithWrongInputs(
 			APIResponseSpec.successNoData("Account information updated successfully"),
 			APIResponseSpec.unauthorized("Your Auth Context is not a session"),
+			APIResponseSpec.forbidden("Current password is incorrect"),
+			APIResponseSpec.conflict("Username already in use / Email already in use"),
 		),
 	}),
 
@@ -91,7 +97,8 @@ router.put(
 		}
 
 		if (!(await Bun.password.verify(current_password, user.password_hash))) {
-			return APIResponse.unauthorized(c, "Current password is incorrect");
+			// 403, not 401: the session is fine, and clients treat any 401 as a signed-out session.
+			return APIResponse.forbidden(c, "Current password is incorrect");
 		}
 
 		// Check for conflicts if changing username or email
@@ -117,11 +124,23 @@ router.put(
 			}
 		}
 
-		DB.instance()
-			.update(DB.Tables.users)
-			.set(updates)
-			.where(eq(DB.Tables.users.id, authContext.user_id))
-			.run();
+		const emailChanged = updates.email !== undefined && updates.email !== user.email;
+
+		await DB.instance().transaction(async (tx) => {
+			await tx
+				.update(DB.Tables.users)
+				.set({
+					...updates,
+					// A new address has to be confirmed again.
+					...(emailChanged ? { email_verified_at: null } : {}),
+				})
+				.where(eq(DB.Tables.users.id, authContext.user_id))
+				.run();
+
+			if (emailChanged && updates.email) {
+				await EmailVerificationHandler.start(authContext.user_id, updates.email, "change", tx);
+			}
+		});
 
 		return APIResponse.successNoData(c, "Account information updated successfully");
 	},
@@ -138,9 +157,8 @@ router.put(
 		responses: APIResponseSpec.describeBasic(
 			APIResponseSpec.successNoData("Password changed successfully"),
 			APIResponseSpec.unauthorized("Your Auth Context is not a session"),
-			APIResponseSpec.badRequest(
-				"Current password is incorrect / Syntax or validation error in request",
-			),
+			APIResponseSpec.badRequest("Syntax or validation error in request"),
+			APIResponseSpec.forbidden("Current password is incorrect"),
 		),
 	}),
 
@@ -166,7 +184,8 @@ router.put(
 		}
 
 		if ((await Bun.password.verify(body.current_password, user.password_hash)) === false) {
-			return APIResponse.unauthorized(c, "Current password is incorrect");
+			// 403, not 401: the session is fine, and clients treat any 401 as a signed-out session.
+			return APIResponse.forbidden(c, "Current password is incorrect");
 		}
 
 		const newPasswordHash = await Bun.password.hash(body.new_password);
@@ -187,6 +206,57 @@ router.put(
 			.run();
 
 		return APIResponse.successNoData(c, "Password changed successfully");
+	},
+);
+
+router.post(
+	"/email-verification",
+
+	APIRouteSpec.authenticated({
+		summary: "Resend the verification email",
+		description:
+			"Send a new confirmation link for the authenticated user's email address, if it is not confirmed yet.",
+		tags: [DOCS_TAGS.ACCOUNT],
+
+		responses: APIResponseSpec.describeBasic(
+			APIResponseSpec.successNoData("Verification email sent"),
+			APIResponseSpec.unauthorized("Your Auth Context is not a session"),
+			APIResponseSpec.conflict("Your email address is already confirmed"),
+			APIResponseSpec.tooManyRequests("Please wait a few minutes before requesting another email"),
+			APIResponseSpec.serverError("Email is not configured on this server"),
+		),
+	}),
+
+	async (c) => {
+		const authContext = AuthHandler.AuthContext.getAsSession(c);
+
+		const user = await DB.instance()
+			.select({ email: DB.Tables.users.email, email_verified_at: DB.Tables.users.email_verified_at })
+			.from(DB.Tables.users)
+			.where(eq(DB.Tables.users.id, authContext.user_id))
+			.get();
+
+		if (!user) {
+			throw new Error("User not found but session exists");
+		}
+
+		if (user.email_verified_at !== null) {
+			return APIResponse.conflict(c, "Your email address is already confirmed");
+		}
+
+		if (!verificationResendsPerUser.hit(String(authContext.user_id))) {
+			return APIResponse.tooManyRequests(
+				c,
+				"Please wait a few minutes before requesting another email",
+			);
+		}
+
+		const sent = await EmailVerificationHandler.start(authContext.user_id, user.email, "signup");
+		if (!sent) {
+			return APIResponse.serverError(c, "Email is not configured on this server");
+		}
+
+		return APIResponse.successNoData(c, "Verification email sent");
 	},
 );
 

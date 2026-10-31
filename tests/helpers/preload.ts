@@ -44,6 +44,8 @@ function setTestEnv(rootDir: string) {
 		LRA_S3_ACCESS_KEY_ID: "S3RVER",
 		LRA_S3_SECRET_ACCESS_KEY: "S3RVER",
 
+		LRA_SIGNUP_ENABLED: true,
+
 		LRA_SMTP_HOST: "127.0.0.1",
 		LRA_SMTP_PORT: 12587,
 		LRA_SMTP_USERNAME: "",

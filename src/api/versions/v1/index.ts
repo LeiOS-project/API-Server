@@ -7,8 +7,11 @@ import { authMiddlewareV1 } from "./middleware/auth";
 import { router as accountRouter } from "./routes/account";
 import { router as adminRouter } from "./routes/admin";
 import { router as authRouter } from "./routes/auth";
+import { router as metaRouter } from "./routes/meta";
+import { router as osReleasesRouter } from "./routes/os-releases";
 import { router as packagesRouter } from "./routes/packages";
 import { router as publishersRouter } from "./routes/publishers";
+import { router as reportsRouter } from "./routes/reports";
 import { router as usersRouter } from "./routes/users";
 
 const openAPIConfig: Partial<GenerateSpecOptions> = {
@@ -48,6 +51,10 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
 
 		"x-tagGroups": [
 			{
+				name: "Hub",
+				tags: [DOCS_TAGS.META, DOCS_TAGS.OS_RELEASES, DOCS_TAGS.REPORTS],
+			},
+			{
 				name: "Resources",
 				tags: [
 					DOCS_TAGS.PUBLISHERS,
@@ -62,7 +69,12 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
 			{
 				name: "Admin",
 				tags: [
+					DOCS_TAGS.ADMIN_OVERVIEW,
 					DOCS_TAGS.ADMIN_USERS,
+					DOCS_TAGS.ADMIN_PUBLISHERS,
+					DOCS_TAGS.ADMIN_PACKAGES,
+					DOCS_TAGS.ADMIN_REPORTS,
+					DOCS_TAGS.ADMIN_AUDIT_LOG,
 					DOCS_TAGS.ADMIN_OS_RELEASES,
 					DOCS_TAGS.ADMIN_TASKS,
 					DOCS_TAGS.ADMIN_STABLE_PROMOTION_REQUESTS,
@@ -76,12 +88,64 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
 
 		tags: [
 			{
+				name: DOCS_TAGS.META,
+				description: "Server features and public hub statistics.",
+			},
+			{
+				name: DOCS_TAGS.OS_RELEASES,
+				description: "Published LeiOS releases and their changelogs.",
+			},
+			{
+				name: DOCS_TAGS.REPORTS,
+				description: "Report packages and publishers to the moderators.",
+			},
+			{
+				name: DOCS_TAGS.ADMIN_OVERVIEW,
+				// @ts-expect-error - Scalar's x-displayName is not part of the OpenAPI tag type
+				"x-displayName": "Overview",
+				summary: "Overview",
+				parent: "Admin",
+				description: "Counts and open work queues for the admin dashboard.",
+			},
+			{
+				name: DOCS_TAGS.ADMIN_PUBLISHERS,
+				// @ts-expect-error - Scalar's x-displayName is not part of the OpenAPI tag type
+				"x-displayName": "Publishers",
+				summary: "Publishers",
+				parent: "Admin",
+				description: "Review every publisher and mark official ones as verified.",
+			},
+			{
+				name: DOCS_TAGS.ADMIN_PACKAGES,
+				// @ts-expect-error - Scalar's x-displayName is not part of the OpenAPI tag type
+				"x-displayName": "Packages",
+				summary: "Packages",
+				parent: "Admin",
+				description: "Hide packages or mark them as deprecated.",
+			},
+			{
+				name: DOCS_TAGS.ADMIN_REPORTS,
+				// @ts-expect-error - Scalar's x-displayName is not part of the OpenAPI tag type
+				"x-displayName": "Reports",
+				summary: "Reports",
+				parent: "Admin",
+				description: "Work through user reports about packages and publishers.",
+			},
+			{
+				name: DOCS_TAGS.ADMIN_AUDIT_LOG,
+				// @ts-expect-error - Scalar's x-displayName is not part of the OpenAPI tag type
+				"x-displayName": "Audit Log",
+				summary: "Audit Log",
+				parent: "Admin",
+				description: "Who did what to which resource.",
+			},
+			{
 				name: DOCS_TAGS.PUBLISHERS,
 				description: "Manage publishers (organizations) and their members.",
 			},
 			{
 				name: DOCS_TAGS.PUBLISHERS_MEMBERS,
-				// @ts-expect-error - Scalar\'s x-displayName is not part of the OpenAPI tag type
+				// @ts-expect-error - Scalar's x-displayName is not part of the OpenAPI tag type
 				"x-displayName": "Members",
 				summary: "Members",
 				parent: DOCS_TAGS.PUBLISHERS,
@@ -93,7 +157,7 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
 			},
 			{
 				name: DOCS_TAGS.PACKAGES_RELEASES,
-				// @ts-expect-error - Scalar\'s x-displayName is not part of the OpenAPI tag type
+				// @ts-expect-error - Scalar's x-displayName is not part of the OpenAPI tag type
 				"x-displayName": "Releases",
 				summary: "Releases",
 				parent: DOCS_TAGS.PACKAGES,
@@ -101,7 +165,7 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
 			},
 			{
 				name: DOCS_TAGS.PACKAGES_STABLE_REQUESTS,
-				// @ts-expect-error - Scalar\'s x-displayName is not part of the OpenAPI tag type
+				// @ts-expect-error - Scalar's x-displayName is not part of the OpenAPI tag type
 				"x-displayName": "Stable Promotion Requests",
 				summary: "Stable Promotion Requests",
 				parent: DOCS_TAGS.PACKAGES,
@@ -109,7 +173,7 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
 			},
 			{
 				name: DOCS_TAGS.PACKAGES_ROLE_ASSIGNMENTS,
-				// @ts-expect-error - Scalar\'s x-displayName is not part of the OpenAPI tag type
+				// @ts-expect-error - Scalar's x-displayName is not part of the OpenAPI tag type
 				"x-displayName": "Role Assignments",
 				summary: "Role Assignments",
 				parent: DOCS_TAGS.PACKAGES,
@@ -117,7 +181,7 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
 			},
 			{
 				name: DOCS_TAGS.ADMIN_USERS,
-				// @ts-expect-error - Scalar\'s x-displayName is not part of the OpenAPI tag type
+				// @ts-expect-error - Scalar's x-displayName is not part of the OpenAPI tag type
 				"x-displayName": DOCS_TAGS.USERS,
 				summary: DOCS_TAGS.USERS,
 				parent: "Admin",
@@ -125,7 +189,7 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
 			},
 			{
 				name: DOCS_TAGS.ADMIN_OS_RELEASES,
-				// @ts-expect-error - Scalar\'s x-displayName is not part of the OpenAPI tag type
+				// @ts-expect-error - Scalar's x-displayName is not part of the OpenAPI tag type
 				"x-displayName": "OS Releases",
 				summary: "OS Releases",
 				parent: "Admin",
@@ -133,7 +197,7 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
 			},
 			{
 				name: DOCS_TAGS.ADMIN_TASKS,
-				// @ts-expect-error - Scalar\'s x-displayName is not part of the OpenAPI tag type
+				// @ts-expect-error - Scalar's x-displayName is not part of the OpenAPI tag type
 				"x-displayName": "Tasks",
 				summary: "Tasks",
 				parent: "Admin",
@@ -141,7 +205,7 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
 			},
 			{
 				name: DOCS_TAGS.ADMIN_STABLE_PROMOTION_REQUESTS,
-				// @ts-expect-error - Scalar\'s x-displayName is not part of the OpenAPI tag type
+				// @ts-expect-error - Scalar's x-displayName is not part of the OpenAPI tag type
 				"x-displayName": "Stable Promotion Requests",
 				summary: "Stable Promotion Requests",
 				parent: "Admin",
@@ -153,7 +217,7 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
 			},
 			{
 				name: DOCS_TAGS.ACCOUNT_API_KEYS,
-				// @ts-expect-error - Scalar\'s x-displayName is not part of the OpenAPI tag type
+				// @ts-expect-error - Scalar's x-displayName is not part of the OpenAPI tag type
 				"x-displayName": "API Keys",
 				summary: "API Keys",
 				parent: DOCS_TAGS.ACCOUNT,
@@ -181,6 +245,9 @@ router.route("/", publishersRouter);
 router.route("/", packagesRouter);
 router.route("/", adminRouter);
 router.route("/", usersRouter);
+router.route("/", metaRouter);
+router.route("/", osReleasesRouter);
+router.route("/", reportsRouter);
 
 export class APIv1Router extends APIVersionRouter {
 	constructor() {

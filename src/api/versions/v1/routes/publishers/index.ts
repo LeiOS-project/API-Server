@@ -6,6 +6,7 @@ import { DB } from "../../../../../db";
 import { Utils } from "../../../../../utils";
 import { PermissionHelper } from "../../../../../utils/permission-helper";
 import { APIResponse } from "../../../../utils/api-res";
+import { AuditLog } from "../../../../utils/auditLog";
 import { AuthHandler } from "../../../../utils/authHandler";
 import { APIResponseSpec, APIRouteSpec } from "../../../../utils/specHelpers";
 import { DOCS_TAGS } from "../../docs";
@@ -59,6 +60,8 @@ router.get(
 
 				maintainer_contact_name: DB.Tables.publishers.maintainer_contact_name,
 				maintainer_contact_email: DB.Tables.publishers.maintainer_contact_email,
+
+				verified_at: DB.Tables.publishers.verified_at,
 			})
 			.from(DB.Tables.publishers)
 			.$dynamic();
@@ -119,6 +122,7 @@ router.post(
 			),
 			APIResponseSpec.conflict("Publisher with this name already exists"),
 			APIResponseSpec.unauthorized("Authentication required"),
+			APIResponseSpec.forbidden("Confirm your email address before creating a publisher"),
 		),
 	}),
 
@@ -129,6 +133,16 @@ router.post(
 
 		if (authContext.type === "unauthenticated") {
 			return APIResponse.unauthorized(c, "Authentication required");
+		}
+
+		const creator = await DB.instance()
+			.select({ email_verified_at: DB.Tables.users.email_verified_at })
+			.from(DB.Tables.users)
+			.where(eq(DB.Tables.users.id, authContext.user_id))
+			.get();
+
+		if (!creator?.email_verified_at) {
+			return APIResponse.forbidden(c, "Confirm your email address before creating a publisher");
 		}
 
 		const publisherData = c.req.valid("json");
@@ -171,6 +185,14 @@ router.post(
 			return publisher;
 		});
 
+		await AuditLog.record({
+			actor: authContext,
+			action: "publisher.create",
+			targetType: "publisher",
+			targetID: publisher.id,
+			targetLabel: publisher.name,
+		});
+
 		return APIResponse.created(c, "Publisher created successfully", {
 			id: publisher.id,
 		} satisfies PublisherModel.CreatePublisher.Response);
@@ -190,7 +212,7 @@ router.use(
 	),
 
 	async (c, next) => {
-		// @ts-expect-error - hono-openapi\'s validator does not type "param" yet
+		// @ts-expect-error - hono-openapi's validator does not type "param" yet
 		const { publisherName } = c.req.valid("param") as { publisherName: string };
 
 		const publisher = await DB.instance()
@@ -241,6 +263,8 @@ router.get(
 
 			maintainer_contact_name: publisher.maintainer_contact_name,
 			maintainer_contact_email: publisher.maintainer_contact_email,
+
+			verified_at: publisher.verified_at,
 		};
 
 		return APIResponse.success(
@@ -288,6 +312,15 @@ router.put(
 			.update(DB.Tables.publishers)
 			.set(updateData)
 			.where(eq(DB.Tables.publishers.id, publisher.id));
+
+		await AuditLog.record({
+			actor: authContext,
+			action: "publisher.update",
+			targetType: "publisher",
+			targetID: publisher.id,
+			targetLabel: publisher.name,
+			metadata: { fields: Object.keys(updateData) },
+		});
 
 		return APIResponse.successNoData(c, "Publisher updated successfully");
 	},
@@ -374,6 +407,15 @@ router.post(
 			}
 		});
 
+		await AuditLog.record({
+			actor: authContext,
+			action: "publisher.transfer_ownership",
+			targetType: "publisher",
+			targetID: publisher.id,
+			targetLabel: publisher.name,
+			metadata: { from_user_id: publisher.owner_user_id, to_user_id: new_owner_user_id },
+		});
+
 		return APIResponse.successNoData(c, "Publisher ownership transferred successfully");
 	},
 );
@@ -425,6 +467,14 @@ router.delete(
 				.delete(DB.Tables.publisherMembers)
 				.where(eq(DB.Tables.publisherMembers.publisher_id, publisher.id));
 			await tx.delete(DB.Tables.publishers).where(eq(DB.Tables.publishers.id, publisher.id));
+		});
+
+		await AuditLog.record({
+			actor: authContext,
+			action: "publisher.delete",
+			targetType: "publisher",
+			targetID: publisher.id,
+			targetLabel: publisher.name,
 		});
 
 		return APIResponse.successNoData(c, "Publisher deleted successfully");

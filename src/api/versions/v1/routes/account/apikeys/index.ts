@@ -137,7 +137,7 @@ router.use(
 	async (c, next) => {
 		const authContext = AuthHandler.AuthContext.getAsSession(c);
 
-		// @ts-expect-error - hono-openapi\'s validator does not type "param" yet
+		// @ts-expect-error - hono-openapi's validator does not type "param" yet
 		const apiKeyID = (c.req.valid("param") as { apiKeyID: string }).apiKeyID;
 
 		const apiKey = await DB.instance()

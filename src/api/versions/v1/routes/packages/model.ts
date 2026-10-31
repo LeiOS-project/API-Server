@@ -20,7 +20,11 @@ export namespace PackageModel {
 				// Indicates that the package is fully managed by the system and cannot be modified or deleted by anyone including admins
 				"SYSTEM-MANAGED",
 
-				// Add more flags as needed
+				// Set by admins: hidden from public listings and package pages (members and admins still see it)
+				"HIDDEN",
+
+				// Set by admins: still listed, but shown as deprecated
+				"DEPRECATED",
 			]),
 		)
 		.refine(
@@ -66,6 +70,13 @@ export namespace PackageModel.GetAll {
 			publisherName: z.string().min(1).optional(),
 
 			onlyMembershipByMe: ApiHelperModels.QueryBoolean.default(false),
+
+			/** name (A–Z), newest (created), updated (latest release first). */
+			sort: z.enum(["name", "newest", "updated"]).default("name"),
+			/** Only packages that have a version in this repository. */
+			channel: z.enum(["stable", "testing"]).optional(),
+			/** Only packages carrying this flag (HIDDEN ones are listed for admins and members only). */
+			flag: z.enum(["SYSTEM-MANAGED", "HIDDEN", "DEPRECATED"]).optional(),
 		})
 		.refine((data) => !(data.publisherID !== undefined && data.publisherName !== undefined), {
 			message: "You can provide either 'publisherID' or 'publisherName', but not both.",

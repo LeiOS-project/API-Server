@@ -5,6 +5,7 @@ import { validator as zValidator } from "hono-openapi";
 import { DB } from "../../../../../db";
 import { APIResponse } from "../../../../utils/api-res";
 import { AuthHandler, SessionHandler } from "../../../../utils/authHandler";
+import { RateLimiter } from "../../../../utils/rateLimiter";
 import { APIResponseSpec, APIRouteSpec } from "../../../../utils/specHelpers";
 import { DOCS_TAGS } from "../../docs";
 import { AuthModel } from "./model";
@@ -34,8 +35,7 @@ const LOGIN_CLEANUP_INTERVAL = setInterval(() => {
 LOGIN_CLEANUP_INTERVAL.unref();
 
 function getClientId(c: Context) {
-	const remote = (c.req.raw as any)?.remoteAddr?.hostname;
-	return remote || "unknown";
+	return RateLimiter.clientId(c);
 }
 
 function getLoginAttemptKey(clientId: string, username: string) {
@@ -94,7 +94,8 @@ router.post(
 
 		responses: APIResponseSpec.describeWithWrongInputs(
 			APIResponseSpec.success("Login successful", AuthModel.Login.Response),
-			APIResponseSpec.unauthorized("Invalid username or password / You are already authenticated"),
+			APIResponseSpec.unauthorized("Invalid username or password"),
+			APIResponseSpec.forbidden("You are already authenticated / This account is suspended"),
 			APIResponseSpec.tooManyRequests("Too many login attempts. Try again later."),
 		),
 	}),
@@ -119,14 +120,7 @@ router.post(
 		if (perIpCount > LOGIN_MAX_ATTEMPTS || globalCount > LOGIN_MAX_GLOBAL_ATTEMPTS) {
 			const retrySeconds = Math.max(1, Math.ceil(LOGIN_WINDOW_MS / 1000));
 			c.header("Retry-After", retrySeconds.toString());
-			return c.json(
-				{
-					success: false,
-					code: 429,
-					message: `Too many login attempts. Try again in ${retrySeconds}s`,
-				},
-				429,
-			);
+			return APIResponse.tooManyRequests(c, `Too many login attempts. Try again in ${retrySeconds}s`);
 		}
 
 		const user = DB.instance()
@@ -147,6 +141,11 @@ router.post(
 
 		// Successful login — clear all counters for this user
 		clearFailedLoginAttempts(loginAttemptKey, globalKey);
+
+		// Checked only after the password, so the account state is not revealed to anyone else.
+		if (user.status === "suspended") {
+			return APIResponse.forbidden(c, "This account is suspended");
+		}
 
 		const session = await SessionHandler.createSession(user.id);
 
@@ -215,3 +214,5 @@ router.post(
 );
 
 router.route("/", (await import("./reset-password")).router);
+router.route("/", (await import("./signup")).router);
+router.route("/", (await import("./verify-email")).router);

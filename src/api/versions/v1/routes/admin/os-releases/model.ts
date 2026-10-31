@@ -1,4 +1,4 @@
-import type { TaskHandler, TuplifyUnion } from "@cleverjs/utils";
+import type { TaskHandler } from "@cleverjs/utils";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 import { DB } from "../../../../../../db";
@@ -14,13 +14,14 @@ export namespace OSReleasesModel.GetByVersion {
 	export const Response = createSelectSchema(DB.Tables.os_releases)
 		.extend({
 			published_at: z.number().nullable(),
+			// `satisfies` keeps this list from listing a status the task handler does not have.
 			publishing_status: z.enum([
 				"pending",
 				"running",
 				"paused",
 				"failed",
 				"completed",
-			] satisfies TuplifyUnion<TaskHandler.BaseTaskData<{}>["status"]>),
+			]) satisfies z.ZodType<TaskHandler.BaseTaskData<{}>["status"]>,
 		})
 		.omit({
 			taskID: true,

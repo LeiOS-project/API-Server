@@ -7,6 +7,7 @@ import { TaskScheduler } from "../../../../../../tasks";
 import { Logger } from "../../../../../../utils/logger";
 import { PermissionHelper } from "../../../../../../utils/permission-helper";
 import { APIResponse } from "../../../../../utils/api-res";
+import { AuditLog } from "../../../../../utils/auditLog";
 import { AuthHandler } from "../../../../../utils/authHandler";
 import { RuntimeMetadata } from "../../../../../utils/metadata";
 import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers";
@@ -130,6 +131,13 @@ router.post(
 			changelog: body.changelog,
 		});
 
+		await AuditLog.record({
+			actor: authContext,
+			action: "release.create",
+			targetType: "release",
+			targetLabel: `${pkg.fullname} ${body.version_with_leios_patch}`,
+		});
+
 		return APIResponse.createdNoData(c, "Package release created successfully");
 	},
 );
@@ -140,7 +148,7 @@ router.use(
 	zValidator("param", PackageReleaseModel.Param),
 
 	async (c, next) => {
-		// @ts-expect-error - hono-openapi\'s validator does not type "param" yet
+		// @ts-expect-error - hono-openapi's validator does not type "param" yet
 		const { version_with_leios_patch } = c.req.valid("param") as { version_with_leios_patch: string };
 		const pkg = c.get("package");
 
@@ -240,6 +248,14 @@ router.put(
 			.update(DB.Tables.packageReleases)
 			.set(body)
 			.where(eq(DB.Tables.packageReleases.id, release.id));
+
+		await AuditLog.record({
+			actor: authContext,
+			action: "release.update",
+			targetType: "release",
+			targetID: release.id,
+			targetLabel: `${pkg.fullname} ${release.version_with_leios_patch}`,
+		});
 
 		return APIResponse.successNoData(c, "Package release updated successfully");
 	},
@@ -398,6 +414,15 @@ router.post(
 			return APIResponse.serverError(c, "Failed to upload and verify package release");
 		}
 
+		await AuditLog.record({
+			actor: authContext,
+			action: "release.upload",
+			targetType: "release",
+			targetID: release.id,
+			targetLabel: `${pkg.fullname} ${release.version_with_leios_patch}`,
+			metadata: { arch },
+		});
+
 		return APIResponse.createdNoData(c, "Package release file uploaded successfully");
 	},
 );
@@ -483,6 +508,14 @@ router.delete(
 		});
 
 		await TaskScheduler.enqueueTask("testing-repo:update", {}, { created_by_user_id: null });
+
+		await AuditLog.record({
+			actor: authContext,
+			action: "release.delete",
+			targetType: "release",
+			targetID: release.id,
+			targetLabel: `${pkg.fullname} ${release.version_with_leios_patch}`,
+		});
 
 		return APIResponse.successNoData(c, "Package release deleted successfully");
 	},

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { DB } from "../../../../../../db";
 import { PermissionHelper } from "../../../../../../utils/permission-helper";
 import { APIResponse } from "../../../../../utils/api-res";
+import { AuditLog } from "../../../../../utils/auditLog";
 import { AuthHandler } from "../../../../../utils/authHandler";
 import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers";
 import { DOCS_TAGS } from "../../../docs";
@@ -223,6 +224,15 @@ router.post(
 			role: body.role,
 		});
 
+		await AuditLog.record({
+			actor: authContext,
+			action: "package.role_assign",
+			targetType: "package",
+			targetID: pkg.id,
+			targetLabel: pkg.fullname,
+			metadata: { user_id: body.user_id, role: body.role },
+		});
+
 		return APIResponse.createdNoData(c, "Role assignment created successfully");
 	},
 );
@@ -318,6 +328,15 @@ router.put(
 			.set({ role: body.role })
 			.where(eq(DB.Tables.roleAssignments.id, assignment.id));
 
+		await AuditLog.record({
+			actor: authContext,
+			action: "package.role_update",
+			targetType: "package",
+			targetID: pkg.id,
+			targetLabel: pkg.fullname,
+			metadata: { user_id: userId, role: body.role },
+		});
+
 		return APIResponse.successNoData(c, "Role assignment updated successfully");
 	},
 );
@@ -383,6 +402,15 @@ router.delete(
 		await DB.instance()
 			.delete(DB.Tables.roleAssignments)
 			.where(eq(DB.Tables.roleAssignments.id, assignment.id));
+
+		await AuditLog.record({
+			actor: authContext,
+			action: "package.role_unassign",
+			targetType: "package",
+			targetID: pkg.id,
+			targetLabel: pkg.fullname,
+			metadata: { user_id: userId },
+		});
 
 		return APIResponse.successNoData(c, "Role assignment deleted successfully");
 	},

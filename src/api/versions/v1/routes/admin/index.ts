@@ -22,3 +22,8 @@ router.route("/", (await import("./users")).router);
 router.route("/", (await import("./os-releases")).router);
 router.route("/", (await import("./tasks")).router);
 router.route("/", (await import("./stable-promotion-requests")).router);
+router.route("/", (await import("./publishers")).router);
+router.route("/", (await import("./packages")).router);
+router.route("/", (await import("./reports")).router);
+router.route("/", (await import("./audit-log")).router);
+router.route("/", (await import("./stats")).router);

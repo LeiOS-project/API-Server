@@ -5,6 +5,7 @@ import { z } from "zod";
 import { DB } from "../../../../../../../db";
 import { PermissionHelper } from "../../../../../../../utils/permission-helper";
 import { APIResponse } from "../../../../../../utils/api-res";
+import { AuditLog } from "../../../../../../utils/auditLog";
 import { AuthHandler } from "../../../../../../utils/authHandler";
 import { APIResponseSpec, APIRouteSpec } from "../../../../../../utils/specHelpers";
 import { DOCS_TAGS } from "../../../../docs";
@@ -160,6 +161,14 @@ router.post(
 			.returning()
 			.get();
 
+		await AuditLog.record({
+			actor: authContext,
+			action: "stable_request.create",
+			targetType: "stable_promotion_request",
+			targetID: result.id,
+			targetLabel: `${pkg.fullname} ${release.version_with_leios_patch}`,
+		});
+
 		return APIResponse.created(c, "Stable promotion request submitted", {
 			id: result.id,
 		} satisfies StablePromotionRequestsModel.Create.Response);
@@ -177,7 +186,7 @@ router.use(
 	),
 
 	async (c, next) => {
-		// @ts-expect-error - hono-openapi\'s validator does not type "param" yet
+		// @ts-expect-error - hono-openapi's validator does not type "param" yet
 		const { stablePromotionRequestID } = c.req.valid("param") as { stablePromotionRequestID: number };
 		const release = c.get("release");
 
@@ -288,6 +297,14 @@ router.delete(
 		await DB.instance()
 			.delete(DB.Tables.stablePromotionRequests)
 			.where(eq(DB.Tables.stablePromotionRequests.id, requestData.id));
+
+		await AuditLog.record({
+			actor: authContext,
+			action: "stable_request.withdraw",
+			targetType: "stable_promotion_request",
+			targetID: requestData.id,
+			targetLabel: `${pkg.fullname} ${requestData.package_release_version}`,
+		});
 
 		return APIResponse.successNoData(c, "Stable promotion request deleted successfully");
 	},

@@ -15,11 +15,11 @@ export namespace AccountModel.UpdateInfo {
 		username: UserDataPolicies.Username,
 		email: z.email("Invalid email"),
 	})
-		.omit({
-			id: true,
-			password_hash: true,
-			role: true,
-			created_at: true,
+		// Allowlist: every other column (role, status, email_verified_at, …) is server-managed.
+		.pick({
+			username: true,
+			display_name: true,
+			email: true,
 		})
 		.partial()
 		.refine((data) => Object.values(data).some((value) => value !== undefined), {

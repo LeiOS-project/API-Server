@@ -71,7 +71,7 @@ router.use(
 	zValidator("param", TaskStatusModel.Param),
 
 	async (c, next) => {
-		// @ts-expect-error - hono-openapi\'s validator does not type "param" yet
+		// @ts-expect-error - hono-openapi's validator does not type "param" yet
 		const { taskID } = c.req.valid("param") as { taskID: number };
 
 		const taskData = await DB.instance()
