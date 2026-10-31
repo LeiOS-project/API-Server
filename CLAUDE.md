@@ -31,15 +31,18 @@ src/
 ├── index.ts                      # Main: config → DB → permissions → email → branding → Aptly → API
 ├── api/
 │   ├── index.ts                  # API: CORS, onError, /v1, /docs/v1, /health
-│   ├── utils/                    # api-res, specHelpers, authHandler, email, metadata, shared-models/
+│   ├── utils/                    # api-res, specHelpers, authHandler, email, emailVerification,
+│   │                             # auditLog, rateLimiter, metadata, shared-models/
 │   └── versions/v1/
 │       ├── index.ts              # openAPIConfig (tags from docs/index.ts DOCS_TAGS) + router
 │       ├── middleware/auth.ts    # resolves the auth context
 │       └── routes/               # one folder per resource: index.ts (router) + model.ts (Zod)
-│           ├── auth/ (+ reset-password/)   account/ (+ apikeys/)   users/
+│           ├── auth/ (+ reset-password/, signup/, verify-email/)   account/ (+ apikeys/)   users/
+│           ├── meta/ (features, public stats)   os-releases/ (public)   reports/
 │           ├── publishers/ (+ members/)
 │           ├── packages/ (+ releases/, releases/stable-promotion-requests/, role-assignments/)
-│           └── admin/ (users/, os-releases/, tasks/, stable-promotion-requests/)
+│           └── admin/ (users/, publishers/, packages/, reports/, audit-log/, stats/,
+│                       os-releases/, tasks/, stable-promotion-requests/)
 ├── aptly/                        # AptlyAPIServer (process), AptlyAPI (calls), api-client/ (generated)
 ├── db/                           # DB (DB.Tables / DB.Models), schema.ts, utils.ts
 ├── tasks/                        # TaskScheduler: os-release:create, testing-repo:update
