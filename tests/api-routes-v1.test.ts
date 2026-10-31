@@ -1237,24 +1237,30 @@ describe("Publisher permission matrix coverage", async () => {
 
     let publisher: DB.Models.Publisher;
 
+    // 16 argon2 hashes: run them in parallel, and allow more than the default 5 s hook timeout.
+    // A timed-out hook makes bun kill the run's subprocesses, Aptly included.
     beforeAll(async () => {
-        owner = await seedUser("user");
-        siteAdmin = await seedUser("admin");
-        orgAdmin = await seedUser("user");
-        maintainer = await seedUser("user");
-        developer = await seedUser("user");
-        viewer = await seedUser("user");
-        outsider = await seedUser("user");
-        hiddenMemberUser = await seedUser("user");
-        transferTarget = await seedUser("user");
+        [owner, siteAdmin, orgAdmin, maintainer, developer, viewer, outsider, hiddenMemberUser, transferTarget] = await Promise.all([
+            seedUser("user"),
+            seedUser("admin"),
+            seedUser("user"),
+            seedUser("user"),
+            seedUser("user"),
+            seedUser("user"),
+            seedUser("user"),
+            seedUser("user"),
+            seedUser("user"),
+        ]);
 
-        ownerSessionToken = await seedSession(owner.id).then(s => s.token);
-        siteAdminSessionToken = await seedSession(siteAdmin.id).then(s => s.token);
-        orgAdminSessionToken = await seedSession(orgAdmin.id).then(s => s.token);
-        maintainerSessionToken = await seedSession(maintainer.id).then(s => s.token);
-        developerSessionToken = await seedSession(developer.id).then(s => s.token);
-        viewerSessionToken = await seedSession(viewer.id).then(s => s.token);
-        outsiderSessionToken = await seedSession(outsider.id).then(s => s.token);
+        [ownerSessionToken, siteAdminSessionToken, orgAdminSessionToken, maintainerSessionToken, developerSessionToken, viewerSessionToken, outsiderSessionToken] = await Promise.all([
+            seedSession(owner.id).then(s => s.token),
+            seedSession(siteAdmin.id).then(s => s.token),
+            seedSession(orgAdmin.id).then(s => s.token),
+            seedSession(maintainer.id).then(s => s.token),
+            seedSession(developer.id).then(s => s.token),
+            seedSession(viewer.id).then(s => s.token),
+            seedSession(outsider.id).then(s => s.token),
+        ]);
 
         publisher = await seedPublisherWithOwner(owner.id, {
             name: `pub-perm-${randomUUID().slice(0, 8)}`,
@@ -1268,7 +1274,7 @@ describe("Publisher permission matrix coverage", async () => {
         await upsertPublisherMember(publisher.id, developer.id, PermissionHelper.OrgRoles.DEVELOPER);
         await upsertPublisherMember(publisher.id, viewer.id, PermissionHelper.OrgRoles.VIEWER);
         await upsertPublisherMember(publisher.id, hiddenMemberUser.id, PermissionHelper.OrgRoles.VIEWER, true);
-    });
+    }, 30_000);
 
     test("GET /publishers?onlyMembershipByMe=true scopes by membership records", async () => {
         const unauth = await makeAPIRequest("/v1/publishers?onlyMembershipByMe=true", {}, 200);
