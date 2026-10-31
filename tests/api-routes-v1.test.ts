@@ -548,9 +548,10 @@ describe("Package list route", () => {
             expectedBodySchema: PackageModel.GetAll.Response
         });
 
-        expect(data.length).toBe(1);
+        expect(data.total).toBe(1);
+        expect(data.items.length).toBe(1);
 
-        const pkg = data[0]!;
+        const pkg = data.items[0]!;
         expect(pkg.id).toBe(tempPkg.id);
         expect(pkg.name).toBe(tempPkg.name);
         expect(pkg.fullname).toBe(`${tempPublisher.name}.${tempPkg.name}`);
@@ -785,13 +786,13 @@ describe("Publisher and member routes", async () => {
 
     test("GET /publishers supports membership filtering", async () => {
         const unauthList = await makeAPIRequest("/v1/publishers?onlyMembershipByMe=true", {}, 200);
-        expect(unauthList).toEqual([]);
+        expect(unauthList).toEqual({ items: [], total: 0 });
 
         const authList = await makeAPIRequest("/v1/publishers?onlyMembershipByMe=true", {
             authToken: ownerSessionToken
         }, 200);
 
-        expect(authList).toEqual([]);
+        expect(authList).toEqual({ items: [], total: 0 });
     });
 
     test("GET /publishers/:publisherName returns publisher details", async () => {
@@ -930,7 +931,7 @@ describe("Package sub-routes coverage", async () => {
             expectedBodySchema: PackageModel.GetAll.Response
         }, 200);
 
-        expect(list.some(pkg => pkg.id === packageID)).toBe(true);
+        expect(list.items.some(pkg => pkg.id === packageID)).toBe(true);
     });
 
     test("GET /packages/:fullPackageName returns package", async () => {
@@ -1271,22 +1272,22 @@ describe("Publisher permission matrix coverage", async () => {
 
     test("GET /publishers?onlyMembershipByMe=true scopes by membership records", async () => {
         const unauth = await makeAPIRequest("/v1/publishers?onlyMembershipByMe=true", {}, 200);
-        expect(unauth).toEqual([]);
+        expect(unauth).toEqual({ items: [], total: 0 });
 
         const ownerList = await makeAPIRequest("/v1/publishers?onlyMembershipByMe=true", {
             authToken: ownerSessionToken
         }, 200);
-        expect(ownerList.some((p: any) => p.id === publisher.id)).toBe(false);
+        expect(ownerList.items.some((p: any) => p.id === publisher.id)).toBe(false);
 
         const outsiderList = await makeAPIRequest("/v1/publishers?onlyMembershipByMe=true", {
             authToken: outsiderSessionToken
         }, 200);
-        expect(outsiderList.some((p: any) => p.id === publisher.id)).toBe(false);
+        expect(outsiderList.items.some((p: any) => p.id === publisher.id)).toBe(false);
 
         const memberList = await makeAPIRequest("/v1/publishers?onlyMembershipByMe=true", {
             authToken: orgAdminSessionToken
         }, 200);
-        expect(memberList.some((p: any) => p.id === publisher.id)).toBe(true);
+        expect(memberList.items.some((p: any) => p.id === publisher.id)).toBe(true);
     });
 
     test("PUT /publishers/:publisherName enforces publisher.update permission matrix", async () => {
@@ -2353,8 +2354,9 @@ describe("Admin sub-routes coverage", async () => {
             authToken: adminSessionToken
         }, 200);
 
-        expect(Array.isArray(users)).toBe(true);
-        expect(users.length).toBeGreaterThan(0);
+        expect(Array.isArray(users.items)).toBe(true);
+        expect(users.items.length).toBeGreaterThan(0);
+        expect(users.total).toBeGreaterThanOrEqual(users.items.length);
     });
 
     test("POST /admin/users creates a user", async () => {
@@ -2414,8 +2416,8 @@ describe("Admin sub-routes coverage", async () => {
             authToken: adminSessionToken
         }, 200);
 
-        expect(Array.isArray(tasks)).toBe(true);
-        expect(tasks.some((task: any) => task.id === taskWithoutLogsID)).toBe(true);
+        expect(Array.isArray(tasks.items)).toBe(true);
+        expect(tasks.items.some((task: any) => task.id === taskWithoutLogsID)).toBe(true);
     });
 
     test("GET /admin/tasks/:taskID returns task", async () => {
@@ -2445,8 +2447,8 @@ describe("Admin sub-routes coverage", async () => {
             authToken: adminSessionToken
         }, 200);
 
-        expect(Array.isArray(releases)).toBe(true);
-        expect(releases.some((rel: any) => rel.version === manualOSReleaseVersion)).toBe(true);
+        expect(Array.isArray(releases.items)).toBe(true);
+        expect(releases.items.some((rel: any) => rel.version === manualOSReleaseVersion)).toBe(true);
     });
 
     test("GET /admin/os-releases/:version returns os release", async () => {
@@ -2496,8 +2498,8 @@ describe("Admin sub-routes coverage", async () => {
             authToken: adminSessionToken
         }, 200);
 
-        expect(Array.isArray(list)).toBe(true);
-        expect(list.some((req: any) => req.id === stableRequestID)).toBe(true);
+        expect(Array.isArray(list.items)).toBe(true);
+        expect(list.items.some((req: any) => req.id === stableRequestID)).toBe(true);
     });
 
     test("GET /admin/stable-promotion-requests/:stablePromotionRequestID returns request", async () => {
@@ -2872,5 +2874,125 @@ describe("Docs Routes", async () => {
     test("GET /docs/v1 returns 404 if disabled", async () => {
 
         await makeAPIRequest("/docs/v1", {}, 404);
+    });
+});
+
+
+describe("List filters and pagination", async () => {
+
+    let admin: SeededUser;
+    let adminSessionToken: string;
+    let member: SeededUser;
+    let memberSessionToken: string;
+
+    let memberPublisher: DB.Models.Publisher;
+    let otherPublisher: DB.Models.Publisher;
+    let memberPackage: DB.Models.Package;
+    let assignedPackage: DB.Models.Package;
+    let otherPackage: DB.Models.Package;
+
+    beforeAll(async () => {
+        admin = await seedUser("admin");
+        adminSessionToken = await seedSession(admin.id).then(s => s.token);
+        member = await seedUser("user");
+        memberSessionToken = await seedSession(member.id).then(s => s.token);
+
+        const otherOwner = await seedUser("user");
+        memberPublisher = await seedPublisherWithOwner(member.id);
+        otherPublisher = await seedPublisherWithOwner(otherOwner.id);
+        await upsertPublisherMember(memberPublisher.id, member.id, PermissionHelper.OrgRoles.ADMIN);
+
+        memberPackage = await seedPackageForPublisher(memberPublisher.id);
+        assignedPackage = await seedPackageForPublisher(otherPublisher.id);
+        otherPackage = await seedPackageForPublisher(otherPublisher.id);
+
+        await DB.instance().insert(DB.Tables.roleAssignments).values({
+            package_id: assignedPackage.id,
+            user_id: member.id,
+            role: PermissionHelper.OrgRoles.DEVELOPER
+        }).run();
+    });
+
+    test("GET /packages?onlyMembershipByMe=true returns member and role-assigned packages only", async () => {
+        const list = await makeAPIRequest("/v1/packages?onlyMembershipByMe=true&limit=100", {
+            authToken: memberSessionToken,
+            expectedBodySchema: PackageModel.GetAll.Response
+        });
+
+        const ids = list.items.map(pkg => pkg.id);
+        expect(ids).toContain(memberPackage.id);
+        expect(ids).toContain(assignedPackage.id);
+        expect(ids).not.toContain(otherPackage.id);
+        expect(list.total).toBe(list.items.length);
+    });
+
+    test("GET /packages?onlyMembershipByMe=false does not filter by membership", async () => {
+        const list = await makeAPIRequest(`/v1/packages?onlyMembershipByMe=false&publisherID=${otherPublisher.id}`, {
+            authToken: memberSessionToken,
+            expectedBodySchema: PackageModel.GetAll.Response
+        });
+
+        expect(list.items.map(pkg => pkg.id)).toContain(otherPackage.id);
+    });
+
+    test("GET /packages rejects non-boolean onlyMembershipByMe values", async () => {
+        await makeAPIRequest("/v1/packages?onlyMembershipByMe=yes", {}, 400);
+    });
+
+    test("GET /publishers?onlyMembershipByMe=false lists publishers the caller is not a member of", async () => {
+        const list = await makeAPIRequest("/v1/publishers?onlyMembershipByMe=false&limit=100", {
+            authToken: memberSessionToken
+        }, 200);
+
+        expect(list.total).toBeGreaterThanOrEqual(2);
+        expect(list.items.some((p: any) => p.id === otherPublisher.id)).toBe(true);
+    });
+
+    test("GET /packages reports the total beyond the page size", async () => {
+        const page = await makeAPIRequest(`/v1/packages?publisherID=${otherPublisher.id}&limit=1`, {
+            expectedBodySchema: PackageModel.GetAll.Response
+        });
+
+        expect(page.items.length).toBe(1);
+        expect(page.total).toBe(2);
+    });
+
+    test("GET release stable-promotion-requests?status= stays scoped to the release", async () => {
+        const release = await seedPackageRelease(memberPackage.id);
+        const otherRelease = await seedPackageRelease(otherPackage.id);
+        const own = await seedStablePromotionRequest(memberPackage.id, release.id);
+        await seedStablePromotionRequest(otherPackage.id, otherRelease.id);
+
+        const list = await makeAPIRequest(
+            `/v1/packages/${memberPublisher.name}.${memberPackage.name}/releases/${release.version_with_leios_patch}/stable-promotion-requests?status=pending`,
+            {},
+            200
+        );
+
+        expect(list.map((item: any) => item.id)).toEqual([own.id]);
+    });
+
+    test("GET /admin/stable-promotion-requests?status= filters and includes the package fullname", async () => {
+        const release = await seedPackageRelease(memberPackage.id);
+        const denied = await seedStablePromotionRequest(memberPackage.id, release.id, { status: "denied", admin_note: "no" });
+
+        const list = await makeAPIRequest("/v1/admin/stable-promotion-requests?status=denied&limit=100", {
+            authToken: adminSessionToken
+        }, 200);
+
+        expect(list.items.every((item: any) => item.status === "denied")).toBe(true);
+        const item = list.items.find((entry: any) => entry.id === denied.id);
+        expect(item?.package_fullname).toBe(`${memberPublisher.name}.${memberPackage.name}`);
+    });
+
+    test("GET /admin/tasks?status= filters by task status", async () => {
+        const failed = await seedTask({ status: "failed" });
+
+        const list = await makeAPIRequest("/v1/admin/tasks?status=failed&limit=100", {
+            authToken: adminSessionToken
+        }, 200);
+
+        expect(list.items.every((task: any) => task.status === "failed")).toBe(true);
+        expect(list.items.some((task: any) => task.id === failed.id)).toBe(true);
     });
 });

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { validator as zValidator } from "hono-openapi";
-import { and, eq, like, or } from "drizzle-orm";
+import { and, eq, like, or, type SQL } from "drizzle-orm";
 import { DB } from "../../../../../../db";
 import { APIResponse } from "../../../../../utils/api-res";
 import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers";
@@ -31,7 +31,7 @@ router.get('/',
     async (c) => {
         const filters = c.req.valid("query") as UsersModel.GetAll.Query;
 
-        let predicate: ReturnType<typeof eq> | undefined;
+        let predicate: SQL | undefined;
 
         if (filters.role) {
             predicate = eq(DB.Tables.users.role, filters.role);
@@ -48,23 +48,16 @@ router.get('/',
             predicate = predicate ? and(predicate, searchPredicate) : searchPredicate;
         }
 
-        let query = DB.instance().select().from(DB.Tables.users).$dynamic();
+        const users = await DB.instance().select()
+            .from(DB.Tables.users)
+            .where(predicate)
+            .orderBy(DB.Tables.users.id)
+            .limit(filters.limit)
+            .offset(filters.offset);
 
-        if (predicate) {
-            query = query.where(predicate);
-        }
+        const total = await DB.instance().$count(DB.Tables.users, predicate);
 
-        if (filters.limit) {
-            query = query.limit(filters.limit);
-        }
-
-        if (filters.offset) {
-            query = query.offset(filters.offset);
-        }
-
-        const users = await query.orderBy(DB.Tables.users.id);
-
-        return APIResponse.success(c, "Users retrieved successfully", users.map(sanitizeUser));
+        return APIResponse.success(c, "Users retrieved successfully", { items: users.map(sanitizeUser), total } satisfies UsersModel.GetAll.Response);
     }
 );
 

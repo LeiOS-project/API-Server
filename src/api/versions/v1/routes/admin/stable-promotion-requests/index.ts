@@ -24,13 +24,15 @@ router.get('/',
         )
     }),
 
-    zValidator("query", ApiHelperModels.ListAll.Query),
+    zValidator("query", AdminStablePromotionRequestModel.GetAll.Query),
 
     async (c) => {
 
-        const { limit, offset, order } = c.req.valid("query");
+        const { limit, offset, order, status } = c.req.valid("query");
 
-        const results = await DB.instance().select({
+        const where = status ? eq(DB.Tables.stablePromotionRequests.status, status) : undefined;
+
+        const items = await DB.instance().select({
             id: DB.Tables.stablePromotionRequests.id,
             package_id: DB.Tables.stablePromotionRequests.package_id,
             package_release_id: DB.Tables.stablePromotionRequests.package_release_id,
@@ -38,18 +40,20 @@ router.get('/',
             status: DB.Tables.stablePromotionRequests.status,
             admin_note: DB.Tables.stablePromotionRequests.admin_note,
 
-            package_name: DB.Tables.packages.name,
+            package_name: DB.Tables.packagesFullView.name,
+            package_fullname: DB.Tables.packagesFullView.fullname,
             package_release_version: DB.Tables.packageReleases.version_with_leios_patch,
         })
         .from(DB.Tables.stablePromotionRequests)
         .innerJoin(
-            DB.Tables.packages,
-            eq(DB.Tables.packages.id, DB.Tables.stablePromotionRequests.package_id),
+            DB.Tables.packagesFullView,
+            eq(DB.Tables.packagesFullView.id, DB.Tables.stablePromotionRequests.package_id),
         )
         .innerJoin(
             DB.Tables.packageReleases,
             eq(DB.Tables.packageReleases.id, DB.Tables.stablePromotionRequests.package_release_id),
         )
+        .where(where)
         .orderBy(
             order === "newest" ?
                 desc(DB.Tables.stablePromotionRequests.created_at) :
@@ -58,7 +62,9 @@ router.get('/',
         .limit(limit)
         .offset(offset);
 
-        return APIResponse.success(c, "Stable promotion requests retrieved successfully", results satisfies AdminStablePromotionRequestModel.GetAll.Response);
+        const total = await DB.instance().$count(DB.Tables.stablePromotionRequests, where);
+
+        return APIResponse.success(c, "Stable promotion requests retrieved successfully", { items, total } satisfies AdminStablePromotionRequestModel.GetAll.Response);
     }
 );
 
@@ -105,9 +111,10 @@ router.get('/:stablePromotionRequestID',
         const request = c.get("stablePromotionRequest") as DB.Models.StablePromotionRequest;
 
         const pkg = await DB.instance().select({
-            name: DB.Tables.packages.name
-        }).from(DB.Tables.packages).where(
-            eq(DB.Tables.packages.id, request.package_id)
+            name: DB.Tables.packagesFullView.name,
+            fullname: DB.Tables.packagesFullView.fullname
+        }).from(DB.Tables.packagesFullView).where(
+            eq(DB.Tables.packagesFullView.id, request.package_id)
         ).get();
 
         if (!pkg) {
@@ -126,6 +133,7 @@ router.get('/:stablePromotionRequestID',
         const result = {
             ...request,
             package_name: pkg.name,
+            package_fullname: pkg.fullname,
             package_release_version: pkgRelease.version_with_leios_patch
         };
 

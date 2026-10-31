@@ -7,7 +7,7 @@ import { ApiHelperModels } from "../../../../../utils/shared-models/api-helper-m
 import { DB } from "../../../../../../db";
 import { APIResponse } from "../../../../../utils/api-res";
 import { TaskUtils } from "../../../../../../tasks/utils";
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, like, or } from "drizzle-orm";
 
 export const router = new Hono().basePath("/tasks");
 
@@ -23,13 +23,24 @@ router.get('/',
         )
     }),
 
-    zValidator("query", ApiHelperModels.ListAll.QueryWithSearch),
+    zValidator("query", TaskStatusModel.GetAll.Query),
 
     async (c) => {
         const queryOpts = c.req.valid("query");
 
-        const tasks = await DB.instance().select()
+        const where = and(
+            queryOpts.status ? eq(DB.Tables.scheduled_tasks.status, queryOpts.status) : undefined,
+            queryOpts.searchString
+                ? or(
+                    like(DB.Tables.scheduled_tasks.function, `%${queryOpts.searchString}%`),
+                    like(DB.Tables.scheduled_tasks.message, `%${queryOpts.searchString}%`)
+                )
+                : undefined,
+        );
+
+        const items = await DB.instance().select()
             .from(DB.Tables.scheduled_tasks)
+            .where(where)
             .orderBy(
                 queryOpts.order === "newest" ?
                     desc(DB.Tables.scheduled_tasks.created_at) :
@@ -38,7 +49,9 @@ router.get('/',
             .limit(queryOpts.limit)
             .offset(queryOpts.offset);
 
-        return APIResponse.success(c, "Scheduled tasks retrieved", tasks);
+        const total = await DB.instance().$count(DB.Tables.scheduled_tasks, where);
+
+        return APIResponse.success(c, "Scheduled tasks retrieved", { items, total } satisfies TaskStatusModel.GetAll.Response);
     }
 );
 

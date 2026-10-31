@@ -1,6 +1,7 @@
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { DB } from "../../../../../../db";
 import { z } from "zod";
+import { ApiHelperModels } from "../../../../../utils/shared-models/api-helper-models";
 import { type TuplifyUnion, TaskHandler } from "@cleverjs/utils";
 
 export namespace OSReleasesModel {
@@ -27,7 +28,7 @@ export namespace OSReleasesModel.GetByVersion {
 
 export namespace OSReleasesModel.GetAll {
 
-    export const Response = z.array(OSReleasesModel.GetByVersion.Response);
+    export const Response = ApiHelperModels.Paginated(OSReleasesModel.GetByVersion.Response);
 
     export type Response = z.infer<typeof Response>;
 

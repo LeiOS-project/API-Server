@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { validator as zValidator } from "hono-openapi";
 import { z } from "zod";
-import { and, eq, like, or, SQL } from "drizzle-orm";
+import { and, asc, eq, inArray, like, or, SQL } from "drizzle-orm";
 import { DB } from "../../../../../db";
 import { APIResponse } from "../../../../utils/api-res";
 import { PublisherModel } from "./model";
@@ -37,7 +37,7 @@ router.get('/',
         const { limit, offset, searchString, onlyMembershipByMe } = c.req.valid("query");
 
         if (onlyMembershipByMe && authContext.type === "unauthenticated") {
-            return APIResponse.success(c, "Publishers retrieved successfully", []);
+            return APIResponse.success(c, "Publishers retrieved successfully", { items: [], total: 0 } satisfies PublisherModel.GetAll.Response);
         }
 
         let query = DB.instance()
@@ -57,17 +57,16 @@ router.get('/',
             .from(DB.Tables.publishers)
             .$dynamic();
 
-        if (onlyMembershipByMe && authContext.type !== "unauthenticated") {
-            query = query.innerJoin(
-                DB.Tables.publisherMembers,
-                and(
-                    eq(DB.Tables.publisherMembers.publisher_id, DB.Tables.publishers.id),
-                    eq(DB.Tables.publisherMembers.user_id, authContext.user_id)
-                )
-            );
-        }
-
         const filters: Array<SQL<unknown> | undefined> = [];
+
+        if (onlyMembershipByMe && authContext.type !== "unauthenticated") {
+            filters.push(inArray(
+                DB.Tables.publishers.id,
+                DB.instance().select({ id: DB.Tables.publisherMembers.publisher_id })
+                    .from(DB.Tables.publisherMembers)
+                    .where(eq(DB.Tables.publisherMembers.user_id, authContext.user_id))
+            ));
+        }
 
         if (searchString) {
             filters.push(
@@ -78,12 +77,17 @@ router.get('/',
             );
         }
 
-        const results = await query
-            .where(filters.length > 0 ? and(...filters) : undefined)
+        const where = filters.length > 0 ? and(...filters) : undefined;
+
+        const items = await query
+            .where(where)
+            .orderBy(asc(DB.Tables.publishers.name))
             .limit(limit)
             .offset(offset);
 
-        return APIResponse.success(c, "Publishers retrieved successfully", results satisfies PublisherModel.GetAll.Response);
+        const total = await DB.instance().$count(DB.Tables.publishers, where);
+
+        return APIResponse.success(c, "Publishers retrieved successfully", { items, total } satisfies PublisherModel.GetAll.Response);
     }
 );
 

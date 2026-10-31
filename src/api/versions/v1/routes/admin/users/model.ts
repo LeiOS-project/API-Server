@@ -2,6 +2,7 @@ import { createInsertSchema, createSelectSchema, createUpdateSchema } from "driz
 import { DB } from "../../../../../../db";
 import z from "zod";
 import { UserDataPolicys } from "../../../../../utils/shared-models/accountData";
+import { ApiHelperModels } from "../../../../../utils/shared-models/api-helper-models";
 
 export namespace UsersModel {
 
@@ -14,12 +15,12 @@ export namespace UsersModel {
         export const Query = z.object({
             role: z.enum(['admin', 'developer', 'user']).optional(),
             search: z.string().min(1).max(64).optional(),
-            limit: z.coerce.number().int().min(1).max(100).optional(),
-            offset: z.coerce.number().int().min(0).optional(),
+            limit: z.coerce.number().int().min(1).max(100).default(25),
+            offset: z.coerce.number().int().min(0).default(0),
         });
         export type Query = z.infer<typeof Query>;
 
-        export const Response = z.array(SafeUser);
+        export const Response = ApiHelperModels.Paginated(SafeUser);
         export type Response = z.infer<typeof Response>;
     }
 

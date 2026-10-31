@@ -66,7 +66,7 @@ export namespace PackageModel.GetAll {
         publisherID: z.coerce.number().int().min(1).optional(),
         publisherName: z.string().min(1).optional(),
 
-        onlyMembershipByMe: z.coerce.boolean().default(false)
+        onlyMembershipByMe: ApiHelperModels.QueryBoolean.default(false)
 
     }).refine(
         (data) => !(data.publisherID !== undefined && data.publisherName !== undefined),
@@ -78,7 +78,7 @@ export namespace PackageModel.GetAll {
 
     export type Query = z.infer<typeof Query>;
 
-    export const Response = z.array(PackageModel.GetPackageByFullName.Response);
+    export const Response = ApiHelperModels.Paginated(PackageModel.GetPackageByFullName.Response);
     export type Response = z.infer<typeof Response>;
 
 }

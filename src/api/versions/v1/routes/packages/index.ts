@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { PackageModel } from '../../../../utils/shared-models/package';
 import { validator as zValidator } from "hono-openapi";
 import { APIResponseSpec, APIRouteSpec } from "../../../../utils/specHelpers";
-import { and, eq, like, or, SQL } from "drizzle-orm";
+import { and, asc, eq, inArray, like, or, SQL } from "drizzle-orm";
 import { DB } from "../../../../../db";
 import { APIResponse } from "../../../../utils/api-res";
 import { AuthHandler } from "../../../../utils/authHandler";
@@ -32,9 +32,34 @@ router.get('/',
     zValidator("query", PackageModel.GetAll.Query),
 
     async (c) => {
-        const { limit, offset, searchString, publisherID, publisherName } = c.req.valid("query");
+        const { limit, offset, searchString, publisherID, publisherName, onlyMembershipByMe } = c.req.valid("query");
+        // @ts-ignore
+        const authContext = c.get("authContext") as AuthHandler.AuthContext;
 
         const filters: Array<SQL<unknown> | undefined> = [];
+
+        if (onlyMembershipByMe) {
+            if (authContext.type === "unauthenticated") {
+                return APIResponse.success(c, "Packages retrieved successfully", { items: [], total: 0 } satisfies PackageModel.GetAll.Response);
+            }
+
+            // A user's packages: everything published by a publisher they are a member of, plus
+            // packages they hold a direct role assignment on.
+            filters.push(or(
+                inArray(
+                    DB.Tables.packagesFullView.publisher_id,
+                    DB.instance().select({ id: DB.Tables.publisherMembers.publisher_id })
+                        .from(DB.Tables.publisherMembers)
+                        .where(eq(DB.Tables.publisherMembers.user_id, authContext.user_id))
+                ),
+                inArray(
+                    DB.Tables.packagesFullView.id,
+                    DB.instance().select({ id: DB.Tables.roleAssignments.package_id })
+                        .from(DB.Tables.roleAssignments)
+                        .where(eq(DB.Tables.roleAssignments.user_id, authContext.user_id))
+                )
+            ));
+        }
 
         if (publisherID !== undefined) {
             filters.push(eq(DB.Tables.packagesFullView.publisher_id, publisherID));
@@ -45,7 +70,7 @@ router.get('/',
                 .where(eq(DB.Tables.publishers.name, publisherName))
                 .get();
             if (!publisher) {
-                return APIResponse.success(c, "Packages retrieved successfully", []);
+                return APIResponse.success(c, "Packages retrieved successfully", { items: [], total: 0 } satisfies PackageModel.GetAll.Response);
             }
             filters.push(eq(DB.Tables.packagesFullView.publisher_id, publisher.id));
         }
@@ -60,14 +85,19 @@ router.get('/',
             );
         }
 
-        const results = await DB.instance()
+        const where = filters.length > 0 ? and(...filters) : undefined;
+
+        const items = await DB.instance()
             .select()
             .from(DB.Tables.packagesFullView)
-            .where(filters.length > 0 ? and(...filters) : undefined)
+            .where(where)
+            .orderBy(asc(DB.Tables.packagesFullView.fullname))
             .limit(limit)
             .offset(offset);
 
-        return APIResponse.success(c, "Packages retrieved successfully", results satisfies PackageModel.GetAll.Response);
+        const total = await DB.instance().$count(DB.Tables.packagesFullView, where);
+
+        return APIResponse.success(c, "Packages retrieved successfully", { items, total } satisfies PackageModel.GetAll.Response);
     }
 );
 

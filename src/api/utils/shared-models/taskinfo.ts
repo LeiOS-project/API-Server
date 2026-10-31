@@ -1,6 +1,7 @@
 import { createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 import { DB } from "../../../db";
+import { ApiHelperModels } from "./api-helper-models";
 
 export namespace TaskStatusModel {
 
@@ -26,7 +27,12 @@ export namespace TaskStatusModel.GetByID {
 
 export namespace TaskStatusModel.GetAll {
 
-    export const Response = z.array(TaskStatusModel.GetByID.Response);
+    export const Query = ApiHelperModels.ListAll.QueryWithSearch.extend({
+        status: z.enum(["pending", "running", "paused", "failed", "completed"]).optional(),
+    });
+    export type Query = z.infer<typeof Query>;
+
+    export const Response = ApiHelperModels.Paginated(TaskStatusModel.GetByID.Response);
     export type Response = z.infer<typeof Response>;
 
 }

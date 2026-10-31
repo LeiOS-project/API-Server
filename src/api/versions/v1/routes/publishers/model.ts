@@ -89,13 +89,13 @@ export namespace PublisherModel.GetAll {
     export const Query = ApiHelperModels.ListAll.QueryWithSearch.omit({
         order: true
     }).extend({
-        onlyMembershipByMe: z.coerce.boolean().default(false)
+        onlyMembershipByMe: ApiHelperModels.QueryBoolean.default(false)
     });
 
     export type Query = z.infer<typeof Query>;
 
 
-    export const Response = z.array(PublisherModel.GetPublisherByName.Response);
+    export const Response = ApiHelperModels.Paginated(PublisherModel.GetPublisherByName.Response);
 
     export type Response = z.infer<typeof Response>;
 

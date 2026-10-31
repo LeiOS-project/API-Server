@@ -31,7 +31,7 @@ router.get('/',
 	async (c) => {
 		const { limit, offset, order } = c.req.valid("query");
 
-		const releases = await DB.instance().select({
+		const items = await DB.instance().select({
 			id: DB.Tables.os_releases.id,
 			version: DB.Tables.os_releases.version,
 			changelog: DB.Tables.os_releases.changelog,
@@ -53,7 +53,9 @@ router.get('/',
 		.limit(limit)
 		.offset(offset);
 
-		return APIResponse.success(c, "OS releases retrieved", releases satisfies OSReleasesModel.GetAll.Response);
+		const total = await DB.instance().$count(DB.Tables.os_releases);
+
+		return APIResponse.success(c, "OS releases retrieved", { items, total } satisfies OSReleasesModel.GetAll.Response);
 	}
 );
 
