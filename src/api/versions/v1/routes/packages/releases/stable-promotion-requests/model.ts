@@ -1,6 +1,6 @@
 import { createSelectSchema } from "drizzle-zod";
 import z from "zod";
-import { DB } from "../../../db";
+import { DB } from "../../../../../../../db";
 
 export namespace StablePromotionRequestsModel {
 	export const Status = z.enum(["pending", "approved", "denied"]);

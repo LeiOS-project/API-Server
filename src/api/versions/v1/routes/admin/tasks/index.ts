@@ -5,11 +5,16 @@ import { DB } from "../../../../../../db";
 import { TaskUtils } from "../../../../../../tasks/utils";
 import { APIResponse } from "../../../../../utils/api-res";
 import { ApiHelperModels } from "../../../../../utils/shared-models/api-helper-models";
-import { TaskStatusModel } from "../../../../../utils/shared-models/taskinfo";
 import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers";
 import { DOCS_TAGS } from "../../../docs";
+import { TaskStatusModel } from "./model";
 
-export const router = new Hono().basePath("/tasks");
+/** Per-request values loaded by the parameter middlewares (this router's or a parent's). */
+type Variables = {
+	task: DB.Models.ScheduledTask;
+};
+
+export const router = new Hono<{ Variables: Variables }>().basePath("/tasks");
 
 router.get(
 	"/",
@@ -66,7 +71,7 @@ router.use(
 	zValidator("param", TaskStatusModel.Param),
 
 	async (c, next) => {
-		// @ts-expect-error
+		// @ts-expect-error - hono-openapi\'s validator does not type "param" yet
 		const { taskID } = c.req.valid("param") as { taskID: number };
 
 		const taskData = await DB.instance()
@@ -79,7 +84,6 @@ router.use(
 			return APIResponse.notFound(c, "Task with specified ID not found");
 		}
 
-		// @ts-expect-error
 		c.set("task", taskData);
 
 		await next();
@@ -101,8 +105,7 @@ router.get(
 	}),
 
 	async (c) => {
-		// @ts-expect-error
-		const taskData = c.get("task") as DB.Models.ScheduledTask;
+		const taskData = c.get("task");
 		return APIResponse.success(c, "Task retrieved successfully", taskData);
 	},
 );
@@ -126,8 +129,7 @@ router.get(
 	}),
 
 	async (c) => {
-		// @ts-expect-error
-		const taskData = c.get("task") as DB.Models.ScheduledTask;
+		const taskData = c.get("task");
 
 		if (!taskData.storeLogs) {
 			return APIResponse.badRequest(c, "Logs are not stored for this task");

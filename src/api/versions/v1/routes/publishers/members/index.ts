@@ -2,16 +2,23 @@ import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator as zValidator } from "hono-openapi";
 import { z } from "zod";
-import { DB } from "../../../../../db";
-import { Utils } from "../../../../../utils";
-import { PermissionHelper } from "../../../../../utils/permission-helper";
-import { APIResponse } from "../../../../utils/api-res";
-import type { AuthHandler } from "../../../../utils/authHandler";
-import { APIResponseSpec, APIRouteSpec } from "../../../../utils/specHelpers";
-import { DOCS_TAGS } from "../../docs";
-import { PublisherModel } from "./model";
+import { DB } from "../../../../../../db";
+import { Utils } from "../../../../../../utils";
+import { PermissionHelper } from "../../../../../../utils/permission-helper";
+import { APIResponse } from "../../../../../utils/api-res";
+import { AuthHandler } from "../../../../../utils/authHandler";
+import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers";
+import { DOCS_TAGS } from "../../../docs";
+import { PublisherModel } from "../model";
+import { PublisherMembersModel } from "./model";
 
-export const router = new Hono().basePath("/members");
+/** Per-request values loaded by the parameter middlewares (this router's or a parent's). */
+type Variables = {
+	publisher: DB.Models.Publisher;
+	member: DB.Models.PublisherMember;
+};
+
+export const router = new Hono<{ Variables: Variables }>().basePath("/members");
 
 // List members
 router.get(
@@ -26,16 +33,14 @@ router.get(
 		responses: APIResponseSpec.describeBasic(
 			APIResponseSpec.success(
 				"Members retrieved successfully",
-				PublisherModel.Members.ListAll.Response,
+				PublisherMembersModel.ListAll.Response,
 			),
 		),
 	}),
 
 	async (c) => {
-		// @ts-expect-error
-		const publisher = c.get("publisher") as DB.Models.Publisher;
-		// @ts-expect-error
-		const authContext = c.get("authContext") as AuthHandler.AuthContext;
+		const publisher = c.get("publisher");
+		const authContext = AuthHandler.AuthContext.get(c);
 
 		let canSeeHidden = false;
 		if (authContext.type !== "unauthenticated") {
@@ -79,7 +84,7 @@ router.get(
 		return APIResponse.success(
 			c,
 			"Members retrieved successfully",
-			Utils.asExact<PublisherModel.Members.ListAll.Response>()(members),
+			Utils.asExact<PublisherMembersModel.ListAll.Response>()(members),
 		);
 	},
 );
@@ -94,20 +99,18 @@ router.post(
 		tags: [DOCS_TAGS.PUBLISHERS_MEMBERS],
 
 		responses: APIResponseSpec.describeWithWrongInputs(
-			APIResponseSpec.created("Member added successfully", PublisherModel.Members.AddMember.Response),
+			APIResponseSpec.created("Member added successfully", PublisherMembersModel.Add.Response),
 			APIResponseSpec.conflict("User is already a member"),
 			APIResponseSpec.forbidden("You do not have permission to manage members"),
 			APIResponseSpec.notFound("User not found"),
 		),
 	}),
 
-	zValidator("json", PublisherModel.Members.AddMember.Body),
+	zValidator("json", PublisherMembersModel.Add.Body),
 
 	async (c) => {
-		// @ts-expect-error
-		const publisher = c.get("publisher") as DB.Models.Publisher;
-		// @ts-expect-error
-		const authContext = c.get("authContext") as AuthHandler.AuthContext;
+		const publisher = c.get("publisher");
+		const authContext = AuthHandler.AuthContext.get(c);
 		const body = c.req.valid("json");
 
 		const allowed = await PermissionHelper.can({
@@ -167,7 +170,7 @@ router.post(
 
 		return APIResponse.created(c, "Member added successfully", {
 			id: member.id,
-		} satisfies PublisherModel.Members.AddMember.Response);
+		} satisfies PublisherMembersModel.Add.Response);
 	},
 );
 
@@ -182,9 +185,8 @@ router.use(
 	),
 
 	async (c, next) => {
-		// @ts-expect-error
-		const publisher = c.get("publisher") as DB.Models.Publisher;
-		// @ts-expect-error
+		const publisher = c.get("publisher");
+		// @ts-expect-error - hono-openapi\'s validator does not type "param" yet
 		const { userId } = c.req.valid("param") as { userId: number };
 
 		const member: DB.Models.PublisherMember | undefined = await DB.instance()
@@ -202,7 +204,6 @@ router.use(
 			return APIResponse.notFound(c, "Member not found");
 		}
 
-		// @ts-expect-error
 		c.set("member", member);
 
 		return await next();
@@ -218,19 +219,14 @@ router.get(
 		tags: [DOCS_TAGS.PUBLISHERS_MEMBERS],
 
 		responses: APIResponseSpec.describeBasic(
-			APIResponseSpec.success(
-				"Member retrieved successfully",
-				PublisherModel.Members.GetMemberByID.Response,
-			),
+			APIResponseSpec.success("Member retrieved successfully", PublisherMembersModel.GetByID.Response),
 			APIResponseSpec.notFound("Member not found"),
 		),
 	}),
 
 	async (c) => {
-		// @ts-expect-error
-		const member = c.get("member") as DB.Models.PublisherMember;
-		// @ts-expect-error
-		const authContext = c.get("authContext") as AuthHandler.AuthContext;
+		const member = c.get("member");
+		const authContext = AuthHandler.AuthContext.get(c);
 
 		if (member.is_publicly_hidden) {
 			let canSeeHidden = false;
@@ -271,7 +267,7 @@ router.get(
 			throw new Error("Inconsistent database state: publisher member references non-existent user");
 		}
 
-		const response: PublisherModel.Members.GetMemberByID.Response = {
+		const response: PublisherMembersModel.GetByID.Response = {
 			id: member.id,
 			user_id: member.user_id,
 			user_username: memberUserData.user_username,
@@ -302,17 +298,14 @@ router.put(
 		),
 	}),
 
-	zValidator("json", PublisherModel.Members.UpdateMember.Body),
+	zValidator("json", PublisherMembersModel.Update.Body),
 
 	async (c) => {
-		// @ts-expect-error
-		const authContext = c.get("authContext") as AuthHandler.AuthContext;
+		const authContext = AuthHandler.AuthContext.get(c);
 
-		// @ts-expect-error
-		const publisher = c.get("publisher") as DB.Models.Publisher;
+		const publisher = c.get("publisher");
 
-		// @ts-expect-error
-		const member = c.get("member") as DB.Models.PublisherMember;
+		const member = c.get("member");
 
 		const body = c.req.valid("json");
 
@@ -376,12 +369,9 @@ router.delete(
 	}),
 
 	async (c) => {
-		// @ts-expect-error
-		const authContext = c.get("authContext") as AuthHandler.AuthContext;
-		// @ts-expect-error
-		const publisher = c.get("publisher") as DB.Models.Publisher;
-		// @ts-expect-error
-		const member = c.get("member") as DB.Models.PublisherMember;
+		const authContext = AuthHandler.AuthContext.get(c);
+		const publisher = c.get("publisher");
+		const member = c.get("member");
 
 		const allowed = await PermissionHelper.can({
 			authContext,

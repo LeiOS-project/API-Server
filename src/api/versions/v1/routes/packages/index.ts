@@ -7,15 +7,18 @@ import { TaskScheduler } from "../../../../../tasks";
 import { Utils } from "../../../../../utils";
 import { PermissionHelper } from "../../../../../utils/permission-helper";
 import { APIResponse } from "../../../../utils/api-res";
-import type { AuthHandler } from "../../../../utils/authHandler";
+import { AuthHandler } from "../../../../utils/authHandler";
 import { RuntimeMetadata } from "../../../../utils/metadata";
-import { PackageModel } from "../../../../utils/shared-models/package";
 import { APIResponseSpec, APIRouteSpec } from "../../../../utils/specHelpers";
 import { DOCS_TAGS } from "../../docs";
-import { router as releasesRouter } from "./releases";
-import { router as roleAssignmentsRouter } from "./role-assignments";
+import { PackageModel } from "./model";
 
-export const router = new Hono().basePath("/packages");
+/** Per-request values loaded by the parameter middlewares (this router's or a parent's). */
+type Variables = {
+	package: DB.Models.PackageFullView;
+};
+
+export const router = new Hono<{ Variables: Variables }>().basePath("/packages");
 
 router.get(
 	"/",
@@ -35,8 +38,7 @@ router.get(
 	async (c) => {
 		const { limit, offset, searchString, publisherID, publisherName, onlyMembershipByMe } =
 			c.req.valid("query");
-		// @ts-expect-error
-		const authContext = c.get("authContext") as AuthHandler.AuthContext;
+		const authContext = AuthHandler.AuthContext.get(c);
 
 		const filters: Array<SQL<unknown> | undefined> = [];
 
@@ -137,8 +139,7 @@ router.post(
 	zValidator("json", PackageModel.CreatePackage.Body),
 
 	async (c) => {
-		// @ts-expect-error
-		const authContext = c.get("authContext") as AuthHandler.AuthContext;
+		const authContext = AuthHandler.AuthContext.get(c);
 		const body = c.req.valid("json");
 
 		if (authContext.type === "unauthenticated") {
@@ -204,7 +205,7 @@ router.use(
 	zValidator("param", PackageModel.Param),
 
 	async (c, next) => {
-		// @ts-expect-error
+		// @ts-expect-error - hono-openapi\'s validator does not type "param" yet
 		const { fullPackageName } = c.req.valid("param") as { fullPackageName: string };
 
 		const row = await DB.instance()
@@ -217,11 +218,7 @@ router.use(
 			return APIResponse.notFound(c, "Package with specified name not found");
 		}
 
-		c.set(
-			// @ts-expect-error
-			"package",
-			row satisfies DB.Models.PackageFullView,
-		);
+		c.set("package", row satisfies DB.Models.PackageFullView);
 
 		return await next();
 	},
@@ -245,8 +242,7 @@ router.get(
 	}),
 
 	async (c) => {
-		// @ts-expect-error
-		const pkg = c.get("package") as DB.Models.PackageFullView;
+		const pkg = c.get("package");
 
 		return APIResponse.success(
 			c,
@@ -276,10 +272,8 @@ router.put(
 	zValidator("json", PackageModel.UpdatePackage.Body),
 
 	async (c) => {
-		// @ts-expect-error
-		const pkg = c.get("package") as DB.Models.PackageFullView;
-		// @ts-expect-error
-		const authContext = c.get("authContext") as AuthHandler.AuthContext;
+		const pkg = c.get("package");
+		const authContext = AuthHandler.AuthContext.get(c);
 		const updateData = c.req.valid("json");
 
 		if (pkg.flags.includes("SYSTEM-MANAGED")) {
@@ -325,10 +319,8 @@ router.delete(
 	}),
 
 	async (c) => {
-		// @ts-expect-error
-		const pkg = c.get("package") as DB.Models.PackageFullView;
-		// @ts-expect-error
-		const authContext = c.get("authContext") as AuthHandler.AuthContext;
+		const pkg = c.get("package");
+		const authContext = AuthHandler.AuthContext.get(c);
 
 		if (pkg.flags.includes("SYSTEM-MANAGED")) {
 			return APIResponse.forbidden(c, "System-managed packages cannot be deleted");
@@ -386,5 +378,5 @@ router.delete(
 	},
 );
 
-router.route("/:fullPackageName", releasesRouter);
-router.route("/:fullPackageName", roleAssignmentsRouter);
+router.route("/:fullPackageName", (await import("./releases")).router);
+router.route("/:fullPackageName", (await import("./role-assignments")).router);

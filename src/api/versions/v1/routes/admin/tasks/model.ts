@@ -1,7 +1,7 @@
 import { createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
-import { DB } from "../../../db";
-import { ApiHelperModels } from "./api-helper-models";
+import { DB } from "../../../../../../db";
+import { ApiHelperModels } from "../../../../../utils/shared-models/api-helper-models";
 
 export namespace TaskStatusModel {
 	export const Param = z.object({

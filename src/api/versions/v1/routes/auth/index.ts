@@ -4,11 +4,10 @@ import { Hono } from "hono";
 import { validator as zValidator } from "hono-openapi";
 import { DB } from "../../../../../db";
 import { APIResponse } from "../../../../utils/api-res";
-import { type AuthHandler, SessionHandler } from "../../../../utils/authHandler";
+import { AuthHandler, SessionHandler } from "../../../../utils/authHandler";
 import { APIResponseSpec, APIRouteSpec } from "../../../../utils/specHelpers";
 import { DOCS_TAGS } from "../../docs";
 import { AuthModel } from "./model";
-import { router as resetPasswordRouter } from "./reset-password";
 
 // Dummy bcrypt hash for timing-normalized login failures — prevents username enumeration
 // Generated once at module load so it's a valid, cost-equivalent hash
@@ -103,8 +102,7 @@ router.post(
 	zValidator("json", AuthModel.Login.Body),
 
 	async (c) => {
-		//@ts-expect-error
-		const authContext = c.get("authContext") as AuthHandler.AuthContext;
+		const authContext = AuthHandler.AuthContext.get(c);
 		if (authContext.type !== "unauthenticated") {
 			return APIResponse.forbidden(c, "You are already authenticated");
 		}
@@ -173,8 +171,7 @@ router.get(
 	}),
 
 	async (c) => {
-		// @ts-expect-error
-		const authContext = c.get("authContext") as AuthHandler.AuthContext;
+		const authContext = AuthHandler.AuthContext.get(c);
 		if (authContext.type !== "session") {
 			return APIResponse.unauthorized(c, "Your Auth Context is not a session");
 		}
@@ -205,8 +202,7 @@ router.post(
 	}),
 
 	async (c) => {
-		// @ts-expect-error
-		const authContext = c.get("authContext") as AuthHandler.AuthContext;
+		const authContext = AuthHandler.AuthContext.get(c);
 
 		if (authContext.type !== "session") {
 			return APIResponse.unauthorized(c, "Your Auth Context is not a session");
@@ -218,4 +214,4 @@ router.post(
 	},
 );
 
-router.route("/", resetPasswordRouter);
+router.route("/", (await import("./reset-password")).router);

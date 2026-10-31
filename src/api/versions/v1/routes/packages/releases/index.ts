@@ -7,14 +7,19 @@ import { TaskScheduler } from "../../../../../../tasks";
 import { Logger } from "../../../../../../utils/logger";
 import { PermissionHelper } from "../../../../../../utils/permission-helper";
 import { APIResponse } from "../../../../../utils/api-res";
-import type { AuthHandler } from "../../../../../utils/authHandler";
+import { AuthHandler } from "../../../../../utils/authHandler";
 import { RuntimeMetadata } from "../../../../../utils/metadata";
-import { PackageReleaseModel } from "../../../../../utils/shared-models/pkg-releases";
 import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers";
 import { DOCS_TAGS } from "../../../docs";
-import { router as stableRequestsRouter } from "./stable-promotion-requests";
+import { PackageReleaseModel } from "./model";
 
-export const router = new Hono().basePath("/releases");
+/** Per-request values loaded by the parameter middlewares (this router's or a parent's). */
+type Variables = {
+	package: DB.Models.PackageFullView;
+	release: DB.Models.PackageRelease;
+};
+
+export const router = new Hono<{ Variables: Variables }>().basePath("/releases");
 
 router.get(
 	"/",
@@ -33,8 +38,7 @@ router.get(
 	}),
 
 	async (c) => {
-		// @ts-expect-error
-		const pkg = c.get("package") as DB.Models.PackageFullView;
+		const pkg = c.get("package");
 
 		const releases = await DB.instance()
 			.select()
@@ -71,10 +75,8 @@ router.post(
 	zValidator("json", PackageReleaseModel.CreateRelease.Body),
 
 	async (c) => {
-		// @ts-expect-error
-		const pkg = c.get("package") as DB.Models.PackageFullView;
-		// @ts-expect-error
-		const authContext = c.get("authContext") as AuthHandler.AuthContext;
+		const pkg = c.get("package");
+		const authContext = AuthHandler.AuthContext.get(c);
 		const body = c.req.valid("json");
 
 		if (pkg.flags.includes("SYSTEM-MANAGED")) {
@@ -138,10 +140,9 @@ router.use(
 	zValidator("param", PackageReleaseModel.Param),
 
 	async (c, next) => {
-		// @ts-expect-error
+		// @ts-expect-error - hono-openapi\'s validator does not type "param" yet
 		const { version_with_leios_patch } = c.req.valid("param") as { version_with_leios_patch: string };
-		// @ts-expect-error
-		const pkg = c.get("package") as DB.Models.PackageFullView;
+		const pkg = c.get("package");
 
 		const releaseData = await DB.instance()
 			.select()
@@ -158,14 +159,13 @@ router.use(
 			return APIResponse.notFound(c, "Package release with specified version not found");
 		}
 
-		// @ts-expect-error
 		c.set("release", releaseData);
 
 		return await next();
 	},
 );
 
-router.route("/:version_with_leios_patch", stableRequestsRouter);
+router.route("/:version_with_leios_patch", (await import("./stable-promotion-requests")).router);
 
 router.get(
 	"/:version_with_leios_patch",
@@ -185,8 +185,7 @@ router.get(
 	}),
 
 	async (c) => {
-		// @ts-expect-error
-		const release = c.get("release") as DB.Models.PackageRelease;
+		const release = c.get("release");
 		return APIResponse.success(
 			c,
 			"Package release retrieved successfully",
@@ -214,12 +213,9 @@ router.put(
 	zValidator("json", PackageReleaseModel.UpdateRelease.Body),
 
 	async (c) => {
-		// @ts-expect-error
-		const pkg = c.get("package") as DB.Models.PackageFullView;
-		// @ts-expect-error
-		const release = c.get("release") as DB.Models.PackageRelease;
-		// @ts-expect-error
-		const authContext = c.get("authContext") as AuthHandler.AuthContext;
+		const pkg = c.get("package");
+		const release = c.get("release");
+		const authContext = AuthHandler.AuthContext.get(c);
 		const body = c.req.valid("json");
 
 		if (pkg.flags.includes("SYSTEM-MANAGED")) {
@@ -270,12 +266,9 @@ router.post(
 	zValidator("param", PackageReleaseModel.PostParamWithArch),
 
 	async (c) => {
-		// @ts-expect-error
-		const pkg = c.get("package") as DB.Models.PackageFullView;
-		// @ts-expect-error
-		const release = c.get("release") as DB.Models.PackageRelease;
-		// @ts-expect-error
-		const authContext = c.get("authContext") as AuthHandler.AuthContext;
+		const pkg = c.get("package");
+		const release = c.get("release");
+		const authContext = AuthHandler.AuthContext.get(c);
 		const { file } = c.req.valid("form");
 		const { arch } = c.req.valid("param");
 
@@ -426,12 +419,9 @@ router.delete(
 	}),
 
 	async (c) => {
-		// @ts-expect-error
-		const pkg = c.get("package") as DB.Models.PackageFullView;
-		// @ts-expect-error
-		const release = c.get("release") as DB.Models.PackageRelease;
-		// @ts-expect-error
-		const authContext = c.get("authContext") as AuthHandler.AuthContext;
+		const pkg = c.get("package");
+		const release = c.get("release");
+		const authContext = AuthHandler.AuthContext.get(c);
 
 		if (pkg.flags.includes("SYSTEM-MANAGED")) {
 			return APIResponse.forbidden(c, "System-managed packages cannot have their releases deleted");

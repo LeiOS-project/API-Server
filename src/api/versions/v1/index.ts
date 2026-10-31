@@ -85,7 +85,7 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
 			},
 			{
 				name: "Publishers / Members",
-				// @ts-expect-error
+				// @ts-expect-error - Scalar\'s x-displayName is not part of the OpenAPI tag type
 				"x-displayName": "Members",
 				summary: "Members",
 				parent: "Publishers",
@@ -97,7 +97,7 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
 			},
 			{
 				name: "Packages / Releases",
-				// @ts-expect-error
+				// @ts-expect-error - Scalar\'s x-displayName is not part of the OpenAPI tag type
 				"x-displayName": "Releases",
 				summary: "Releases",
 				parent: "Packages",
@@ -105,7 +105,7 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
 			},
 			{
 				name: "Packages / Stable Promotion Requests",
-				// @ts-expect-error
+				// @ts-expect-error - Scalar\'s x-displayName is not part of the OpenAPI tag type
 				"x-displayName": "Stable Promotion Requests",
 				summary: "Stable Promotion Requests",
 				parent: "Packages",
@@ -113,7 +113,7 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
 			},
 			{
 				name: "Packages / Role Assignments",
-				// @ts-expect-error
+				// @ts-expect-error - Scalar\'s x-displayName is not part of the OpenAPI tag type
 				"x-displayName": "Role Assignments",
 				summary: "Role Assignments",
 				parent: "Packages",
@@ -121,7 +121,7 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
 			},
 			{
 				name: "Admin / Users",
-				// @ts-expect-error
+				// @ts-expect-error - Scalar\'s x-displayName is not part of the OpenAPI tag type
 				"x-displayName": "Users",
 				summary: "Users",
 				parent: "Admin",
@@ -129,7 +129,7 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
 			},
 			{
 				name: "Admin / OS Releases",
-				// @ts-expect-error
+				// @ts-expect-error - Scalar\'s x-displayName is not part of the OpenAPI tag type
 				"x-displayName": "OS Releases",
 				summary: "OS Releases",
 				parent: "Admin",
@@ -137,7 +137,7 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
 			},
 			{
 				name: "Admin / Tasks",
-				// @ts-expect-error
+				// @ts-expect-error - Scalar\'s x-displayName is not part of the OpenAPI tag type
 				"x-displayName": "Tasks",
 				summary: "Tasks",
 				parent: "Admin",
@@ -145,7 +145,7 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
 			},
 			{
 				name: "Admin / Stable Promotion Requests",
-				// @ts-expect-error
+				// @ts-expect-error - Scalar\'s x-displayName is not part of the OpenAPI tag type
 				"x-displayName": "Stable Promotion Requests",
 				summary: "Stable Promotion Requests",
 				parent: "Admin",
@@ -157,7 +157,7 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
 			},
 			{
 				name: "Account / API Keys",
-				// @ts-expect-error
+				// @ts-expect-error - Scalar\'s x-displayName is not part of the OpenAPI tag type
 				"x-displayName": "API Keys",
 				summary: "API Keys",
 				parent: "Account",

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { OSReleaseUtils } from "../src/api/utils/os-release-utils";
-import { PackageReleaseModel } from "../src/api/utils/shared-models/pkg-releases";
+import { PackageReleaseModel } from "../src/api/versions/v1/routes/packages/releases/model";
 import { AptlyUtils } from "../src/aptly/utils";
 
 describe("Testing Aptly Utilities", () => {

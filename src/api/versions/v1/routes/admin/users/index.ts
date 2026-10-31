@@ -8,11 +8,14 @@ import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers"
 import { DOCS_TAGS } from "../../../docs";
 import { UsersModel } from "./model";
 
-const TARGET_USER_KEY = "targetUser";
-
 const sanitizeUser = (user: DB.Models.User) => UsersModel.SafeUser.parse(user);
 
-export const router = new Hono().basePath("/users");
+/** Per-request values loaded by the parameter middlewares (this router's or a parent's). */
+type Variables = {
+	targetUser: DB.Models.User;
+};
+
+export const router = new Hono<{ Variables: Variables }>().basePath("/users");
 
 router.get(
 	"/",
@@ -116,7 +119,7 @@ router.use(
 	zValidator("param", UsersModel.UserId.Params),
 
 	async (c, next) => {
-		// @ts-expect-error
+		// @ts-expect-error - hono-openapi\'s validator does not type "param" yet
 		const { userId } = c.req.valid("param") as UsersModel.UserId.Params;
 
 		const user = await DB.instance()
@@ -130,8 +133,7 @@ router.use(
 		}
 
 		// Store the full user in context — strip password_hash only at the response boundary
-		// @ts-expect-error
-		c.set(TARGET_USER_KEY, user);
+		c.set("targetUser", user);
 
 		await next();
 	},
@@ -152,8 +154,7 @@ router.get(
 	}),
 
 	async (c) => {
-		// @ts-expect-error
-		const user = c.get(TARGET_USER_KEY) as DB.Models.User;
+		const user = c.get("targetUser");
 		return APIResponse.success(c, "User retrieved successfully", sanitizeUser(user));
 	},
 );
@@ -176,8 +177,7 @@ router.put(
 	zValidator("json", UsersModel.Update.Body),
 
 	async (c) => {
-		// @ts-expect-error
-		const user = c.get(TARGET_USER_KEY) as DB.Models.User;
+		const user = c.get("targetUser");
 		const updateBody = c.req.valid("json") as UsersModel.Update.Body;
 
 		const updates = Object.fromEntries(
@@ -256,8 +256,7 @@ router.put(
 	zValidator("json", UsersModel.UpdatePassword.Body),
 
 	async (c) => {
-		// @ts-expect-error
-		const user = c.get(TARGET_USER_KEY) as DB.Models.User;
+		const user = c.get("targetUser");
 		const { password } = c.req.valid("json") as UsersModel.UpdatePassword.Body;
 
 		const passwordHash = await Bun.password.hash(password);
@@ -298,8 +297,7 @@ router.delete(
 	}),
 
 	async (c) => {
-		// @ts-expect-error
-		const user = c.get(TARGET_USER_KEY) as DB.Models.User;
+		const user = c.get("targetUser");
 
 		const ownedPublishers = await DB.instance()
 			.select({ id: DB.Tables.publishers.id, name: DB.Tables.publishers.name })

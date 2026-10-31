@@ -13,7 +13,7 @@ import {
 	uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 import { UserAccountSettings } from "../api/utils/shared-models/accountData";
-import type { PackageModel } from "../api/utils/shared-models/package";
+import type { PackageModel } from "../api/versions/v1/routes/packages/model";
 import { PermissionHelper } from "../utils/permission-helper";
 import { SQLUtils } from "./utils";
 

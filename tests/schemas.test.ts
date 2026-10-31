@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { UserDataPolicys } from "../src/api/utils/shared-models/accountData";
-import { PackageModel } from "../src/api/utils/shared-models/package";
+import { PackageModel } from "../src/api/versions/v1/routes/packages/model";
 
 describe("Package Schema Testing", () => {
 	test("Package name validation matches the new short-name rules", async () => {

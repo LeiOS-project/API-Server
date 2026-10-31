@@ -10,7 +10,12 @@ import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers"
 import { DOCS_TAGS } from "../../../docs";
 import { AdminStablePromotionRequestModel } from "./model";
 
-export const router = new Hono().basePath("/stable-promotion-requests");
+/** Per-request values loaded by the parameter middlewares (this router's or a parent's). */
+type Variables = {
+	stablePromotionRequest: DB.Models.StablePromotionRequest;
+};
+
+export const router = new Hono<{ Variables: Variables }>().basePath("/stable-promotion-requests");
 
 router.get(
 	"/",
@@ -86,7 +91,7 @@ router.use(
 	),
 
 	async (c, next) => {
-		// @ts-expect-error
+		// @ts-expect-error - hono-openapi\'s validator does not type "param" yet
 		const { stablePromotionRequestID } = c.req.valid("param") as { stablePromotionRequestID: number };
 
 		const request = await DB.instance()
@@ -99,7 +104,6 @@ router.use(
 			return APIResponse.notFound(c, "Stable promotion request not found");
 		}
 
-		// @ts-expect-error
 		c.set("stablePromotionRequest", request);
 
 		await next();
@@ -124,8 +128,7 @@ router.get(
 	}),
 
 	async (c) => {
-		// @ts-expect-error
-		const request = c.get("stablePromotionRequest") as DB.Models.StablePromotionRequest;
+		const request = c.get("stablePromotionRequest");
 
 		const pkg = await DB.instance()
 			.select({
@@ -190,8 +193,7 @@ router.post(
 	zValidator("json", AdminStablePromotionRequestModel.Decide.Body),
 
 	async (c) => {
-		// @ts-expect-error
-		const request = c.get("stablePromotionRequest") as DB.Models.StablePromotionRequest;
+		const request = c.get("stablePromotionRequest");
 		const decision = c.req.valid("json");
 
 		if (request.status !== "pending") {

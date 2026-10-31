@@ -6,13 +6,17 @@ import { DB } from "../../../../../db";
 import { Utils } from "../../../../../utils";
 import { PermissionHelper } from "../../../../../utils/permission-helper";
 import { APIResponse } from "../../../../utils/api-res";
-import type { AuthHandler } from "../../../../utils/authHandler";
+import { AuthHandler } from "../../../../utils/authHandler";
 import { APIResponseSpec, APIRouteSpec } from "../../../../utils/specHelpers";
 import { DOCS_TAGS } from "../../docs";
-import { router as membersRouter } from "./members";
 import { PublisherModel } from "./model";
 
-export const router = new Hono().basePath("/publishers");
+/** Per-request values loaded by the parameter middlewares (this router's or a parent's). */
+type Variables = {
+	publisher: DB.Models.Publisher;
+};
+
+export const router = new Hono<{ Variables: Variables }>().basePath("/publishers");
 
 // List all publishers
 router.get(
@@ -31,8 +35,7 @@ router.get(
 	zValidator("query", PublisherModel.GetAll.Query),
 
 	async (c) => {
-		// @ts-expect-error
-		const authContext = c.get("authContext") as AuthHandler.AuthContext;
+		const authContext = AuthHandler.AuthContext.get(c);
 
 		const { limit, offset, searchString, onlyMembershipByMe } = c.req.valid("query");
 
@@ -122,8 +125,7 @@ router.post(
 	zValidator("json", PublisherModel.CreatePublisher.Body),
 
 	async (c) => {
-		// @ts-expect-error
-		const authContext = c.get("authContext") as AuthHandler.AuthContext;
+		const authContext = AuthHandler.AuthContext.get(c);
 
 		if (authContext.type === "unauthenticated") {
 			return APIResponse.unauthorized(c, "Authentication required");
@@ -188,7 +190,7 @@ router.use(
 	),
 
 	async (c, next) => {
-		// @ts-expect-error
+		// @ts-expect-error - hono-openapi\'s validator does not type "param" yet
 		const { publisherName } = c.req.valid("param") as { publisherName: string };
 
 		const publisher = await DB.instance()
@@ -201,7 +203,6 @@ router.use(
 			return APIResponse.notFound(c, "Publisher not found");
 		}
 
-		// @ts-expect-error
 		c.set("publisher", publisher);
 
 		return await next();
@@ -226,8 +227,7 @@ router.get(
 	}),
 
 	async (c) => {
-		// @ts-expect-error
-		const publisher = c.get("publisher") as DB.Models.Publisher;
+		const publisher = c.get("publisher");
 
 		const returnPublisher = {
 			id: publisher.id,
@@ -270,10 +270,8 @@ router.put(
 	zValidator("json", PublisherModel.UpdatePublisher.Body),
 
 	async (c) => {
-		// @ts-expect-error
-		const publisher = c.get("publisher") as DB.Models.Publisher;
-		// @ts-expect-error
-		const authContext = c.get("authContext") as AuthHandler.AuthContext;
+		const publisher = c.get("publisher");
+		const authContext = AuthHandler.AuthContext.get(c);
 		const updateData = c.req.valid("json");
 
 		const allowed = await PermissionHelper.can({
@@ -315,10 +313,8 @@ router.post(
 	zValidator("json", PublisherModel.TransferOwnership.Body),
 
 	async (c) => {
-		// @ts-expect-error
-		const publisher = c.get("publisher") as DB.Models.Publisher;
-		// @ts-expect-error
-		const authContext = c.get("authContext") as AuthHandler.AuthContext;
+		const publisher = c.get("publisher");
+		const authContext = AuthHandler.AuthContext.get(c);
 		const { new_owner_user_id } = c.req.valid("json");
 
 		if (authContext.type === "unauthenticated") {
@@ -401,10 +397,8 @@ router.delete(
 	}),
 
 	async (c) => {
-		// @ts-expect-error
-		const publisher = c.get("publisher") as DB.Models.Publisher;
-		// @ts-expect-error
-		const authContext = c.get("authContext") as AuthHandler.AuthContext;
+		const publisher = c.get("publisher");
+		const authContext = AuthHandler.AuthContext.get(c);
 
 		if (authContext.type === "unauthenticated") {
 			return APIResponse.unauthorized(c, "Authentication required");
@@ -438,4 +432,4 @@ router.delete(
 );
 
 // Mount members router
-router.route("/:publisherName", membersRouter);
+router.route("/:publisherName", (await import("./members")).router);

@@ -6,7 +6,7 @@ import { DB } from "../../../../../../db";
 import { APIResponse } from "../../../../../utils/api-res";
 import {
 	APIKeyHandler,
-	type AuthHandler,
+	AuthHandler,
 	AuthUtils,
 	SessionHandler,
 } from "../../../../../utils/authHandler";
@@ -14,7 +14,12 @@ import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers"
 import { DOCS_TAGS } from "../../../docs";
 import { AccountAPIKeysModel } from "./model";
 
-export const router = new Hono().basePath("/apikeys");
+/** Per-request values loaded by the parameter middlewares (this router's or a parent's). */
+type Variables = {
+	apiKey: DB.Models.ApiKey;
+};
+
+export const router = new Hono<{ Variables: Variables }>().basePath("/apikeys");
 
 router.get(
 	"/",
@@ -33,8 +38,7 @@ router.get(
 	}),
 
 	async (c) => {
-		// @ts-expect-error
-		const authContext = c.get("authContext") as AuthHandler.SessionAuthContext;
+		const authContext = AuthHandler.AuthContext.getAsSession(c);
 
 		const apiKeys = DB.instance()
 			.select()
@@ -69,8 +73,7 @@ router.post(
 	validator("json", AccountAPIKeysModel.Create.Body),
 
 	async (c) => {
-		// @ts-expect-error
-		const authContext = c.get("authContext") as AuthHandler.SessionAuthContext;
+		const authContext = AuthHandler.AuthContext.getAsSession(c);
 
 		const apiKeyData = c.req.valid("json");
 
@@ -132,10 +135,9 @@ router.use(
 	),
 
 	async (c, next) => {
-		// @ts-expect-error
-		const authContext = c.get("authContext") as AuthHandler.SessionAuthContext;
+		const authContext = AuthHandler.AuthContext.getAsSession(c);
 
-		// @ts-expect-error
+		// @ts-expect-error - hono-openapi\'s validator does not type "param" yet
 		const apiKeyID = (c.req.valid("param") as { apiKeyID: string }).apiKeyID;
 
 		const apiKey = await DB.instance()
@@ -150,7 +152,6 @@ router.use(
 			return APIResponse.notFound(c, "API key not found");
 		}
 
-		// @ts-expect-error
 		c.set("apiKey", apiKey);
 
 		await next();
@@ -173,8 +174,7 @@ router.get(
 	}),
 
 	async (c) => {
-		// @ts-expect-error
-		const apiKey = c.get("apiKey") as DB.Models.ApiKey;
+		const apiKey = c.get("apiKey");
 
 		const apiKeyWithoutSensitive = {
 			id: apiKey.id,
@@ -206,8 +206,7 @@ router.delete(
 	}),
 
 	async (c) => {
-		// @ts-expect-error
-		const apiKey = c.get("apiKey") as DB.Models.ApiKey;
+		const apiKey = c.get("apiKey");
 
 		await APIKeyHandler.deleteApiKey(apiKey.id);
 

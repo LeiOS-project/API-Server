@@ -6,15 +6,13 @@ import { APIResponse } from "../../../../utils/api-res";
 import { AuthHandler } from "../../../../utils/authHandler";
 import { APIResponseSpec, APIRouteSpec } from "../../../../utils/specHelpers";
 import { DOCS_TAGS } from "../../docs";
-import { router as apiKeyRouter } from "./apikeys";
 import { AccountModel } from "./model";
 
 export const router = new Hono().basePath("/account");
 
 // all routes below require authentication via session
 router.use("*", async (c, next) => {
-	// @ts-expect-error
-	const authContext = c.get("authContext") as AuthHandler.AuthContext;
+	const authContext = AuthHandler.AuthContext.get(c);
 
 	if (authContext.type !== "session") {
 		return APIResponse.unauthorized(c, "Your Auth Context is not a session");
@@ -41,8 +39,7 @@ router.get(
 	}),
 
 	async (c) => {
-		// @ts-expect-error
-		const authContext = c.get("authContext") as AuthHandler.SessionAuthContext;
+		const authContext = AuthHandler.AuthContext.getAsSession(c);
 
 		const user = DB.instance()
 			.select()
@@ -77,8 +74,7 @@ router.put(
 	validator("json", AccountModel.UpdateInfo.Body),
 
 	async (c) => {
-		// @ts-expect-error
-		const authContext = c.get("authContext") as AuthHandler.SessionAuthContext;
+		const authContext = AuthHandler.AuthContext.getAsSession(c);
 
 		const body = c.req.valid("json") as AccountModel.UpdateInfo.Body;
 		const { current_password, ...updates } = body;
@@ -151,8 +147,7 @@ router.put(
 	validator("json", AccountModel.UpdatePassword.Body),
 
 	async (c) => {
-		// @ts-expect-error
-		const authContext = c.get("authContext") as AuthHandler.SessionAuthContext;
+		const authContext = AuthHandler.AuthContext.getAsSession(c);
 
 		if (authContext.type !== "session") {
 			return APIResponse.unauthorized(c, "Your Auth Context is not a session");
@@ -210,8 +205,7 @@ router.delete(
 	}),
 
 	async (c) => {
-		// @ts-expect-error
-		const authContext = c.get("authContext") as AuthHandler.SessionAuthContext;
+		const authContext = AuthHandler.AuthContext.getAsSession(c);
 
 		// Block deletion while the user owns any publishers — they must transfer or delete them first.
 		const ownedPublishers = await DB.instance()
@@ -243,4 +237,4 @@ router.delete(
 	},
 );
 
-router.route("/", apiKeyRouter);
+router.route("/", (await import("./apikeys")).router);

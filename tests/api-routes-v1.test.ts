@@ -5,13 +5,14 @@ import { mkdir } from "fs/promises";
 import { API } from "../src/api";
 import { AuthHandler, AuthUtils, SessionHandler } from "../src/api/utils/authHandler";
 import { RuntimeMetadata } from "../src/api/utils/metadata";
-import { PackageModel } from "../src/api/utils/shared-models/package";
+import { PackageModel } from "../src/api/versions/v1/routes/packages/model";
 import { AccountModel } from "../src/api/versions/v1/routes/account/model";
 import { AuthModel } from "../src/api/versions/v1/routes/auth/model";
 import { hashResetToken } from "../src/api/versions/v1/routes/auth/reset-password";
 import { AptlyAPI } from "../src/aptly/api";
 import { DB } from "../src/db";
 import { TaskScheduler } from "../src/tasks";
+import { ConfigHandler } from "../src/utils/config";
 import { PermissionHelper } from "../src/utils/permission-helper";
 import { makeAPIRequest } from "./helpers/api";
 import { TEST_PACKAGE_FIXTURES } from "./helpers/package-fixtures";
@@ -199,7 +200,7 @@ async function seedTask(overrides: Partial<DB.Models.ScheduledTask> = {}) {
 }
 
 async function writeStoredTaskLog(taskID: number, content: string) {
-	const logDir = process.env.LRA_LOG_DIR ?? "./data/logs";
+	const logDir = ConfigHandler.getConfig()?.LOG_DIR ?? "./data/logs";
 	await mkdir(`${logDir}/tasks`, { recursive: true });
 	await Bun.write(`${logDir}/tasks/task-${taskID}.log`, content);
 }

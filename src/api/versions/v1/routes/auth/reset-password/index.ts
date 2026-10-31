@@ -74,8 +74,7 @@ router.post(
 	zValidator("json", ResetPasswordModel.Reset.Body),
 
 	async (c) => {
-		//@ts-expect-error
-		const authContext = c.get("authContext") as AuthHandler.AuthContext;
+		const authContext = AuthHandler.AuthContext.get(c);
 		if (authContext.type !== "unauthenticated") {
 			return APIResponse.unauthorized(c, "You are already authenticated");
 		}
@@ -157,8 +156,7 @@ router.post(
 	zValidator("json", ResetPasswordModel.RequestReset.Body),
 
 	async (c) => {
-		//@ts-expect-error
-		const authContext = c.get("authContext") as AuthHandler.AuthContext;
+		const authContext = AuthHandler.AuthContext.get(c);
 		if (authContext.type !== "unauthenticated") {
 			return APIResponse.unauthorized(c, "You are already authenticated");
 		}

@@ -12,7 +12,12 @@ import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers"
 import { DOCS_TAGS } from "../../../docs";
 import { OSReleasesModel } from "./model";
 
-export const router = new Hono().basePath("/os-releases");
+/** Per-request values loaded by the parameter middlewares (this router's or a parent's). */
+type Variables = {
+	osRelease: DB.Models.OSRelease;
+};
+
+export const router = new Hono<{ Variables: Variables }>().basePath("/os-releases");
 
 router.get(
 	"/",
@@ -154,7 +159,7 @@ router.use(
 	zValidator("param", OSReleasesModel.Param),
 
 	async (c, next) => {
-		// @ts-expect-error
+		// @ts-expect-error - hono-openapi\'s validator does not type "param" yet
 		const { version } = c.req.valid("param") as { version: string };
 
 		const release = await DB.instance()
@@ -167,7 +172,6 @@ router.use(
 			return APIResponse.notFound(c, "OS release not found");
 		}
 
-		// @ts-expect-error
 		c.set("osRelease", release);
 
 		await next();
@@ -189,8 +193,7 @@ router.get(
 	}),
 
 	async (c) => {
-		// @ts-expect-error
-		const release = c.get("osRelease") as DB.Models.OSRelease;
+		const release = c.get("osRelease");
 
 		const task = await DB.instance()
 			.select()
@@ -233,8 +236,7 @@ router.get(
 	}),
 
 	async (c) => {
-		// @ts-expect-error
-		const release = c.get("osRelease") as DB.Models.OSRelease;
+		const release = c.get("osRelease");
 
 		const logs = await TaskUtils.getLogsForTask(release.taskID);
 
@@ -265,8 +267,7 @@ router.put(
 	zValidator("json", OSReleasesModel.UpdateRelease.Body),
 
 	async (c) => {
-		// @ts-expect-error
-		const release = c.get("osRelease") as DB.Models.OSRelease;
+		const release = c.get("osRelease");
 
 		const updateData = c.req.valid("json");
 

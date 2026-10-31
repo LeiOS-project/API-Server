@@ -2,15 +2,20 @@ import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator as zValidator } from "hono-openapi";
 import { z } from "zod";
-import { DB } from "../../../../../db";
-import { PermissionHelper } from "../../../../../utils/permission-helper";
-import { APIResponse } from "../../../../utils/api-res";
-import type { AuthHandler } from "../../../../utils/authHandler";
-import { PackageModel } from "../../../../utils/shared-models/package";
-import { APIResponseSpec, APIRouteSpec } from "../../../../utils/specHelpers";
-import { DOCS_TAGS } from "../../docs";
+import { DB } from "../../../../../../db";
+import { PermissionHelper } from "../../../../../../utils/permission-helper";
+import { APIResponse } from "../../../../../utils/api-res";
+import { AuthHandler } from "../../../../../utils/authHandler";
+import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers";
+import { DOCS_TAGS } from "../../../docs";
+import { RoleAssignmentsModel } from "./model";
 
-export const router = new Hono().basePath("/role-assignments");
+/** Per-request values loaded by the parameter middlewares (this router's or a parent's). */
+type Variables = {
+	package: DB.Models.PackageFullView;
+};
+
+export const router = new Hono<{ Variables: Variables }>().basePath("/role-assignments");
 
 /**
  * Fetch the current publisher-level role for a user, treating publisher ownership
@@ -49,7 +54,7 @@ router.get(
 		responses: APIResponseSpec.describeBasic(
 			APIResponseSpec.success(
 				"Role assignments retrieved successfully",
-				PackageModel.ListRoleAssignments.Response,
+				RoleAssignmentsModel.ListAll.Response,
 			),
 			APIResponseSpec.forbidden(
 				"You do not have permission to view role assignments for this package",
@@ -58,10 +63,8 @@ router.get(
 	}),
 
 	async (c) => {
-		// @ts-expect-error
-		const pkg = c.get("package") as DB.Models.PackageFullView;
-		// @ts-expect-error
-		const authContext = c.get("authContext") as AuthHandler.AuthContext;
+		const pkg = c.get("package");
+		const authContext = AuthHandler.AuthContext.get(c);
 
 		const allowed = await PermissionHelper.can({
 			authContext,
@@ -120,7 +123,7 @@ router.get(
 		return APIResponse.success(
 			c,
 			"Role assignments retrieved successfully",
-			assignments satisfies PackageModel.ListRoleAssignments.Response,
+			assignments satisfies RoleAssignmentsModel.ListAll.Response,
 		);
 	},
 );
@@ -147,14 +150,12 @@ router.post(
 		),
 	}),
 
-	zValidator("json", PackageModel.CreateRoleAssignment.Body),
+	zValidator("json", RoleAssignmentsModel.Create.Body),
 
 	async (c) => {
-		// @ts-expect-error
-		const pkg = c.get("package") as DB.Models.PackageFullView;
+		const pkg = c.get("package");
 
-		// @ts-expect-error
-		const authContext = c.get("authContext") as AuthHandler.AuthContext;
+		const authContext = AuthHandler.AuthContext.get(c);
 		const body = c.req.valid("json");
 
 		const allowed = await PermissionHelper.can({
@@ -254,13 +255,11 @@ router.put(
 		}),
 	),
 
-	zValidator("json", PackageModel.UpdateRoleAssignment.Body),
+	zValidator("json", RoleAssignmentsModel.Update.Body),
 
 	async (c) => {
-		// @ts-expect-error
-		const pkg = c.get("package") as DB.Models.PackageFullView;
-		// @ts-expect-error
-		const authContext = c.get("authContext") as AuthHandler.AuthContext;
+		const pkg = c.get("package");
+		const authContext = AuthHandler.AuthContext.get(c);
 		const { userId } = c.req.valid("param") as { userId: number };
 		const body = c.req.valid("json");
 
@@ -349,10 +348,8 @@ router.delete(
 	),
 
 	async (c) => {
-		// @ts-expect-error
-		const pkg = c.get("package") as DB.Models.PackageFullView;
-		// @ts-expect-error
-		const authContext = c.get("authContext") as AuthHandler.AuthContext;
+		const pkg = c.get("package");
+		const authContext = AuthHandler.AuthContext.get(c);
 		const { userId } = c.req.valid("param") as { userId: number };
 
 		const allowed = await PermissionHelper.can({

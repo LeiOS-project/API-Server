@@ -1,17 +1,12 @@
 import { Hono } from "hono";
 import { APIResponse } from "../../../../utils/api-res";
-import type { AuthHandler } from "../../../../utils/authHandler";
-import { router as osReleasesRouter } from "./os-releases";
-import { router as stablePromotionRequestsRouter } from "./stable-promotion-requests";
-import { router as tasksRouter } from "./tasks";
-import { router as usersRouter } from "./users";
+import { AuthHandler } from "../../../../utils/authHandler";
 
 export const router = new Hono().basePath("/admin");
 
 // Site-admin gate. Everything under /admin/* requires user_role === 'admin'.
 router.use("*", async (c, next) => {
-	// @ts-expect-error
-	const authContext = c.get("authContext") as AuthHandler.AuthContext;
+	const authContext = AuthHandler.AuthContext.get(c);
 
 	if (authContext.type === "unauthenticated") {
 		return APIResponse.unauthorized(c, "Authentication required");
@@ -23,7 +18,7 @@ router.use("*", async (c, next) => {
 	await next();
 });
 
-router.route("/", usersRouter);
-router.route("/", osReleasesRouter);
-router.route("/", tasksRouter);
-router.route("/", stablePromotionRequestsRouter);
+router.route("/", (await import("./users")).router);
+router.route("/", (await import("./os-releases")).router);
+router.route("/", (await import("./tasks")).router);
+router.route("/", (await import("./stable-promotion-requests")).router);

@@ -2,15 +2,22 @@ import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator as zValidator } from "hono-openapi";
 import { z } from "zod";
-import { DB } from "../../../../../../db";
-import { PermissionHelper } from "../../../../../../utils/permission-helper";
-import { APIResponse } from "../../../../../utils/api-res";
-import type { AuthHandler } from "../../../../../utils/authHandler";
-import { StablePromotionRequestsModel } from "../../../../../utils/shared-models/stableRequests";
-import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers";
-import { DOCS_TAGS } from "../../../docs";
+import { DB } from "../../../../../../../db";
+import { PermissionHelper } from "../../../../../../../utils/permission-helper";
+import { APIResponse } from "../../../../../../utils/api-res";
+import { AuthHandler } from "../../../../../../utils/authHandler";
+import { APIResponseSpec, APIRouteSpec } from "../../../../../../utils/specHelpers";
+import { DOCS_TAGS } from "../../../../docs";
+import { StablePromotionRequestsModel } from "./model";
 
-export const router = new Hono().basePath("/stable-promotion-requests");
+/** Per-request values loaded by the parameter middlewares (this router's or a parent's). */
+type Variables = {
+	package: DB.Models.PackageFullView;
+	release: DB.Models.PackageRelease;
+	stablePromotionRequest: StablePromotionRequestsModel.Entity;
+};
+
+export const router = new Hono<{ Variables: Variables }>().basePath("/stable-promotion-requests");
 
 router.get(
 	"/",
@@ -32,8 +39,7 @@ router.get(
 	zValidator("query", StablePromotionRequestsModel.GetAll.Query),
 
 	async (c) => {
-		// @ts-expect-error
-		const release = c.get("release") as DB.Models.PackageRelease;
+		const release = c.get("release");
 		const filters = c.req.valid("query");
 
 		const query = DB.instance()
@@ -105,12 +111,9 @@ router.post(
 	zValidator("json", StablePromotionRequestsModel.Create.Body),
 
 	async (c) => {
-		// @ts-expect-error
-		const pkg = c.get("package") as DB.Models.PackageFullView;
-		// @ts-expect-error
-		const release = c.get("release") as DB.Models.PackageRelease;
-		// @ts-expect-error
-		const authContext = c.get("authContext") as AuthHandler.AuthContext;
+		const pkg = c.get("package");
+		const release = c.get("release");
+		const authContext = AuthHandler.AuthContext.get(c);
 
 		const allowed = await PermissionHelper.can({
 			authContext,
@@ -174,10 +177,9 @@ router.use(
 	),
 
 	async (c, next) => {
-		// @ts-expect-error
+		// @ts-expect-error - hono-openapi\'s validator does not type "param" yet
 		const { stablePromotionRequestID } = c.req.valid("param") as { stablePromotionRequestID: number };
-		// @ts-expect-error
-		const release = c.get("release") as DB.Models.PackageRelease;
+		const release = c.get("release");
 
 		const requestData = (await DB.instance()
 			.select({
@@ -212,7 +214,6 @@ router.use(
 			return APIResponse.notFound(c, "Stable promotion request not found for this release");
 		}
 
-		// @ts-expect-error
 		c.set("stablePromotionRequest", requestData);
 
 		return await next();
@@ -237,14 +238,12 @@ router.get(
 	}),
 
 	async (c) => {
-		const requestData = c.get(
-			// @ts-expect-error
-			"stablePromotionRequest",
-		) as StablePromotionRequestsModel.GetByID.Response;
+		const requestData = c.get("stablePromotionRequest");
 		return APIResponse.success(
 			c,
 			"Stable promotion request retrieved successfully",
-			requestData satisfies StablePromotionRequestsModel.GetByID.Response,
+			// The DB row is the flat Entity; the response schema narrows admin_note by status.
+			requestData as StablePromotionRequestsModel.GetByID.Response,
 		);
 	},
 );
@@ -268,12 +267,9 @@ router.delete(
 	}),
 
 	async (c) => {
-		// @ts-expect-error
-		const pkg = c.get("package") as DB.Models.PackageFullView;
-		// @ts-expect-error
-		const authContext = c.get("authContext") as AuthHandler.AuthContext;
-		// @ts-expect-error
-		const requestData = c.get("stablePromotionRequest") as DB.Models.StablePromotionRequest;
+		const pkg = c.get("package");
+		const authContext = AuthHandler.AuthContext.get(c);
+		const requestData = c.get("stablePromotionRequest");
 
 		const allowed = await PermissionHelper.can({
 			authContext,

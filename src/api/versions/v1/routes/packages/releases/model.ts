@@ -1,6 +1,6 @@
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import z from "zod";
-import { DB } from "../../../db";
+import { DB } from "../../../../../../db";
 
 export namespace PackageReleaseModel {
 	// Matches versions that optionally end with a `leios` patch suffix (e.g. leios1, leios1.1.1)
