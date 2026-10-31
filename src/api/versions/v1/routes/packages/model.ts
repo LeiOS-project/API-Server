@@ -45,6 +45,7 @@ export namespace PackageModel {
 export namespace PackageModel.GetPackageByFullName {
 	export const Response = createSelectSchema(DB.Tables.packagesFullView, {
 		fullname: z.string(),
+		flags: PackageModel.PackageFlags,
 
 		latest_stable_release: z.object({
 			amd64: z.string().nullable(),
