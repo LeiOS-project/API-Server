@@ -1,45 +1,36 @@
-# API Server
+# LeiOS API Server
+
+The API behind the LeiOS package hub: accounts, publishers, packages and releases, stable promotion
+and OS releases, backed by an Aptly repository that is published to S3. Built with Bun, Hono,
+hono-openapi and Drizzle (SQLite), following the
+[LeiCraftMC Style Guide](https://git.leicraftmc.de/LeiCraftMC/Style-Guides).
 
 ## Development
 
-Install dependencies:
-
 ```bash
 bun install
+cp example.env .env   # then fill in the S3 settings and key paths
+bun run dev           # http://localhost:12151 — API docs at /docs/v1
 ```
 
-Run the development server:
+On first start the server downloads Aptly (needs network and `unzip`) and creates an `admin` user;
+the password-reset link for it is logged and written to
+`<LRA_CONFIG_BASE_DIR>/initial_admin_password_reset_token.txt`.
 
-```bash
-bun run dev
-```
+| Command | What it does |
+| --- | --- |
+| `bun run check:ci` | Biome format + lint check |
+| `bun run typecheck` | TypeScript check of `src`, `tests`, `scripts` |
+| `bun test` | Integration tests (temp DB, local S3, Aptly; needs `dpkg`, `dpkg-dev`, `build-essential`) |
+| `bun run db:generate` | Generate a migration after editing `src/db/schema.ts` |
+| `bun run compile linux-x64-baseline --no-version-tag` | Build the binary the Docker image uses |
 
-Start the server with auto-migrations enabled:
+## Deployment
 
-```bash
-bun run start
-```
+CI builds the binary and the Docker image (`docker/Dockerfile`) from the default branch. Run it with
+`docker/docker-compose.yml`; configuration is `LRA_*` environment variables (see `example.env`).
+Everything stateful lives in the `data/` and `config/` volumes.
 
-Typecheck the project:
+## License
 
-```bash
-bun run typecheck
-```
-
-Run tests:
-
-```bash
-bun test
-```
-
-## OpenCode
-
-This repo includes project-level OpenCode config in `opencode.json` plus repo-specific commands in `.opencode/commands/`.
-
-Useful commands inside OpenCode:
-
-- `/typecheck` runs `bun run typecheck`
-- `/test` runs the most appropriate Bun test command
-- `/verify` runs typecheck first, then focused or full tests
-
-Project-specific OpenCode guidance lives in `AGENTS.md`.
+[AGPL-3.0](LICENSE)
