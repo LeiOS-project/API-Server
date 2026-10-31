@@ -57,3 +57,9 @@ src/
   approved releases are moved into stable by the next OS release.
 - Site roles are `admin | developer | user`; publisher/package roles are
   `ADMIN > MAINTAINER > DEVELOPER > VIEWER` (`PermissionHelper`).
+- Signup (`LRA_SIGNUP_ENABLED` + SMTP) creates unconfirmed accounts; publishers and reports need a
+  confirmed email (`users.email_verified_at`). Suspended users (`users.status`) cannot sign in.
+- Packages flagged `HIDDEN` are visible only to site admins, the owner and members
+  (`PermissionHelper.canViewPackage`, applied by the package-loading middleware and the list).
+- Record admin and publisher-management actions with `AuditLog.record(...)` (inside the action's
+  transaction when there is one); paginated lists return `{ items, total }`.
