@@ -1,38 +1,46 @@
 {
-    "name": "api-server",
-    "module": "index.ts",
-    "type": "module",
-    "private": true,
-    "scripts": {
-        "aptly-api-client:generate": "openapi-ts -f ./openapi-ts.aptly-api.config.ts",
-        "db:generate": "bun scripts/db-utils && bunx --bun drizzle-kit generate --config=drizzle.config.ts",
-        "db:migrate": "bun scripts/db-utils && bunx --bun drizzle-kit migrate --config=drizzle.config.ts",
-        "typecheck": "tsc -p ./tsconfig/tsconfig.typecheck.json && echo 'Typecheck passed!'",
-        "test": "bun test",
-        "dev": "bun run --watch src/index.ts",
-        "compile": "bun run ./scripts/compile",
-        "start": "bun run scripts/entrypoint.ts"
-    },
-    "devDependencies": {
-        "@cleverjs/cli": "^2.4.0",
-        "@hey-api/openapi-ts": "0.99.0",
-        "@types/bun": "^1.3.14",
-        "@types/nodemailer": "^8.0.1",
-        "drizzle-kit": "0.31.10",
-        "s3rver": "^3.7.1"
-    },
-    "peerDependencies": {
-        "typescript": "^6.0.3 || ^7.0.0"
-    },
-    "dependencies": {
-        "@cleverjs/utils": "^1.1.9",
-        "@hono/standard-validator": "^0.2.2",
-        "@scalar/hono-api-reference": "^0.11.0",
-        "drizzle-orm": "0.45.2",
-        "drizzle-zod": "^0.8.3",
-        "hono": "^4.12.23",
-        "hono-openapi": "^1.3.0",
-        "nodemailer": "^9.0.0",
-        "zod": "^4.4.3"
-    }
+	"name": "leios-api",
+	"version": "1.0.0",
+	"private": true,
+	"type": "module",
+	"description": "LeiOS package repository API",
+	"scripts": {
+		"check": "bunx --bun biome check",
+		"check:ci": "bunx --bun biome ci",
+		"format": "bunx --bun biome format --write",
+		"lint": "bunx --bun biome lint",
+		"typecheck": "bunx --bun tsc -p ./tsconfig/tsconfig.typecheck.json && echo 'Typecheck passed!'",
+		"test": "bun test",
+		"test:ci": "bun test --coverage --reporter=junit --reporter-outfile=./junit.xml",
+		"db:generate": "bun scripts/db-utils && bunx --bun drizzle-kit generate --config=drizzle/configs/drizzle.config.ts",
+		"db:migrate": "bun scripts/db-utils && bunx --bun drizzle-kit migrate --config=drizzle/configs/drizzle.config.ts",
+		"dev": "bun run --watch src/index.ts",
+		"start": "bun run scripts/entrypoint.ts",
+		"compile": "bun run ./scripts/compile",
+		"aptly-api-client:generate": "openapi-ts -f ./openapi-ts.aptly-api.config.ts"
+	},
+	"dependencies": {
+		"@cleverjs/utils": "^1.1.9",
+		"@hono/standard-validator": "^0.2.2",
+		"@scalar/hono-api-reference": "^0.11.0",
+		"drizzle-orm": "0.45.2",
+		"drizzle-zod": "^0.8.3",
+		"hono": "^4.12.23",
+		"hono-openapi": "^1.3.0",
+		"nodemailer": "^9.0.0",
+		"zod": "^4.4.3"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.5.0",
+		"@cleverjs/cli": "^2.4.0",
+		"@hey-api/openapi-ts": "0.99.0",
+		"@types/bun": "^1.3.14",
+		"@types/nodemailer": "^8.0.1",
+		"drizzle-kit": "0.31.10",
+		"s3rver": "^3.7.1",
+		"typescript": "^6.0.3"
+	},
+	"peerDependencies": {
+		"typescript": "^6.0.3 || ^7.0.0"
+	}
 }

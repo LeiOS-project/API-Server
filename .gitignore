@@ -1,43 +1,59 @@
-# dependencies (bun install)
+# Node
 node_modules
 
-# output
-out
-dist
+# Dev / Build / compile output
+.output
+.data
+.nuxt
+.nitro
+.cache
+build/
+out/
+dist/
 *.tgz
 
-# code coverage
-coverage
-*.lcov
+# Drizzle artifacts
+.drizzle
 
-# logs
-logs
-_.log
-report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
-
-# dotenv environment variable files
-.env
-.env.development.local
-.env.test.local
-.env.production.local
-.env.local
-
-# caches
-.eslintcache
-.cache
+# TypeScript
 *.tsbuildinfo
 
-# IntelliJ based IDEs
+# Coverage and test reports
+coverage
+*.lcov
+junit.xml
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editor / OS
+.DS_Store
+.fleet
 .idea
 
-# Finder (MacOS) folder config
-.DS_Store
+# Environment
+.env
+.env.*
+!.env.example
 
+#Tests
+tmp-data-*
+
+# Backend data & config (keep examples)
 data/
-config/
+!app/data/
+config/*
+!config/*.example.json
+
+.claude/settings.local.json
+# LeiOS API specifics
+# Test temp dirs other than tmp-data-* (e.g. the branding clone tests)
+tmp-*
+# Local .deb fixtures for tests/aptly.test.ts
 testdata/
-tmp*
-
-build/
-
+# Local planning notes
 plans/

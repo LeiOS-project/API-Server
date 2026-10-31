@@ -1,2 +1,18 @@
+# .gitlab-ci.yml — root include for LeiCraftMC projects (see the style guide, docs/13-git-and-ci.md).
+
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+stages:
+  - test
+  - build
+
+variables:
+  GIT_DEPTH: "20"
+  BUN_INSTALL_CACHE: "$CI_PROJECT_DIR/.bun"
+
 include:
   - local: ".gitlab/ci/testing.yml"
+  - local: ".gitlab/ci/build.yml"

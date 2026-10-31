@@ -25,7 +25,7 @@ export class DB {
         this.db = drizzle(path);
         if (autoMigrate) {
             Logger.info("Running database migrations...");
-            await migrate(this.db, { migrationsFolder: "drizzle" });
+            await migrate(this.db, { migrationsFolder: "drizzle/migrations" });
             Logger.info("Database migrations completed.");
         }
 
