@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
-import type { DB } from "../db";
 import type { AuthHandler } from "../api/utils/authHandler";
+import type { DB } from "../db";
 
 export class PermissionHelper {
 	private static _dbModule: typeof DB | null = null;

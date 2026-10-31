@@ -1,16 +1,16 @@
+import { desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator as zValidator } from "hono-openapi";
-import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers";
-import { DOCS_TAGS } from "../../../docs";
-import { OSReleasesModel } from "./model";
 import { DB } from "../../../../../../db";
-import { APIResponse } from "../../../../../utils/api-res";
-import { eq, desc } from "drizzle-orm";
 import { TaskQueueUtils } from "../../../../../../tasks";
+import { TaskUtils } from "../../../../../../tasks/utils";
+import { APIResponse } from "../../../../../utils/api-res";
 import { RuntimeMetadata } from "../../../../../utils/metadata";
 import { OSReleaseUtils } from "../../../../../utils/os-release-utils";
 import { ApiHelperModels } from "../../../../../utils/shared-models/api-helper-models";
-import { TaskUtils } from "../../../../../../tasks/utils";
+import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers";
+import { DOCS_TAGS } from "../../../docs";
+import { OSReleasesModel } from "./model";
 
 export const router = new Hono().basePath("/os-releases");
 
@@ -154,7 +154,7 @@ router.use(
 	zValidator("param", OSReleasesModel.Param),
 
 	async (c, next) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const { version } = c.req.valid("param") as { version: string };
 
 		const release = await DB.instance()
@@ -167,7 +167,7 @@ router.use(
 			return APIResponse.notFound(c, "OS release not found");
 		}
 
-		// @ts-ignore
+		// @ts-expect-error
 		c.set("osRelease", release);
 
 		await next();
@@ -189,7 +189,7 @@ router.get(
 	}),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const release = c.get("osRelease") as DB.Models.OSRelease;
 
 		const task = await DB.instance()
@@ -233,7 +233,7 @@ router.get(
 	}),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const release = c.get("osRelease") as DB.Models.OSRelease;
 
 		const logs = await TaskUtils.getLogsForTask(release.taskID);
@@ -265,7 +265,7 @@ router.put(
 	zValidator("json", OSReleasesModel.UpdateRelease.Body),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const release = c.get("osRelease") as DB.Models.OSRelease;
 
 		const updateData = c.req.valid("json");

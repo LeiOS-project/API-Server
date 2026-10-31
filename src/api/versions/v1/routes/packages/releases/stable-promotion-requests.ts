@@ -1,13 +1,13 @@
+import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator as zValidator } from "hono-openapi";
 import { z } from "zod";
-import { and, eq } from "drizzle-orm";
 import { DB } from "../../../../../../db";
-import { APIResponse } from "../../../../../utils/api-res";
-import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers";
-import { StablePromotionRequestsModel } from "../../../../../utils/shared-models/stableRequests";
-import { AuthHandler } from "../../../../../utils/authHandler";
 import { PermissionHelper } from "../../../../../../utils/permission-helper";
+import { APIResponse } from "../../../../../utils/api-res";
+import type { AuthHandler } from "../../../../../utils/authHandler";
+import { StablePromotionRequestsModel } from "../../../../../utils/shared-models/stableRequests";
+import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers";
 import { DOCS_TAGS } from "../../../docs";
 
 export const router = new Hono().basePath("/stable-promotion-requests");
@@ -32,7 +32,7 @@ router.get(
 	zValidator("query", StablePromotionRequestsModel.GetAll.Query),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const release = c.get("release") as DB.Models.PackageRelease;
 		const filters = c.req.valid("query");
 
@@ -105,11 +105,11 @@ router.post(
 	zValidator("json", StablePromotionRequestsModel.Create.Body),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const pkg = c.get("package") as DB.Models.PackageFullView;
-		// @ts-ignore
+		// @ts-expect-error
 		const release = c.get("release") as DB.Models.PackageRelease;
-		// @ts-ignore
+		// @ts-expect-error
 		const authContext = c.get("authContext") as AuthHandler.AuthContext;
 
 		const allowed = await PermissionHelper.can({
@@ -174,9 +174,9 @@ router.use(
 	),
 
 	async (c, next) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const { stablePromotionRequestID } = c.req.valid("param") as { stablePromotionRequestID: number };
-		// @ts-ignore
+		// @ts-expect-error
 		const release = c.get("release") as DB.Models.PackageRelease;
 
 		const requestData = (await DB.instance()
@@ -212,7 +212,7 @@ router.use(
 			return APIResponse.notFound(c, "Stable promotion request not found for this release");
 		}
 
-		// @ts-ignore
+		// @ts-expect-error
 		c.set("stablePromotionRequest", requestData);
 
 		return await next();
@@ -238,7 +238,7 @@ router.get(
 
 	async (c) => {
 		const requestData = c.get(
-			// @ts-ignore
+			// @ts-expect-error
 			"stablePromotionRequest",
 		) as StablePromotionRequestsModel.GetByID.Response;
 		return APIResponse.success(
@@ -268,11 +268,11 @@ router.delete(
 	}),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const pkg = c.get("package") as DB.Models.PackageFullView;
-		// @ts-ignore
+		// @ts-expect-error
 		const authContext = c.get("authContext") as AuthHandler.AuthContext;
-		// @ts-ignore
+		// @ts-expect-error
 		const requestData = c.get("stablePromotionRequest") as DB.Models.StablePromotionRequest;
 
 		const allowed = await PermissionHelper.can({

@@ -1,19 +1,19 @@
+import { eq } from "drizzle-orm";
 import { Hono } from "hono";
-import { AccountModel } from "./model";
 import { validator } from "hono-openapi";
 import { DB } from "../../../../../db";
-import { eq } from "drizzle-orm";
 import { APIResponse } from "../../../../utils/api-res";
-import { APIResponseSpec, APIRouteSpec } from "../../../../utils/specHelpers";
 import { AuthHandler } from "../../../../utils/authHandler";
+import { APIResponseSpec, APIRouteSpec } from "../../../../utils/specHelpers";
 import { DOCS_TAGS } from "../../docs";
 import { router as apiKeyRouter } from "./apikeys";
+import { AccountModel } from "./model";
 
 export const router = new Hono().basePath("/account");
 
 // all routes below require authentication via session
 router.use("*", async (c, next) => {
-	// @ts-ignore
+	// @ts-expect-error
 	const authContext = c.get("authContext") as AuthHandler.AuthContext;
 
 	if (authContext.type !== "session") {
@@ -41,7 +41,7 @@ router.get(
 	}),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const authContext = c.get("authContext") as AuthHandler.SessionAuthContext;
 
 		const user = DB.instance()
@@ -77,7 +77,7 @@ router.put(
 	validator("json", AccountModel.UpdateInfo.Body),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const authContext = c.get("authContext") as AuthHandler.SessionAuthContext;
 
 		const body = c.req.valid("json") as AccountModel.UpdateInfo.Body;
@@ -151,7 +151,7 @@ router.put(
 	validator("json", AccountModel.UpdatePassword.Body),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const authContext = c.get("authContext") as AuthHandler.SessionAuthContext;
 
 		if (authContext.type !== "session") {
@@ -210,7 +210,7 @@ router.delete(
 	}),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const authContext = c.get("authContext") as AuthHandler.SessionAuthContext;
 
 		// Block deletion while the user owns any publishers — they must transfer or delete them first.

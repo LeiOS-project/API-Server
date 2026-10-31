@@ -1,6 +1,6 @@
+import { createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 import { DB } from "../../../../../db";
-import { createSelectSchema } from "drizzle-zod";
 
 export namespace UsersPublicModel {
 	const SafeUser = createSelectSchema(DB.Tables.users).omit({

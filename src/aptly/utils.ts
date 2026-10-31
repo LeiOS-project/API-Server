@@ -98,11 +98,11 @@ export class AptlyUtils {
 					if (done) break;
 					buffer += decoder.decode(value, { stream: true });
 
-					let newlineIndex: number;
-					while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
-						const line = buffer.slice(0, newlineIndex);
+					let newlineIndex = buffer.indexOf("\n");
+					while (newlineIndex !== -1) {
+						emitLine(buffer.slice(0, newlineIndex));
 						buffer = buffer.slice(newlineIndex + 1);
-						emitLine(line);
+						newlineIndex = buffer.indexOf("\n");
 					}
 				}
 

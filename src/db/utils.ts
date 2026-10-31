@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/bun-sqlite";
+import type { drizzle } from "drizzle-orm/bun-sqlite";
 import { int } from "drizzle-orm/sqlite-core";
 
 export type DrizzleDB = ReturnType<typeof drizzle>;

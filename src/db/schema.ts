@@ -1,21 +1,21 @@
 import type { TaskHandler } from "@cleverjs/utils";
-import { desc, sql, eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import {
-	sqliteTable,
+	check,
+	foreignKey,
+	index,
 	integer,
+	primaryKey,
+	sqliteTable,
+	sqliteView,
 	text,
 	unique,
-	index,
 	uniqueIndex,
-	foreignKey,
-	primaryKey,
-	check,
-	sqliteView,
 } from "drizzle-orm/sqlite-core";
-import { SQLUtils } from "./utils";
-import type { PackageModel } from "../api/utils/shared-models/package";
 import { UserAccountSettings } from "../api/utils/shared-models/accountData";
+import type { PackageModel } from "../api/utils/shared-models/package";
 import { PermissionHelper } from "../utils/permission-helper";
+import { SQLUtils } from "./utils";
 
 /**
  * @deprecated Use DB.Tables.users to access this table.

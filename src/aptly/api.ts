@@ -1,9 +1,9 @@
 import fs from "fs/promises";
 import path from "path";
+import z from "zod";
+import { Logger } from "../utils/logger";
 import { AptlyAPIServer } from "./server";
 import { AptlyUtils } from "./utils";
-import { Logger } from "../utils/logger";
-import z from "zod";
 
 export namespace AptlyAPI.Utils {
 	export const REPOS = ["leios-stable", "leios-testing", "leios-archive"] as const;

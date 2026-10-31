@@ -1,13 +1,13 @@
+import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator as zValidator } from "hono-openapi";
 import { z } from "zod";
-import { and, eq } from "drizzle-orm";
 import { DB } from "../../../../../db";
-import { APIResponse } from "../../../../utils/api-res";
-import { APIResponseSpec, APIRouteSpec } from "../../../../utils/specHelpers";
-import { AuthHandler } from "../../../../utils/authHandler";
 import { PermissionHelper } from "../../../../../utils/permission-helper";
+import { APIResponse } from "../../../../utils/api-res";
+import type { AuthHandler } from "../../../../utils/authHandler";
 import { PackageModel } from "../../../../utils/shared-models/package";
+import { APIResponseSpec, APIRouteSpec } from "../../../../utils/specHelpers";
 import { DOCS_TAGS } from "../../docs";
 
 export const router = new Hono().basePath("/role-assignments");
@@ -58,9 +58,9 @@ router.get(
 	}),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const pkg = c.get("package") as DB.Models.PackageFullView;
-		// @ts-ignore
+		// @ts-expect-error
 		const authContext = c.get("authContext") as AuthHandler.AuthContext;
 
 		const allowed = await PermissionHelper.can({
@@ -150,10 +150,10 @@ router.post(
 	zValidator("json", PackageModel.CreateRoleAssignment.Body),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const pkg = c.get("package") as DB.Models.PackageFullView;
 
-		// @ts-ignore
+		// @ts-expect-error
 		const authContext = c.get("authContext") as AuthHandler.AuthContext;
 		const body = c.req.valid("json");
 
@@ -257,11 +257,10 @@ router.put(
 	zValidator("json", PackageModel.UpdateRoleAssignment.Body),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const pkg = c.get("package") as DB.Models.PackageFullView;
-		// @ts-ignore
+		// @ts-expect-error
 		const authContext = c.get("authContext") as AuthHandler.AuthContext;
-		// @ts-ignore
 		const { userId } = c.req.valid("param") as { userId: number };
 		const body = c.req.valid("json");
 
@@ -350,11 +349,10 @@ router.delete(
 	),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const pkg = c.get("package") as DB.Models.PackageFullView;
-		// @ts-ignore
+		// @ts-expect-error
 		const authContext = c.get("authContext") as AuthHandler.AuthContext;
-		// @ts-ignore
 		const { userId } = c.req.valid("param") as { userId: number };
 
 		const allowed = await PermissionHelper.can({

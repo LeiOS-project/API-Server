@@ -1,10 +1,10 @@
 import fs from "fs/promises";
 import path from "path";
 import z from "zod";
-import { client } from "./api-client/client.gen";
-import * as apiClient from "./api-client";
-import { Logger } from "../utils/logger";
 import { Utils } from "../utils";
+import { Logger } from "../utils/logger";
+import * as apiClient from "./api-client";
+import { client } from "./api-client/client.gen";
 import { AptlyUtils } from "./utils";
 
 const AptlyAPISettingsSchema = z.object({

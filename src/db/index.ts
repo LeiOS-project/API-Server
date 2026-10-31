@@ -1,14 +1,14 @@
-import { drizzle } from "drizzle-orm/bun-sqlite";
-import * as TableSchema from "./schema";
-import { randomBytes as crypto_randomBytes, createHash as crypto_createHash } from "crypto";
-import { type DrizzleDB } from "./utils";
-import { Logger } from "../utils/logger";
+import { createHash as crypto_createHash, randomBytes as crypto_randomBytes } from "crypto";
 import { eq } from "drizzle-orm";
-import { ConfigHandler } from "../utils/config";
+import { drizzle } from "drizzle-orm/bun-sqlite";
 import { migrate } from "drizzle-orm/bun-sqlite/migrator";
 import { mkdir as fs_mkdir } from "fs/promises";
 import { dirname as path_dirname } from "path";
+import { ConfigHandler } from "../utils/config";
+import { Logger } from "../utils/logger";
 import { PermissionHelper } from "../utils/permission-helper";
+import * as TableSchema from "./schema";
+import type { DrizzleDB } from "./utils";
 
 export class DB {
 	protected static db: DrizzleDB;

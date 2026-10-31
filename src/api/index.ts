@@ -1,12 +1,12 @@
-import { Logger } from "../utils/logger";
+import { Scalar } from "@scalar/hono-api-reference";
 import { Hono } from "hono";
-import { prettyJSON } from "hono/pretty-json";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
+import { prettyJSON } from "hono/pretty-json";
+import { openAPIRouteHandler } from "hono-openapi";
+import { Logger } from "../utils/logger";
 import type { APIVersionRouter } from "./utils/apiVersionRouter";
 import { APIv1Router } from "./versions/v1";
-import { openAPIRouteHandler } from "hono-openapi";
-import { Scalar } from "@scalar/hono-api-reference";
 
 export class API {
 	protected static server: Bun.Server<undefined>;

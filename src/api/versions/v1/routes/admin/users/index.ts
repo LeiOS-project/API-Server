@@ -1,12 +1,12 @@
+import { and, eq, like, or, type SQL } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator as zValidator } from "hono-openapi";
-import { and, eq, like, or, type SQL } from "drizzle-orm";
 import { DB } from "../../../../../../db";
 import { APIResponse } from "../../../../../utils/api-res";
-import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers";
-import { UsersModel } from "./model";
 import { AuthHandler } from "../../../../../utils/authHandler";
+import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers";
 import { DOCS_TAGS } from "../../../docs";
+import { UsersModel } from "./model";
 
 const TARGET_USER_KEY = "targetUser";
 
@@ -116,7 +116,7 @@ router.use(
 	zValidator("param", UsersModel.UserId.Params),
 
 	async (c, next) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const { userId } = c.req.valid("param") as UsersModel.UserId.Params;
 
 		const user = await DB.instance()
@@ -130,7 +130,7 @@ router.use(
 		}
 
 		// Store the full user in context — strip password_hash only at the response boundary
-		// @ts-ignore
+		// @ts-expect-error
 		c.set(TARGET_USER_KEY, user);
 
 		await next();
@@ -152,7 +152,7 @@ router.get(
 	}),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const user = c.get(TARGET_USER_KEY) as DB.Models.User;
 		return APIResponse.success(c, "User retrieved successfully", sanitizeUser(user));
 	},
@@ -176,7 +176,7 @@ router.put(
 	zValidator("json", UsersModel.Update.Body),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const user = c.get(TARGET_USER_KEY) as DB.Models.User;
 		const updateBody = c.req.valid("json") as UsersModel.Update.Body;
 
@@ -256,7 +256,7 @@ router.put(
 	zValidator("json", UsersModel.UpdatePassword.Body),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const user = c.get(TARGET_USER_KEY) as DB.Models.User;
 		const { password } = c.req.valid("json") as UsersModel.UpdatePassword.Body;
 
@@ -298,7 +298,7 @@ router.delete(
 	}),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const user = c.get(TARGET_USER_KEY) as DB.Models.User;
 
 		const ownedPublishers = await DB.instance()

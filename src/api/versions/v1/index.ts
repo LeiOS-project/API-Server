@@ -1,13 +1,13 @@
 import { Hono } from "hono";
-import { APIVersionRouter } from "../../utils/apiVersionRouter";
 import type { GenerateSpecOptions } from "hono-openapi";
-import { router as authRouter } from "./routes/auth";
-import { router as accountRouter } from "./routes/account";
-import { router as publishersRouter } from "./routes/publishers";
-import { router as packagesRouter } from "./routes/packages";
-import { router as adminRouter } from "./routes/admin";
-import { router as usersRouter } from "./routes/users";
+import { APIVersionRouter } from "../../utils/apiVersionRouter";
 import { authMiddlewareV1 } from "./middleware/auth";
+import { router as accountRouter } from "./routes/account";
+import { router as adminRouter } from "./routes/admin";
+import { router as authRouter } from "./routes/auth";
+import { router as packagesRouter } from "./routes/packages";
+import { router as publishersRouter } from "./routes/publishers";
+import { router as usersRouter } from "./routes/users";
 
 const openAPIConfig: Partial<GenerateSpecOptions> = {
 	documentation: {
@@ -85,7 +85,7 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
 			},
 			{
 				name: "Publishers / Members",
-				// @ts-ignore
+				// @ts-expect-error
 				"x-displayName": "Members",
 				summary: "Members",
 				parent: "Publishers",
@@ -97,7 +97,7 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
 			},
 			{
 				name: "Packages / Releases",
-				// @ts-ignore
+				// @ts-expect-error
 				"x-displayName": "Releases",
 				summary: "Releases",
 				parent: "Packages",
@@ -105,7 +105,7 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
 			},
 			{
 				name: "Packages / Stable Promotion Requests",
-				// @ts-ignore
+				// @ts-expect-error
 				"x-displayName": "Stable Promotion Requests",
 				summary: "Stable Promotion Requests",
 				parent: "Packages",
@@ -113,7 +113,7 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
 			},
 			{
 				name: "Packages / Role Assignments",
-				// @ts-ignore
+				// @ts-expect-error
 				"x-displayName": "Role Assignments",
 				summary: "Role Assignments",
 				parent: "Packages",
@@ -121,7 +121,7 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
 			},
 			{
 				name: "Admin / Users",
-				// @ts-ignore
+				// @ts-expect-error
 				"x-displayName": "Users",
 				summary: "Users",
 				parent: "Admin",
@@ -129,7 +129,7 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
 			},
 			{
 				name: "Admin / OS Releases",
-				// @ts-ignore
+				// @ts-expect-error
 				"x-displayName": "OS Releases",
 				summary: "OS Releases",
 				parent: "Admin",
@@ -137,7 +137,7 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
 			},
 			{
 				name: "Admin / Tasks",
-				// @ts-ignore
+				// @ts-expect-error
 				"x-displayName": "Tasks",
 				summary: "Tasks",
 				parent: "Admin",
@@ -145,7 +145,7 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
 			},
 			{
 				name: "Admin / Stable Promotion Requests",
-				// @ts-ignore
+				// @ts-expect-error
 				"x-displayName": "Stable Promotion Requests",
 				summary: "Stable Promotion Requests",
 				parent: "Admin",
@@ -157,7 +157,7 @@ const openAPIConfig: Partial<GenerateSpecOptions> = {
 			},
 			{
 				name: "Account / API Keys",
-				// @ts-ignore
+				// @ts-expect-error
 				"x-displayName": "API Keys",
 				summary: "API Keys",
 				parent: "Account",

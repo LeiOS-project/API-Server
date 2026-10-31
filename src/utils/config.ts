@@ -99,7 +99,7 @@ class ConfigSchema<T extends ConfigSchemaSettings = {}> {
 	}
 }
 
-// @ts-ignore
+// @ts-expect-error
 export type ParsedConfig = ConfigLike<typeof ConfigHandler.schema.schema>;
 
 export class ConfigHandler {

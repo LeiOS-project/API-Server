@@ -1,9 +1,9 @@
 import { TaskHandler } from "@cleverjs/utils";
-import { DB } from "../db";
 import { eq } from "drizzle-orm";
-import { AptlyAPI } from "../aptly/api";
-import { BrandingBuilder } from "../utils/branding-builder";
 import { RuntimeMetadata } from "../api/utils/metadata";
+import { AptlyAPI } from "../aptly/api";
+import { DB } from "../db";
+import { BrandingBuilder } from "../utils/branding-builder";
 
 interface Payload {
 	pkgReleasesToIncludeByID: number[];

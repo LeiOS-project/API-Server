@@ -1,18 +1,18 @@
-import { Hono } from "hono";
-import { AccountAPIKeysModel } from "./model";
-import { validator } from "hono-openapi";
-import { DB } from "../../../../../../db";
 import { and, eq } from "drizzle-orm";
+import { Hono } from "hono";
+import { validator } from "hono-openapi";
+import z from "zod";
+import { DB } from "../../../../../../db";
 import { APIResponse } from "../../../../../utils/api-res";
-import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers";
 import {
 	APIKeyHandler,
-	AuthHandler,
+	type AuthHandler,
 	AuthUtils,
 	SessionHandler,
 } from "../../../../../utils/authHandler";
+import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers";
 import { DOCS_TAGS } from "../../../docs";
-import z from "zod";
+import { AccountAPIKeysModel } from "./model";
 
 export const router = new Hono().basePath("/apikeys");
 
@@ -33,7 +33,7 @@ router.get(
 	}),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const authContext = c.get("authContext") as AuthHandler.SessionAuthContext;
 
 		const apiKeys = DB.instance()
@@ -69,7 +69,7 @@ router.post(
 	validator("json", AccountAPIKeysModel.Create.Body),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const authContext = c.get("authContext") as AuthHandler.SessionAuthContext;
 
 		const apiKeyData = c.req.valid("json");
@@ -132,10 +132,10 @@ router.use(
 	),
 
 	async (c, next) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const authContext = c.get("authContext") as AuthHandler.SessionAuthContext;
 
-		// @ts-ignore
+		// @ts-expect-error
 		const apiKeyID = (c.req.valid("param") as { apiKeyID: string }).apiKeyID;
 
 		const apiKey = await DB.instance()
@@ -150,7 +150,7 @@ router.use(
 			return APIResponse.notFound(c, "API key not found");
 		}
 
-		// @ts-ignore
+		// @ts-expect-error
 		c.set("apiKey", apiKey);
 
 		await next();
@@ -173,7 +173,7 @@ router.get(
 	}),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const apiKey = c.get("apiKey") as DB.Models.ApiKey;
 
 		const apiKeyWithoutSensitive = {
@@ -206,7 +206,7 @@ router.delete(
 	}),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const apiKey = c.get("apiKey") as DB.Models.ApiKey;
 
 		await APIKeyHandler.deleteApiKey(apiKey.id);

@@ -1,14 +1,14 @@
 import { API } from "./api";
+import { EmailService } from "./api/utils/email";
 import { AptlyAPIServer } from "./aptly/server";
 import { DB } from "./db";
-import { ConfigHandler } from "./utils/config";
-import { Logger } from "./utils/logger";
 import { TaskScheduler } from "./tasks";
-import { LiveRepoUtils } from "./utils/live-repo";
 import { Utils } from "./utils";
-import { PermissionHelper } from "./utils/permission-helper";
-import { EmailService } from "./api/utils/email";
 import { BrandingBuilder } from "./utils/branding-builder";
+import { ConfigHandler } from "./utils/config";
+import { LiveRepoUtils } from "./utils/live-repo";
+import { Logger } from "./utils/logger";
+import { PermissionHelper } from "./utils/permission-helper";
 
 export class Main {
 	static async main() {

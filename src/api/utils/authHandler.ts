@@ -1,6 +1,6 @@
+import { createHash as crypto_createHash, randomBytes as crypto_randomBytes } from "crypto";
 import { eq } from "drizzle-orm";
 import { DB } from "../../db";
-import { randomBytes as crypto_randomBytes, createHash as crypto_createHash } from "crypto";
 import type { UserAccountSettings } from "./shared-models/accountData";
 
 export class AuthUtils {
@@ -253,7 +253,7 @@ export class AuthHandler {
 		}
 
 		switch (await this.getTokenType(fullToken)) {
-			case "session":
+			case "session": {
 				const session = await SessionHandler.getSession(tokenParts);
 				if (!session) {
 					return null;
@@ -262,7 +262,8 @@ export class AuthHandler {
 					type: "session" as const,
 					...session,
 				};
-			case "apiKey":
+			}
+			case "apiKey": {
 				const apiKey = await APIKeyHandler.getApiKey(tokenParts);
 				if (!apiKey) {
 					return null;
@@ -271,6 +272,7 @@ export class AuthHandler {
 					type: "apiKey" as const,
 					...apiKey,
 				};
+			}
 			default:
 				return null;
 		}

@@ -1,15 +1,15 @@
+import { afterAll, beforeAll } from "bun:test";
 import fs from "fs/promises";
 import path from "path";
-import { afterAll, beforeAll } from "bun:test";
-import { AptlyAPIServer } from "../../src/aptly/server";
-import { ConfigHandler, type ParsedConfig } from "../../src/utils/config";
-import { DB } from "../../src/db";
-import { API } from "../../src/api";
-import { PermissionHelper } from "../../src/utils/permission-helper";
 import S3rver from "s3rver";
-import { ensureTestPackageFixtures } from "./package-fixtures";
-import { ensureBrandingFixtureRepo } from "./branding-fixtures";
+import { API } from "../../src/api";
+import { AptlyAPIServer } from "../../src/aptly/server";
+import { DB } from "../../src/db";
 import { BrandingBuilder } from "../../src/utils/branding-builder";
+import { ConfigHandler, type ParsedConfig } from "../../src/utils/config";
+import { PermissionHelper } from "../../src/utils/permission-helper";
+import { ensureBrandingFixtureRepo } from "./branding-fixtures";
+import { ensureTestPackageFixtures } from "./package-fixtures";
 
 function setTestEnv(rootDir: string) {
 	const envVars = {

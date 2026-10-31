@@ -1,13 +1,13 @@
-import { beforeAll, afterAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { randomUUID } from "crypto";
 import { eq } from "drizzle-orm";
-import { DB } from "../src/db";
-import { EmailService, type CapturedEmail } from "../src/api/utils/email";
+import { type CapturedEmail, EmailService } from "../src/api/utils/email";
 import { hashResetToken } from "../src/api/versions/v1/routes/auth/reset-password";
+import { DB } from "../src/db";
 import { makeAPIRequest } from "./helpers/api";
-import { seedUser, seedSession } from "./helpers/seed";
 import { createMemoryTransport } from "./helpers/memory-transport";
 import type { SeededUser } from "./helpers/seed";
+import { seedSession, seedUser } from "./helpers/seed";
 
 /** Emails captured by the in-memory transport, isolated to this file. */
 const capturedEmails: CapturedEmail[] = [];

@@ -1,13 +1,13 @@
+import { and, asc, desc, eq, like, or } from "drizzle-orm";
 import { Hono } from "hono";
+import { validator as zValidator } from "hono-openapi";
+import { DB } from "../../../../../../db";
+import { TaskUtils } from "../../../../../../tasks/utils";
+import { APIResponse } from "../../../../../utils/api-res";
+import { ApiHelperModels } from "../../../../../utils/shared-models/api-helper-models";
+import { TaskStatusModel } from "../../../../../utils/shared-models/taskinfo";
 import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers";
 import { DOCS_TAGS } from "../../../docs";
-import { TaskStatusModel } from "../../../../../utils/shared-models/taskinfo";
-import { validator as zValidator } from "hono-openapi";
-import { ApiHelperModels } from "../../../../../utils/shared-models/api-helper-models";
-import { DB } from "../../../../../../db";
-import { APIResponse } from "../../../../../utils/api-res";
-import { TaskUtils } from "../../../../../../tasks/utils";
-import { and, asc, desc, eq, like, or } from "drizzle-orm";
 
 export const router = new Hono().basePath("/tasks");
 
@@ -66,7 +66,7 @@ router.use(
 	zValidator("param", TaskStatusModel.Param),
 
 	async (c, next) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const { taskID } = c.req.valid("param") as { taskID: number };
 
 		const taskData = await DB.instance()
@@ -79,7 +79,7 @@ router.use(
 			return APIResponse.notFound(c, "Task with specified ID not found");
 		}
 
-		// @ts-ignore
+		// @ts-expect-error
 		c.set("task", taskData);
 
 		await next();
@@ -101,7 +101,7 @@ router.get(
 	}),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const taskData = c.get("task") as DB.Models.ScheduledTask;
 		return APIResponse.success(c, "Task retrieved successfully", taskData);
 	},
@@ -126,7 +126,7 @@ router.get(
 	}),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const taskData = c.get("task") as DB.Models.ScheduledTask;
 
 		if (!taskData.storeLogs) {

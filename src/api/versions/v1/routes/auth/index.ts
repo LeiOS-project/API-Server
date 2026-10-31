@@ -1,14 +1,14 @@
-import { Hono } from "hono";
+import { eq } from "drizzle-orm";
 import type { Context } from "hono";
-import { AuthModel } from "./model";
+import { Hono } from "hono";
 import { validator as zValidator } from "hono-openapi";
 import { DB } from "../../../../../db";
-import { eq } from "drizzle-orm";
 import { APIResponse } from "../../../../utils/api-res";
-import { AuthHandler, SessionHandler } from "../../../../utils/authHandler";
+import { type AuthHandler, SessionHandler } from "../../../../utils/authHandler";
 import { APIResponseSpec, APIRouteSpec } from "../../../../utils/specHelpers";
-import { router as resetPasswordRouter } from "./reset-password";
 import { DOCS_TAGS } from "../../docs";
+import { AuthModel } from "./model";
+import { router as resetPasswordRouter } from "./reset-password";
 
 // Dummy bcrypt hash for timing-normalized login failures — prevents username enumeration
 // Generated once at module load so it's a valid, cost-equivalent hash
@@ -35,7 +35,6 @@ const LOGIN_CLEANUP_INTERVAL = setInterval(() => {
 LOGIN_CLEANUP_INTERVAL.unref();
 
 function getClientId(c: Context) {
-	// @ts-ignore bun/hono provides a native request with connection info
 	const remote = (c.req.raw as any)?.remoteAddr?.hostname;
 	return remote || "unknown";
 }
@@ -104,7 +103,7 @@ router.post(
 	zValidator("json", AuthModel.Login.Body),
 
 	async (c) => {
-		//@ts-ignore
+		//@ts-expect-error
 		const authContext = c.get("authContext") as AuthHandler.AuthContext;
 		if (authContext.type !== "unauthenticated") {
 			return APIResponse.forbidden(c, "You are already authenticated");
@@ -174,7 +173,7 @@ router.get(
 	}),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const authContext = c.get("authContext") as AuthHandler.AuthContext;
 		if (authContext.type !== "session") {
 			return APIResponse.unauthorized(c, "Your Auth Context is not a session");
@@ -206,7 +205,7 @@ router.post(
 	}),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const authContext = c.get("authContext") as AuthHandler.AuthContext;
 
 		if (authContext.type !== "session") {

@@ -1,16 +1,16 @@
-import { Hono } from "hono";
-import { PackageReleaseModel } from "../../../../../utils/shared-models/pkg-releases";
-import { validator as zValidator } from "hono-openapi";
-import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers";
-import { DB } from "../../../../../../db";
 import { and, eq } from "drizzle-orm";
-import { APIResponse } from "../../../../../utils/api-res";
-import { AuthHandler } from "../../../../../utils/authHandler";
-import { PermissionHelper } from "../../../../../../utils/permission-helper";
+import { Hono } from "hono";
+import { validator as zValidator } from "hono-openapi";
 import { AptlyAPI } from "../../../../../../aptly/api";
+import { DB } from "../../../../../../db";
 import { TaskScheduler } from "../../../../../../tasks";
-import { RuntimeMetadata } from "../../../../../utils/metadata";
 import { Logger } from "../../../../../../utils/logger";
+import { PermissionHelper } from "../../../../../../utils/permission-helper";
+import { APIResponse } from "../../../../../utils/api-res";
+import type { AuthHandler } from "../../../../../utils/authHandler";
+import { RuntimeMetadata } from "../../../../../utils/metadata";
+import { PackageReleaseModel } from "../../../../../utils/shared-models/pkg-releases";
+import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers";
 import { DOCS_TAGS } from "../../../docs";
 import { router as stableRequestsRouter } from "./stable-promotion-requests";
 
@@ -33,7 +33,7 @@ router.get(
 	}),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const pkg = c.get("package") as DB.Models.PackageFullView;
 
 		const releases = await DB.instance()
@@ -71,9 +71,9 @@ router.post(
 	zValidator("json", PackageReleaseModel.CreateRelease.Body),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const pkg = c.get("package") as DB.Models.PackageFullView;
-		// @ts-ignore
+		// @ts-expect-error
 		const authContext = c.get("authContext") as AuthHandler.AuthContext;
 		const body = c.req.valid("json");
 
@@ -138,9 +138,9 @@ router.use(
 	zValidator("param", PackageReleaseModel.Param),
 
 	async (c, next) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const { version_with_leios_patch } = c.req.valid("param") as { version_with_leios_patch: string };
-		// @ts-ignore
+		// @ts-expect-error
 		const pkg = c.get("package") as DB.Models.PackageFullView;
 
 		const releaseData = await DB.instance()
@@ -158,7 +158,7 @@ router.use(
 			return APIResponse.notFound(c, "Package release with specified version not found");
 		}
 
-		// @ts-ignore
+		// @ts-expect-error
 		c.set("release", releaseData);
 
 		return await next();
@@ -185,7 +185,7 @@ router.get(
 	}),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const release = c.get("release") as DB.Models.PackageRelease;
 		return APIResponse.success(
 			c,
@@ -214,11 +214,11 @@ router.put(
 	zValidator("json", PackageReleaseModel.UpdateRelease.Body),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const pkg = c.get("package") as DB.Models.PackageFullView;
-		// @ts-ignore
+		// @ts-expect-error
 		const release = c.get("release") as DB.Models.PackageRelease;
-		// @ts-ignore
+		// @ts-expect-error
 		const authContext = c.get("authContext") as AuthHandler.AuthContext;
 		const body = c.req.valid("json");
 
@@ -270,11 +270,11 @@ router.post(
 	zValidator("param", PackageReleaseModel.PostParamWithArch),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const pkg = c.get("package") as DB.Models.PackageFullView;
-		// @ts-ignore
+		// @ts-expect-error
 		const release = c.get("release") as DB.Models.PackageRelease;
-		// @ts-ignore
+		// @ts-expect-error
 		const authContext = c.get("authContext") as AuthHandler.AuthContext;
 		const { file } = c.req.valid("form");
 		const { arch } = c.req.valid("param");
@@ -426,11 +426,11 @@ router.delete(
 	}),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const pkg = c.get("package") as DB.Models.PackageFullView;
-		// @ts-ignore
+		// @ts-expect-error
 		const release = c.get("release") as DB.Models.PackageRelease;
-		// @ts-ignore
+		// @ts-expect-error
 		const authContext = c.get("authContext") as AuthHandler.AuthContext;
 
 		if (pkg.flags.includes("SYSTEM-MANAGED")) {

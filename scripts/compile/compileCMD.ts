@@ -1,7 +1,7 @@
 import {
 	CLIBaseCommand,
 	CLICommandArg,
-	CLICommandArgParser,
+	type CLICommandArgParser,
 	type CLICommandContext,
 } from "@cleverjs/cli";
 import { Compiler, type PlatformArg, Platforms } from "./compiler";

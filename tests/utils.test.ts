@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { AptlyUtils } from "../src/aptly/utils";
-import { PackageReleaseModel } from "../src/api/utils/shared-models/pkg-releases";
 import { OSReleaseUtils } from "../src/api/utils/os-release-utils";
+import { PackageReleaseModel } from "../src/api/utils/shared-models/pkg-releases";
+import { AptlyUtils } from "../src/aptly/utils";
 
 describe("Testing Aptly Utilities", () => {
 	test("Extract Version and Patch Suffix", () => {

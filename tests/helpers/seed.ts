@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
-import { DB } from "../../src/db";
 import { SessionHandler } from "../../src/api/utils/authHandler";
+import { DB } from "../../src/db";
 import { PermissionHelper } from "../../src/utils/permission-helper";
 
 export type SeededUser = Omit<DB.Models.User, "password_hash"> & { password: string };

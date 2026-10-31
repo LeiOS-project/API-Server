@@ -1,14 +1,14 @@
+import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import z from "zod";
 import { DB } from "../../../db";
-import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 
 export namespace PackageReleaseModel {
 	// Matches versions that optionally end with a `leios` patch suffix (e.g. leios1, leios1.1.1)
 	// Disallows dangling/invalid leios fragments and limits patch to three numeric segments
 	export const versionWithLeiOSPatchRegex =
-		/^(?:[0-9][0-9A-Za-z.+~\-]*leios\d+(?:\.\d+){0,2}|(?!.*leios)[0-9][0-9A-Za-z.+~\-]*)$/;
+		/^(?:[0-9][0-9A-Za-z.+~-]*leios\d+(?:\.\d+){0,2}|(?!.*leios)[0-9][0-9A-Za-z.+~-]*)$/;
 	export const versionWithRequiredLeiOSPatchRegex =
-		/^(?:[0-9][0-9A-Za-z.+~\-]*leios\d+(?:\.\d+){0,2})$/;
+		/^(?:[0-9][0-9A-Za-z.+~-]*leios\d+(?:\.\d+){0,2})$/;
 
 	export const Param = z.object({
 		version_with_leios_patch: z.string().regex(versionWithLeiOSPatchRegex),

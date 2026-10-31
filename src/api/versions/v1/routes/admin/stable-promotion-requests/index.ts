@@ -1,14 +1,14 @@
+import { asc, desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator as zValidator } from "hono-openapi";
 import { z } from "zod";
+import { DB } from "../../../../../../db";
+import { APIResponse } from "../../../../../utils/api-res";
+import { RuntimeMetadata } from "../../../../../utils/metadata";
+import { ApiHelperModels } from "../../../../../utils/shared-models/api-helper-models";
 import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers";
 import { DOCS_TAGS } from "../../../docs";
 import { AdminStablePromotionRequestModel } from "./model";
-import { DB } from "../../../../../../db";
-import { APIResponse } from "../../../../../utils/api-res";
-import { asc, desc, eq } from "drizzle-orm";
-import { RuntimeMetadata } from "../../../../../utils/metadata";
-import { ApiHelperModels } from "../../../../../utils/shared-models/api-helper-models";
 
 export const router = new Hono().basePath("/stable-promotion-requests");
 
@@ -86,7 +86,7 @@ router.use(
 	),
 
 	async (c, next) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const { stablePromotionRequestID } = c.req.valid("param") as { stablePromotionRequestID: number };
 
 		const request = await DB.instance()
@@ -99,7 +99,7 @@ router.use(
 			return APIResponse.notFound(c, "Stable promotion request not found");
 		}
 
-		// @ts-ignore
+		// @ts-expect-error
 		c.set("stablePromotionRequest", request);
 
 		await next();
@@ -124,7 +124,7 @@ router.get(
 	}),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const request = c.get("stablePromotionRequest") as DB.Models.StablePromotionRequest;
 
 		const pkg = await DB.instance()
@@ -190,7 +190,7 @@ router.post(
 	zValidator("json", AdminStablePromotionRequestModel.Decide.Body),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const request = c.get("stablePromotionRequest") as DB.Models.StablePromotionRequest;
 		const decision = c.req.valid("json");
 

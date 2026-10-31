@@ -1,19 +1,19 @@
+import { and, asc, eq, inArray, like, or, type SQL } from "drizzle-orm";
 import { Hono } from "hono";
-import { PackageModel } from "../../../../utils/shared-models/package";
 import { validator as zValidator } from "hono-openapi";
-import { APIResponseSpec, APIRouteSpec } from "../../../../utils/specHelpers";
-import { and, asc, eq, inArray, like, or, SQL } from "drizzle-orm";
-import { DB } from "../../../../../db";
-import { APIResponse } from "../../../../utils/api-res";
-import { AuthHandler } from "../../../../utils/authHandler";
-import { PermissionHelper } from "../../../../../utils/permission-helper";
 import { AptlyAPI } from "../../../../../aptly/api";
+import { DB } from "../../../../../db";
 import { TaskScheduler } from "../../../../../tasks";
+import { Utils } from "../../../../../utils";
+import { PermissionHelper } from "../../../../../utils/permission-helper";
+import { APIResponse } from "../../../../utils/api-res";
+import type { AuthHandler } from "../../../../utils/authHandler";
 import { RuntimeMetadata } from "../../../../utils/metadata";
+import { PackageModel } from "../../../../utils/shared-models/package";
+import { APIResponseSpec, APIRouteSpec } from "../../../../utils/specHelpers";
 import { DOCS_TAGS } from "../../docs";
 import { router as releasesRouter } from "./releases";
 import { router as roleAssignmentsRouter } from "./role-assignments";
-import { Utils } from "../../../../../utils";
 
 export const router = new Hono().basePath("/packages");
 
@@ -35,7 +35,7 @@ router.get(
 	async (c) => {
 		const { limit, offset, searchString, publisherID, publisherName, onlyMembershipByMe } =
 			c.req.valid("query");
-		// @ts-ignore
+		// @ts-expect-error
 		const authContext = c.get("authContext") as AuthHandler.AuthContext;
 
 		const filters: Array<SQL<unknown> | undefined> = [];
@@ -137,7 +137,7 @@ router.post(
 	zValidator("json", PackageModel.CreatePackage.Body),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const authContext = c.get("authContext") as AuthHandler.AuthContext;
 		const body = c.req.valid("json");
 
@@ -204,7 +204,7 @@ router.use(
 	zValidator("param", PackageModel.Param),
 
 	async (c, next) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const { fullPackageName } = c.req.valid("param") as { fullPackageName: string };
 
 		const row = await DB.instance()
@@ -218,7 +218,7 @@ router.use(
 		}
 
 		c.set(
-			// @ts-ignore
+			// @ts-expect-error
 			"package",
 			row satisfies DB.Models.PackageFullView,
 		);
@@ -245,7 +245,7 @@ router.get(
 	}),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const pkg = c.get("package") as DB.Models.PackageFullView;
 
 		return APIResponse.success(
@@ -276,9 +276,9 @@ router.put(
 	zValidator("json", PackageModel.UpdatePackage.Body),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const pkg = c.get("package") as DB.Models.PackageFullView;
-		// @ts-ignore
+		// @ts-expect-error
 		const authContext = c.get("authContext") as AuthHandler.AuthContext;
 		const updateData = c.req.valid("json");
 
@@ -325,9 +325,9 @@ router.delete(
 	}),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const pkg = c.get("package") as DB.Models.PackageFullView;
-		// @ts-ignore
+		// @ts-expect-error
 		const authContext = c.get("authContext") as AuthHandler.AuthContext;
 
 		if (pkg.flags.includes("SYSTEM-MANAGED")) {

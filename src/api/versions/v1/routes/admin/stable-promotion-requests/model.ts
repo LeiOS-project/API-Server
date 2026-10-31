@@ -1,6 +1,6 @@
 import { createSelectSchema, createUpdateSchema } from "drizzle-zod";
-import { DB } from "../../../../../../db";
 import z from "zod";
+import { DB } from "../../../../../../db";
 import { ApiHelperModels } from "../../../../../utils/shared-models/api-helper-models";
 
 export namespace AdminStablePromotionRequestModel.GetById {

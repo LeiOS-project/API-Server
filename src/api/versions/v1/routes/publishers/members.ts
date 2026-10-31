@@ -1,15 +1,15 @@
+import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator as zValidator } from "hono-openapi";
 import { z } from "zod";
-import { and, eq } from "drizzle-orm";
-import { PublisherModel } from "./model";
+import { DB } from "../../../../../db";
+import { Utils } from "../../../../../utils";
+import { PermissionHelper } from "../../../../../utils/permission-helper";
+import { APIResponse } from "../../../../utils/api-res";
+import type { AuthHandler } from "../../../../utils/authHandler";
 import { APIResponseSpec, APIRouteSpec } from "../../../../utils/specHelpers";
 import { DOCS_TAGS } from "../../docs";
-import { AuthHandler } from "../../../../utils/authHandler";
-import { APIResponse } from "../../../../utils/api-res";
-import { DB } from "../../../../../db";
-import { PermissionHelper } from "../../../../../utils/permission-helper";
-import { Utils } from "../../../../../utils";
+import { PublisherModel } from "./model";
 
 export const router = new Hono().basePath("/members");
 
@@ -32,9 +32,9 @@ router.get(
 	}),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const publisher = c.get("publisher") as DB.Models.Publisher;
-		// @ts-ignore
+		// @ts-expect-error
 		const authContext = c.get("authContext") as AuthHandler.AuthContext;
 
 		let canSeeHidden = false;
@@ -104,9 +104,9 @@ router.post(
 	zValidator("json", PublisherModel.Members.AddMember.Body),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const publisher = c.get("publisher") as DB.Models.Publisher;
-		// @ts-ignore
+		// @ts-expect-error
 		const authContext = c.get("authContext") as AuthHandler.AuthContext;
 		const body = c.req.valid("json");
 
@@ -182,9 +182,9 @@ router.use(
 	),
 
 	async (c, next) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const publisher = c.get("publisher") as DB.Models.Publisher;
-		// @ts-ignore
+		// @ts-expect-error
 		const { userId } = c.req.valid("param") as { userId: number };
 
 		const member: DB.Models.PublisherMember | undefined = await DB.instance()
@@ -202,7 +202,7 @@ router.use(
 			return APIResponse.notFound(c, "Member not found");
 		}
 
-		// @ts-ignore
+		// @ts-expect-error
 		c.set("member", member);
 
 		return await next();
@@ -227,9 +227,9 @@ router.get(
 	}),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const member = c.get("member") as DB.Models.PublisherMember;
-		// @ts-ignore
+		// @ts-expect-error
 		const authContext = c.get("authContext") as AuthHandler.AuthContext;
 
 		if (member.is_publicly_hidden) {
@@ -305,13 +305,13 @@ router.put(
 	zValidator("json", PublisherModel.Members.UpdateMember.Body),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const authContext = c.get("authContext") as AuthHandler.AuthContext;
 
-		// @ts-ignore
+		// @ts-expect-error
 		const publisher = c.get("publisher") as DB.Models.Publisher;
 
-		// @ts-ignore
+		// @ts-expect-error
 		const member = c.get("member") as DB.Models.PublisherMember;
 
 		const body = c.req.valid("json");
@@ -376,11 +376,11 @@ router.delete(
 	}),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const authContext = c.get("authContext") as AuthHandler.AuthContext;
-		// @ts-ignore
+		// @ts-expect-error
 		const publisher = c.get("publisher") as DB.Models.Publisher;
-		// @ts-ignore
+		// @ts-expect-error
 		const member = c.get("member") as DB.Models.PublisherMember;
 
 		const allowed = await PermissionHelper.can({

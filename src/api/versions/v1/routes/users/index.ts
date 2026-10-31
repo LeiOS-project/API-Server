@@ -1,10 +1,10 @@
+import { like, or } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator as zValidator } from "hono-openapi";
-import { like, or } from "drizzle-orm";
 import { DB } from "../../../../../db";
 import { APIResponse } from "../../../../utils/api-res";
+import type { AuthHandler } from "../../../../utils/authHandler";
 import { APIResponseSpec, APIRouteSpec } from "../../../../utils/specHelpers";
-import { AuthHandler } from "../../../../utils/authHandler";
 import { DOCS_TAGS } from "../../docs";
 import { UsersPublicModel } from "./model";
 
@@ -28,7 +28,7 @@ router.get(
 	zValidator("query", UsersPublicModel.Search.Query),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const authContext = c.get("authContext") as AuthHandler.AuthContext;
 
 		if (authContext.type === "unauthenticated") {

@@ -1,8 +1,8 @@
+import type { TaskHandler, TuplifyUnion } from "@cleverjs/utils";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
-import { DB } from "../../../../../../db";
 import { z } from "zod";
+import { DB } from "../../../../../../db";
 import { ApiHelperModels } from "../../../../../utils/shared-models/api-helper-models";
-import { type TuplifyUnion, TaskHandler } from "@cleverjs/utils";
 
 export namespace OSReleasesModel {
 	export const Param = z.object({
@@ -14,7 +14,6 @@ export namespace OSReleasesModel.GetByVersion {
 	export const Response = createSelectSchema(DB.Tables.os_releases)
 		.extend({
 			published_at: z.number().nullable(),
-			//@ts-ignore
 			publishing_status: z.enum([
 				"pending",
 				"running",

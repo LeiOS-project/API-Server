@@ -1,16 +1,16 @@
+import { and, asc, eq, inArray, like, or, type SQL } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator as zValidator } from "hono-openapi";
 import { z } from "zod";
-import { and, asc, eq, inArray, like, or, SQL } from "drizzle-orm";
 import { DB } from "../../../../../db";
+import { Utils } from "../../../../../utils";
+import { PermissionHelper } from "../../../../../utils/permission-helper";
 import { APIResponse } from "../../../../utils/api-res";
-import { PublisherModel } from "./model";
+import type { AuthHandler } from "../../../../utils/authHandler";
 import { APIResponseSpec, APIRouteSpec } from "../../../../utils/specHelpers";
 import { DOCS_TAGS } from "../../docs";
-import { AuthHandler } from "../../../../utils/authHandler";
-import { PermissionHelper } from "../../../../../utils/permission-helper";
 import { router as membersRouter } from "./members";
-import { Utils } from "../../../../../utils";
+import { PublisherModel } from "./model";
 
 export const router = new Hono().basePath("/publishers");
 
@@ -31,7 +31,7 @@ router.get(
 	zValidator("query", PublisherModel.GetAll.Query),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const authContext = c.get("authContext") as AuthHandler.AuthContext;
 
 		const { limit, offset, searchString, onlyMembershipByMe } = c.req.valid("query");
@@ -43,7 +43,7 @@ router.get(
 			} satisfies PublisherModel.GetAll.Response);
 		}
 
-		let query = DB.instance()
+		const query = DB.instance()
 			.select({
 				id: DB.Tables.publishers.id,
 
@@ -122,7 +122,7 @@ router.post(
 	zValidator("json", PublisherModel.CreatePublisher.Body),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const authContext = c.get("authContext") as AuthHandler.AuthContext;
 
 		if (authContext.type === "unauthenticated") {
@@ -188,7 +188,7 @@ router.use(
 	),
 
 	async (c, next) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const { publisherName } = c.req.valid("param") as { publisherName: string };
 
 		const publisher = await DB.instance()
@@ -201,7 +201,7 @@ router.use(
 			return APIResponse.notFound(c, "Publisher not found");
 		}
 
-		// @ts-ignore
+		// @ts-expect-error
 		c.set("publisher", publisher);
 
 		return await next();
@@ -226,7 +226,7 @@ router.get(
 	}),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const publisher = c.get("publisher") as DB.Models.Publisher;
 
 		const returnPublisher = {
@@ -270,9 +270,9 @@ router.put(
 	zValidator("json", PublisherModel.UpdatePublisher.Body),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const publisher = c.get("publisher") as DB.Models.Publisher;
-		// @ts-ignore
+		// @ts-expect-error
 		const authContext = c.get("authContext") as AuthHandler.AuthContext;
 		const updateData = c.req.valid("json");
 
@@ -315,9 +315,9 @@ router.post(
 	zValidator("json", PublisherModel.TransferOwnership.Body),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const publisher = c.get("publisher") as DB.Models.Publisher;
-		// @ts-ignore
+		// @ts-expect-error
 		const authContext = c.get("authContext") as AuthHandler.AuthContext;
 		const { new_owner_user_id } = c.req.valid("json");
 
@@ -401,9 +401,9 @@ router.delete(
 	}),
 
 	async (c) => {
-		// @ts-ignore
+		// @ts-expect-error
 		const publisher = c.get("publisher") as DB.Models.Publisher;
-		// @ts-ignore
+		// @ts-expect-error
 		const authContext = c.get("authContext") as AuthHandler.AuthContext;
 
 		if (authContext.type === "unauthenticated") {
