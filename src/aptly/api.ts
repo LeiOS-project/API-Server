@@ -504,7 +504,7 @@ export namespace AptlyAPI.Snapshots {
         const snapshotResult = await AptlyAPI.Tasks.run(`create snapshot ${snapshotName}`, (query) =>
             AptlyAPIServer.getClient().postApiReposByNameSnapshots({
                 path: {
-                    name: "leios-stable"
+                    name: repoName
                 },
                 body: {
                     Name: snapshotName,

@@ -377,7 +377,7 @@ router.delete('/:version_with_leios_patch',
         let aptlyDeleted: boolean;
 
         try {
-            aptlyDeleted = await AptlyAPI.Packages.deleteAllInAllRepos(pkg.name, release.version_with_leios_patch, undefined);
+            aptlyDeleted = await AptlyAPI.Packages.deleteAllInAllRepos(pkg.fullname, release.version_with_leios_patch, undefined);
         } catch {
             return APIResponse.serverError(c, "Failed to delete release from Aptly repositories");
         }
@@ -388,6 +388,13 @@ router.delete('/:version_with_leios_patch',
 
         await RuntimeMetadata.removeOSReleasePendingPackageIfExists(release.id);
 
+        // Testing and stable hold one version per architecture, so a deleted release that was the
+        // latest one there leaves that architecture empty.
+        const withoutDeletedVersion = (latest: DB.Models.Package["latest_testing_release"]) => ({
+            amd64: latest.amd64 === release.version_with_leios_patch ? null : latest.amd64,
+            arm64: latest.arm64 === release.version_with_leios_patch ? null : latest.arm64,
+        });
+
         await DB.instance().transaction(async (tx) => {
             await tx.delete(DB.Tables.stablePromotionRequests).where(
                 eq(DB.Tables.stablePromotionRequests.package_release_id, release.id)
@@ -396,6 +403,11 @@ router.delete('/:version_with_leios_patch',
             await tx.delete(DB.Tables.packageReleases).where(
                 eq(DB.Tables.packageReleases.id, release.id)
             );
+
+            await tx.update(DB.Tables.packages).set({
+                latest_testing_release: withoutDeletedVersion(pkg.latest_testing_release),
+                latest_stable_release: withoutDeletedVersion(pkg.latest_stable_release),
+            }).where(eq(DB.Tables.packages.id, pkg.id));
         });
 
         await TaskScheduler.enqueueTask("testing-repo:update", {}, { created_by_user_id: null });

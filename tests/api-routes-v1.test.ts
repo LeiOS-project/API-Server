@@ -2663,6 +2663,83 @@ describe("Task queue execution coverage", async () => {
         ).run();
     }, { timeout: 30000 });
 
+    test("DELETE release and package remove their files from every aptly repo", async () => {
+        const owner = await seedUser("user");
+        const publisher = await seedPublisherWithOwner(owner.id, {
+            name: `fastfetch`,
+
+            maintainer_contact_email: "zhangsongcui@live.cn",
+            maintainer_contact_name: "Carter Li"
+        });
+
+        const pkg = await seedPackageForPublisher(publisher.id, {
+            name: "fastfetch",
+            display_name: "Fastfetch Delete Coverage",
+            description: "Delete coverage package"
+        });
+
+        const release = await seedPackageRelease(pkg.id, {
+            version_with_leios_patch: "2.55.0",
+            changelog: "Delete coverage release"
+        });
+
+        const uploadRelease = async () => {
+            const formData = new FormData();
+            formData.set("file", new File([
+                await Bun.file(TEST_PACKAGE_FIXTURES.fastfetchAmd64).arrayBuffer()
+            ], "fastfetch_2.55.0_amd64.deb"));
+
+            await makeAPIRequest(`/v1/packages/fastfetch.fastfetch/releases/2.55.0/amd64`, {
+                method: "POST",
+                authToken: siteAdminSessionToken,
+                additionalOptions: {
+                    body: formData
+                }
+            }, 201);
+        };
+
+        await uploadRelease();
+        expect(await AptlyAPI.Packages.existsInRepo("leios-archive", "fastfetch.fastfetch", "2.55.0", "amd64")).toBe(true);
+        expect(await AptlyAPI.Packages.existsInRepo("leios-testing", "fastfetch.fastfetch", "2.55.0", "amd64")).toBe(true);
+
+        await makeAPIRequest(`/v1/packages/fastfetch.fastfetch/releases/2.55.0`, {
+            method: "DELETE",
+            authToken: siteAdminSessionToken
+        }, 200);
+
+        for (const repo of AptlyAPI.Utils.REPOS) {
+            expect(await AptlyAPI.Packages.existsInRepo(repo, "fastfetch.fastfetch")).toBe(false);
+        }
+
+        const afterReleaseDelete = DB.instance().select().from(DB.Tables.packages).where(
+            eq(DB.Tables.packages.id, pkg.id)
+        ).get();
+        expect(afterReleaseDelete?.latest_testing_release).toEqual({ amd64: null, arm64: null });
+
+        // Upload again, then delete the whole package.
+        await seedPackageRelease(pkg.id, {
+            version_with_leios_patch: release.version_with_leios_patch,
+            changelog: "Delete coverage release (again)"
+        });
+        await uploadRelease();
+        expect(await AptlyAPI.Packages.existsInRepo("leios-archive", "fastfetch.fastfetch", "2.55.0", "amd64")).toBe(true);
+
+        await makeAPIRequest(`/v1/packages/fastfetch.fastfetch`, {
+            method: "DELETE",
+            authToken: siteAdminSessionToken
+        }, 200);
+
+        for (const repo of AptlyAPI.Utils.REPOS) {
+            expect(await AptlyAPI.Packages.existsInRepo(repo, "fastfetch.fastfetch")).toBe(false);
+        }
+
+        await AptlyAPI.Packages.deleteAllInAllRepos("leios.system.branding-meta-files").catch(() => null);
+
+        await DB.instance().delete(DB.Tables.publishers).where(
+            eq(DB.Tables.publishers.id, publisher.id)
+        ).run();
+    }, { timeout: 30000 });
+
     test("queued testing-repo:update tasks publish once", async () => {
         await TaskScheduler.stopProcessing();
 

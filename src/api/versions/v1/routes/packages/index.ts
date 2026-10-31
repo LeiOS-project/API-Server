@@ -287,7 +287,7 @@ router.delete('/:fullPackageName',
         let aptlyDeleted: boolean;
 
         try {
-            aptlyDeleted = await AptlyAPI.Packages.deleteAllInAllRepos(pkg.name);
+            aptlyDeleted = await AptlyAPI.Packages.deleteAllInAllRepos(pkg.fullname);
         } catch {
             return APIResponse.serverError(c, "Failed to delete package from Aptly repositories");
         }
