@@ -33,7 +33,7 @@ router.get('/',
         const release = c.get("release") as DB.Models.PackageRelease;
         const filters = c.req.valid("query");
 
-        let query = DB.instance().select({
+        const query = DB.instance().select({
             id: DB.Tables.stablePromotionRequests.id,
             package_id: DB.Tables.stablePromotionRequests.package_id,
             package_release_id: DB.Tables.stablePromotionRequests.package_release_id,
@@ -54,12 +54,11 @@ router.get('/',
             eq(DB.Tables.packageReleases.id, DB.Tables.stablePromotionRequests.package_release_id),
         )
         .where(
-            eq(DB.Tables.stablePromotionRequests.package_release_id, release.id)
-        ).$dynamic();
-
-        if (filters.status) {
-            query = query.where(eq(DB.Tables.stablePromotionRequests.status, filters.status));
-        }
+            and(
+                eq(DB.Tables.stablePromotionRequests.package_release_id, release.id),
+                filters.status ? eq(DB.Tables.stablePromotionRequests.status, filters.status) : undefined,
+            )
+        );
 
         const requests = (await query satisfies StablePromotionRequestsModel.Entity[]) as StablePromotionRequestsModel.GetAll.Response;
 
