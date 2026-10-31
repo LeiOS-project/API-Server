@@ -1,7 +1,21 @@
+import { AppConstants } from "../../src/utils/constants";
+
+/**
+ * The compile engine: wraps `bun build --compile --sourcemap --minify --bytecode` and injects
+ * `APP_VERSION` via `--define`. Targets: linux-x64 (modern), linux-x64-baseline, linux-arm64.
+ * The binary name comes from `AppConstants.BINARY_NAME`. See docs/11-cli-and-infra.md.
+ */
 export enum Platforms {
 	"linux-x64" = "bun-linux-x64-modern",
 	"linux-x64-baseline" = "bun-linux-x64-baseline",
 	"linux-arm64" = "bun-linux-arm64",
+
+	// "win-x64" = "bun-windows-x64-modern",
+	// "win-x64-baseline" = "bun-windows-x64-baseline",
+
+	// "macos-x64" = "bun-darwin-x64-modern",
+	// "macos-x64-baseline" = "bun-darwin-x64-baseline",
+	// "macos-arm64" = "bun-darwin-arm64"
 }
 
 export type PlatformArg = keyof typeof Platforms | "auto";
@@ -11,7 +25,8 @@ class CompilerCommand {
 	public minify = true;
 	public bytecode = true;
 	public entrypoint = "./scripts/entrypoint.ts";
-	public outfile = "./build/bin/leios-api";
+	// Set the name in AppConstants.BINARY_NAME (src/utils/constants.ts), e.g. leios-api, nowip-api.
+	public outfile = `./build/bin/${AppConstants.BINARY_NAME}`;
 	public platform: PlatformArg = "auto";
 	public env: NodeJS.ProcessEnv = {};
 	private additionalArgs: string[] = [];
@@ -47,27 +62,43 @@ export class Compiler {
 		versionInFileName: boolean,
 	) {
 		if (versionInFileName) {
-			this.command.outfile += `-v${version}`;
+			this.command.outfile += `-v${this.version}`;
 		}
 
 		this.command.platform = platform;
 
 		if (platform !== "auto") {
-			if (Object.keys(Platforms).some((p) => p === platform) === false) {
+			if (!Object.keys(Platforms).some((p) => p === platform)) {
 				throw new Error(`Invalid platform: ${platform}`);
 			}
 			this.command.outfile += `-${platform}`;
 		}
 
-		this.command.env.APP_VERSION = version;
+		this.command.env.APP_VERSION = this.version;
+
+		// Embed the migrations so the binary can migrate on its own. `--asset` needs a newer Bun than
+		// some dev machines run; older ones would treat the folder as a second entry point. Without it
+		// the binary reads DB_MIGRATION_DIR instead (the Docker image ships the folder).
+		if (Compiler.supportsAssetFlag()) {
+			this.command.addArg("--asset ./drizzle/migrations");
+		} else {
+			console.warn(
+				`Bun ${Bun.version} does not support \`bun build --asset\`; the binary will not embed the migrations.`,
+			);
+		}
+	}
+
+	protected static supportsAssetFlag() {
+		const help = Bun.spawnSync(["bun", "build", "--help"]).stdout.toString();
+		return /--asset[\s=]/.test(help);
 	}
 
 	async build() {
 		try {
-			const output = await Bun.$`
-                echo "Building from sources. Version: ${this.version} Platform: ${this.platform}";
-                ${{ raw: this.command.getCommand() }}
-                `.text();
+			console.log(`Building from sources. Version: ${this.version} Platform: ${this.platform}`);
+
+			const output = await Bun.$`${{ raw: this.command.getCommand() }}`.text();
+
 			console.log(output);
 		} catch (err: any) {
 			console.log(`Compiling Failed:\n`, err);
