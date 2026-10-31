@@ -2,21 +2,19 @@ import { Logger } from "../utils/logger";
 import { Hono } from "hono";
 import { prettyJSON } from "hono/pretty-json";
 import { cors } from "hono/cors";
-import { HTTPException } from 'hono/http-exception'
+import { HTTPException } from "hono/http-exception";
 import type { APIVersionRouter } from "./utils/apiVersionRouter";
 import { APIv1Router } from "./versions/v1";
 import { openAPIRouteHandler } from "hono-openapi";
 import { Scalar } from "@scalar/hono-api-reference";
 
 export class API {
-
 	protected static server: Bun.Server<undefined>;
 	protected static app: Hono;
 
 	protected static latestVersion: number | null = null;
 
 	protected static registerVersion(versionRouter: APIVersionRouter, disableDocs: boolean = false) {
-
 		this.app.route(`/v${versionRouter.version}`, versionRouter.router);
 
 		if (!this.latestVersion || versionRouter.version > this.latestVersion) {
@@ -24,7 +22,6 @@ export class API {
 		}
 
 		if (!disableDocs) {
-
 			this.app.get(
 				`/docs/v${versionRouter.version}/openapi`,
 				openAPIRouteHandler(versionRouter.router, versionRouter.openAPIConfig),
@@ -32,37 +29,38 @@ export class API {
 
 			this.app.get(
 				`/docs/v${versionRouter.version}`,
-				Scalar({ url: `/docs/v${versionRouter.version}/openapi` })
+				Scalar({ url: `/docs/v${versionRouter.version}/openapi` }),
 			);
-
 		}
 	}
 
-	static async init(
-		frontendUrls: string[] = [],
-		disableDocs = false
-	) {
-
+	static async init(frontendUrls: string[] = [], disableDocs = false) {
 		this.app = new Hono();
 
-		this.app.use(prettyJSON())
+		this.app.use(prettyJSON());
 
-		this.app.use('*', cors({
-			origin: frontendUrls,
-			allowHeaders: ['Content-Type', 'Authorization'],
-			allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-			maxAge: 600,
-			credentials: true,
-		}))
+		this.app.use(
+			"*",
+			cors({
+				origin: frontendUrls,
+				allowHeaders: ["Content-Type", "Authorization"],
+				allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+				maxAge: 600,
+				credentials: true,
+			}),
+		);
 
 		this.app.onError(async (err, c) => {
 			if (err instanceof HTTPException) {
 				// Return only safe error metadata — never leak Zod validation details
-				return c.json({
-					success: false,
-					code: err.status,
-					message: 'Your input is invalid',
-				}, err.status)
+				return c.json(
+					{
+						success: false,
+						code: err.status,
+						message: "Your input is invalid",
+					},
+					err.status,
+				);
 			}
 
 			// this would potentially leak sensitive information, so we catch it here and return a generic error message instead of the default Hono error response which includes the error message and stack trace in development mode.
@@ -86,44 +84,37 @@ export class API {
 			// }
 
 			Logger.error("API Error:", err);
-			return c.json({ success: false, code: 500, message: 'Internal Server Error' }, 500);
+			return c.json({ success: false, code: 500, message: "Internal Server Error" }, 500);
 		});
 
-
-		this.registerVersion(new APIv1Router, disableDocs);
-
+		this.registerVersion(new APIv1Router(), disableDocs);
 
 		this.app.get("/health", (c) => {
 			return c.json({
 				success: true,
 				code: 200,
 				message: "LeiOS API is running",
-				data: null
+				data: null,
 			});
 		});
 
 		if (!disableDocs) {
-
 			this.app.get("/", (c) => {
 				return c.redirect(`/docs/v${this.latestVersion}`);
 			});
-
 		} else {
-
 			this.app.get("/", (c) => {
 				return c.json({
 					success: true,
 					code: 200,
 					message: "LeiOS API is running. Documentation is disabled.",
-					data: null
+					data: null,
 				});
 			});
 		}
-
 	}
 
 	static async start(port: number, hostname: string) {
-
 		if (!this.app) {
 			await this.init();
 		}
@@ -146,5 +137,4 @@ export class API {
 		}
 		return this.app;
 	}
-
 }

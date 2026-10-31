@@ -1,10 +1,3 @@
-
 export class DataSyncUtils {
-
-    static async checkForDiffrences() {
-        
-        
-
-    }
-
+	static async checkForDiffrences() {}
 }

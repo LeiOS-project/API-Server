@@ -12,9 +12,10 @@ import { OSReleaseUtils } from "../../../../../utils/os-release-utils";
 import { ApiHelperModels } from "../../../../../utils/shared-models/api-helper-models";
 import { TaskUtils } from "../../../../../../tasks/utils";
 
-export const router = new Hono().basePath('/os-releases');
+export const router = new Hono().basePath("/os-releases");
 
-router.get('/',
+router.get(
+	"/",
 
 	APIRouteSpec.authenticated({
 		summary: "List OS releases",
@@ -22,8 +23,8 @@ router.get('/',
 		tags: [DOCS_TAGS.ADMIN_OS_RELEASES],
 
 		responses: APIResponseSpec.describeBasic(
-			APIResponseSpec.success("OS releases retrieved", OSReleasesModel.GetAll.Response)
-		)
+			APIResponseSpec.success("OS releases retrieved", OSReleasesModel.GetAll.Response),
+		),
 	}),
 
 	zValidator("query", ApiHelperModels.ListAll.Query),
@@ -31,35 +32,38 @@ router.get('/',
 	async (c) => {
 		const { limit, offset, order } = c.req.valid("query");
 
-		const items = await DB.instance().select({
-			id: DB.Tables.os_releases.id,
-			version: DB.Tables.os_releases.version,
-			changelog: DB.Tables.os_releases.changelog,
-			created_at: DB.Tables.os_releases.created_at,
+		const items = await DB.instance()
+			.select({
+				id: DB.Tables.os_releases.id,
+				version: DB.Tables.os_releases.version,
+				changelog: DB.Tables.os_releases.changelog,
+				created_at: DB.Tables.os_releases.created_at,
 
-			published_at: DB.Tables.scheduled_tasks.finished_at,
-			publishing_status: DB.Tables.scheduled_tasks.status,
-		})
-		.from(DB.Tables.os_releases)
-		.innerJoin(
-			DB.Tables.scheduled_tasks,
-			eq(DB.Tables.scheduled_tasks.id, DB.Tables.os_releases.taskID)
-		)
-		.orderBy(
-			order === "newest" ?
-				desc(DB.Tables.os_releases.created_at) :
-				DB.Tables.os_releases.created_at
-		)
-		.limit(limit)
-		.offset(offset);
+				published_at: DB.Tables.scheduled_tasks.finished_at,
+				publishing_status: DB.Tables.scheduled_tasks.status,
+			})
+			.from(DB.Tables.os_releases)
+			.innerJoin(
+				DB.Tables.scheduled_tasks,
+				eq(DB.Tables.scheduled_tasks.id, DB.Tables.os_releases.taskID),
+			)
+			.orderBy(
+				order === "newest" ? desc(DB.Tables.os_releases.created_at) : DB.Tables.os_releases.created_at,
+			)
+			.limit(limit)
+			.offset(offset);
 
 		const total = await DB.instance().$count(DB.Tables.os_releases);
 
-		return APIResponse.success(c, "OS releases retrieved", { items, total } satisfies OSReleasesModel.GetAll.Response);
-	}
+		return APIResponse.success(c, "OS releases retrieved", {
+			items,
+			total,
+		} satisfies OSReleasesModel.GetAll.Response);
+	},
 );
 
-router.post('/',
+router.post(
+	"/",
 
 	APIRouteSpec.authenticated({
 		summary: "Create OS release (async)",
@@ -67,17 +71,24 @@ router.post('/',
 		tags: [DOCS_TAGS.ADMIN_OS_RELEASES],
 
 		responses: APIResponseSpec.describeBasic(
-			APIResponseSpec.accepted("OS release creation task enqueued", OSReleasesModel.CreateRelease.Response)
-		)
+			APIResponseSpec.accepted(
+				"OS release creation task enqueued",
+				OSReleasesModel.CreateRelease.Response,
+			),
+		),
 	}),
 
-	zValidator('json', OSReleasesModel.CreateRelease.Body),
+	zValidator("json", OSReleasesModel.CreateRelease.Body),
 
 	async (c) => {
+		const newReleaseData = c.req.valid("json");
 
-		const newReleaseData = c.req.valid('json');
-
-		let lastReleaseVersion = DB.instance().select().from(DB.Tables.os_releases).orderBy(desc(DB.Tables.os_releases.created_at)).limit(1).get()?.version;
+		let lastReleaseVersion = DB.instance()
+			.select()
+			.from(DB.Tables.os_releases)
+			.orderBy(desc(DB.Tables.os_releases.created_at))
+			.limit(1)
+			.get()?.version;
 		if (!lastReleaseVersion) {
 			const anyRelease = DB.instance().select().from(DB.Tables.os_releases).limit(1).get();
 			if (!anyRelease) {
@@ -92,25 +103,34 @@ router.post('/',
 			pkgReleasesToIncludeByID: await RuntimeMetadata.getOSReleasePendingPackages(),
 			version,
 			timestamp: now.getTime(),
-			changelogLines: newReleaseData.changelog.split("\n").filter(line => line.trim().length > 0),
+			changelogLines: newReleaseData.changelog.split("\n").filter((line) => line.trim().length > 0),
 		};
 
-		const taskID = await TaskQueueUtils.createPendingTaskRecord("os-release:create", taskArgs, {
-			created_by_user_id: null
-		}, {
-			storeLogs: true
-		});
+		const taskID = await TaskQueueUtils.createPendingTaskRecord(
+			"os-release:create",
+			taskArgs,
+			{
+				created_by_user_id: null,
+			},
+			{
+				storeLogs: true,
+			},
+		);
 
 		const result = await (async () => {
 			try {
 				return {
-					...await DB.instance().insert(DB.Tables.os_releases).values({
-						version,
-						changelog: newReleaseData.changelog,
-						taskID,
-					}).returning().get(),
+					...(await DB.instance()
+						.insert(DB.Tables.os_releases)
+						.values({
+							version,
+							changelog: newReleaseData.changelog,
+							taskID,
+						})
+						.returning()
+						.get()),
 					published_at: null,
-					publishing_status: "pending"
+					publishing_status: "pending",
 				} as const;
 			} catch (error) {
 				await TaskQueueUtils.deleteTaskRecord(taskID);
@@ -120,21 +140,28 @@ router.post('/',
 
 		await TaskQueueUtils.activatePendingTask(taskID);
 
-		return APIResponse.accepted(c, "OS release creation task enqueued", result satisfies OSReleasesModel.CreateRelease.Response);
-	}
+		return APIResponse.accepted(
+			c,
+			"OS release creation task enqueued",
+			result satisfies OSReleasesModel.CreateRelease.Response,
+		);
+	},
 );
 
-router.use('/:version/*',
+router.use(
+	"/:version/*",
 
-	zValidator('param', OSReleasesModel.Param),
+	zValidator("param", OSReleasesModel.Param),
 
 	async (c, next) => {
 		// @ts-ignore
 		const { version } = c.req.valid("param") as { version: string };
 
-		const release = await DB.instance().select().from(DB.Tables.os_releases).where(
-			eq(DB.Tables.os_releases.version, version)
-		).get();
+		const release = await DB.instance()
+			.select()
+			.from(DB.Tables.os_releases)
+			.where(eq(DB.Tables.os_releases.version, version))
+			.get();
 
 		if (!release) {
 			return APIResponse.notFound(c, "OS release not found");
@@ -144,10 +171,11 @@ router.use('/:version/*',
 		c.set("osRelease", release);
 
 		await next();
-	}
+	},
 );
 
-router.get('/:version',
+router.get(
+	"/:version",
 
 	APIRouteSpec.authenticated({
 		summary: "Get OS release",
@@ -156,17 +184,19 @@ router.get('/:version',
 
 		responses: APIResponseSpec.describeBasic(
 			APIResponseSpec.success("OS release retrieved", OSReleasesModel.GetByVersion.Response),
-			APIResponseSpec.notFound("OS release not found")
-		)
+			APIResponseSpec.notFound("OS release not found"),
+		),
 	}),
 
 	async (c) => {
 		// @ts-ignore
 		const release = c.get("osRelease") as DB.Models.OSRelease;
 
-		const task = await DB.instance().select().from(DB.Tables.scheduled_tasks).where(
-			eq(DB.Tables.scheduled_tasks.id, release.taskID)
-		).get();
+		const task = await DB.instance()
+			.select()
+			.from(DB.Tables.scheduled_tasks)
+			.where(eq(DB.Tables.scheduled_tasks.id, release.taskID))
+			.get();
 
 		if (!task) {
 			return APIResponse.serverError(c, "Associated publishing task not found for this OS release");
@@ -175,14 +205,19 @@ router.get('/:version',
 		const result = {
 			...release,
 			published_at: task.finished_at,
-			publishing_status: task.status
+			publishing_status: task.status,
 		};
 
-		return APIResponse.success(c, "OS release retrieved", result satisfies OSReleasesModel.GetByVersion.Response);
-	}
+		return APIResponse.success(
+			c,
+			"OS release retrieved",
+			result satisfies OSReleasesModel.GetByVersion.Response,
+		);
+	},
 );
 
-router.get('/:version/publishing-logs',
+router.get(
+	"/:version/publishing-logs",
 
 	APIRouteSpec.authenticated({
 		summary: "Get OS release publishing logs",
@@ -191,8 +226,10 @@ router.get('/:version/publishing-logs',
 
 		responses: APIResponseSpec.describeBasic(
 			APIResponseSpec.success("Publishing logs retrieved", OSReleasesModel.GetPublishingLogs.Response),
-			APIResponseSpec.notFound("OS release not found / Log file not found for this OS release publishing task")
-		)
+			APIResponseSpec.notFound(
+				"OS release not found / Log file not found for this OS release publishing task",
+			),
+		),
 	}),
 
 	async (c) => {
@@ -205,11 +242,14 @@ router.get('/:version/publishing-logs',
 			return APIResponse.notFound(c, "Log file not found for this OS release publishing task");
 		}
 
-		return APIResponse.success(c, "Publishing logs retrieved", { logs } satisfies OSReleasesModel.GetPublishingLogs.Response);
-	}
+		return APIResponse.success(c, "Publishing logs retrieved", {
+			logs,
+		} satisfies OSReleasesModel.GetPublishingLogs.Response);
+	},
 );
 
-router.put('/:version',
+router.put(
+	"/:version",
 
 	APIRouteSpec.authenticated({
 		summary: "Update OS release",
@@ -218,22 +258,23 @@ router.put('/:version',
 
 		responses: APIResponseSpec.describeWithWrongInputs(
 			APIResponseSpec.successNoData("OS release updated successfully"),
-			APIResponseSpec.notFound("OS release not found")
-		)
+			APIResponseSpec.notFound("OS release not found"),
+		),
 	}),
 
-	zValidator('json', OSReleasesModel.UpdateRelease.Body),
+	zValidator("json", OSReleasesModel.UpdateRelease.Body),
 
 	async (c) => {
 		// @ts-ignore
 		const release = c.get("osRelease") as DB.Models.OSRelease;
 
-		const updateData = c.req.valid('json');
+		const updateData = c.req.valid("json");
 
-		await DB.instance().update(DB.Tables.os_releases).set(updateData).where(
-			eq(DB.Tables.os_releases.id, release.id)
-		);
+		await DB.instance()
+			.update(DB.Tables.os_releases)
+			.set(updateData)
+			.where(eq(DB.Tables.os_releases.id, release.id));
 
 		return APIResponse.successNoData(c, "OS release updated successfully");
-	}
+	},
 );

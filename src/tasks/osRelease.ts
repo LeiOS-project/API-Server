@@ -6,166 +6,216 @@ import { BrandingBuilder } from "../utils/branding-builder";
 import { RuntimeMetadata } from "../api/utils/metadata";
 
 interface Payload {
-    pkgReleasesToIncludeByID: number[];
-    version: string;
-    timestamp: number;
-    changelogLines?: string[];
+	pkgReleasesToIncludeByID: number[];
+	version: string;
+	timestamp: number;
+	changelogLines?: string[];
 }
 interface StepState {
-    nextPackageIndexToMove: number;
+	nextPackageIndexToMove: number;
 }
 
+export const OsReleaseTask = new TaskHandler.StepBasedTaskFn(
+	"os-release:create",
+	async (payload: Payload, logger, state: StepState) => {
+		state.nextPackageIndexToMove = 0;
 
-export const OsReleaseTask = new TaskHandler.StepBasedTaskFn("os-release:create", async (payload: Payload, logger, state: StepState) => {
+		return { success: true };
+	},
+);
 
-    state.nextPackageIndexToMove = 0;
+OsReleaseTask.addStep(
+	"Build and add LeiOS branding package to stable repo",
+	async (payload, logger) => {
+		try {
+			logger.info(
+				`Building leios.system.branding-meta-files for stable release ${payload.version}...`,
+			);
 
-    return { success: true };
-});
+			const debPath = await BrandingBuilder.buildBrandingPackage({
+				version: payload.version,
+				distribution: "stable",
+				changelogLines: payload.changelogLines,
+			});
 
-OsReleaseTask.addStep("Build and add LeiOS branding package to stable repo", async (payload, logger) => {
+			logger.info(`Uploading branding package to archive repo: ${debPath}`);
+			const brandingPackage = await AptlyAPI.Packages.uploadLocalDebIntoArchiveRepo(debPath);
 
-    try {
-        logger.info(`Building leios.system.branding-meta-files for stable release ${payload.version}...`);
+			// Remove any previous branding package versions from stable so only the
+			// newly built one remains (matching how normal package releases are replaced).
+			logger.info(`Removing previous branding package versions from stable repo`);
+			await AptlyAPI.Packages.deleteInRepo("leios-stable", brandingPackage.name);
 
-        const debPath = await BrandingBuilder.buildBrandingPackage({
-            version: payload.version,
-            distribution: "stable",
-            changelogLines: payload.changelogLines,
-        });
+			logger.info(`Copying ${brandingPackage.name} ${brandingPackage.version} into stable repo`);
+			await AptlyAPI.Packages.copyIntoRepo(
+				"leios-stable",
+				brandingPackage.name,
+				brandingPackage.version,
+				brandingPackage.architecture,
+			);
 
-        logger.info(`Uploading branding package to archive repo: ${debPath}`);
-        const brandingPackage = await AptlyAPI.Packages.uploadLocalDebIntoArchiveRepo(debPath);
+			return { success: true };
+		} catch (err) {
+			logger.error("Error building or adding branding package to stable repo:", err);
+			return {
+				success: false,
+				message: Error.isError(err) ? err.message : "Unknown error",
+			};
+		}
+	},
+);
 
-        // Remove any previous branding package versions from stable so only the
-        // newly built one remains (matching how normal package releases are replaced).
-        logger.info(`Removing previous branding package versions from stable repo`);
-        await AptlyAPI.Packages.deleteInRepo("leios-stable", brandingPackage.name);
+OsReleaseTask.addStep(
+	"Move packages from archive to local stable repo",
+	async (payload, logger, state, isPaused) => {
+		for (
+			;
+			state.nextPackageIndexToMove < payload.pkgReleasesToIncludeByID.length;
+			state.nextPackageIndexToMove++
+		) {
+			let pkgFullName = "UNKNOWN";
+			let pkgReleaseVersion = "UNKNOWN";
 
-        logger.info(`Copying ${brandingPackage.name} ${brandingPackage.version} into stable repo`);
-        await AptlyAPI.Packages.copyIntoRepo("leios-stable", brandingPackage.name, brandingPackage.version, brandingPackage.architecture);
+			try {
+				if (isPaused.valueOf()) {
+					logger.info("Pausing First Long Step at index", state.nextPackageIndexToMove);
+					return { success: true, paused: true };
+				}
 
-        return { success: true };
+				const pkgReleaseID = payload.pkgReleasesToIncludeByID[state.nextPackageIndexToMove];
 
-    } catch (err) {
-        logger.error("Error building or adding branding package to stable repo:", err);
-        return {
-            success: false,
-            message: Error.isError(err) ? err.message : "Unknown error"
-        };
-    }
+				if (!pkgReleaseID) {
+					return {
+						success: false,
+						message: `Invalid package release ID at index ${state.nextPackageIndexToMove}.`,
+					};
+				}
 
-});
+				await DB.instance().transaction(async (tx) => {
+					const release = tx
+						.select()
+						.from(DB.Tables.packageReleases)
+						.where(eq(DB.Tables.packageReleases.id, pkgReleaseID))
+						.get();
 
-OsReleaseTask.addStep("Move packages from archive to local stable repo", async (payload, logger, state, isPaused) => {
+					if (!release) {
+						throw new Error(`Package release with ID ${pkgReleaseID} not found.`);
+					}
 
-    for (; state.nextPackageIndexToMove < payload.pkgReleasesToIncludeByID.length; state.nextPackageIndexToMove++) {
+					const packageData = tx
+						.select()
+						.from(DB.Tables.packagesFullView)
+						.where(eq(DB.Tables.packagesFullView.id, release.package_id))
+						.get();
 
-        let pkgFullName = "UNKNOWN";
-        let pkgReleaseVersion = "UNKNOWN";
+					if (!packageData?.name) {
+						throw new Error(
+							`Package with ID ${release.package_id} not found for release ID ${pkgReleaseID}.`,
+						);
+					}
 
-        try {
+					pkgFullName = packageData.fullname;
+					pkgReleaseVersion = release.version_with_leios_patch;
 
-            if (isPaused.valueOf()) {
-                logger.info("Pausing First Long Step at index", state.nextPackageIndexToMove);
-                return { success: true, paused: true };
-            }
+					const hasUploadedArtifacts =
+						release.architectures.is_all || release.architectures.amd64 || release.architectures.arm64;
+					if (!hasUploadedArtifacts) {
+						throw new Error(
+							`Package ${packageData.fullname} version ${release.version_with_leios_patch} has no uploaded artifacts.`,
+						);
+					}
 
-            const pkgReleaseID = payload.pkgReleasesToIncludeByID[state.nextPackageIndexToMove];
+					if (release.architectures.is_all) {
+						if (!release.architectures.amd64 || !release.architectures.arm64) {
+							throw new Error(
+								`Release ID ${pkgReleaseID} is marked as 'all' architectures but is missing specific architecture flags.`,
+							);
+						}
 
-            if (!pkgReleaseID) {
-                return { success: false, message: `Invalid package release ID at index ${state.nextPackageIndexToMove}.` };
-            }
+						// delete in stable for this package first
+						await AptlyAPI.Packages.deleteInRepo("leios-stable", packageData.fullname);
 
-            await DB.instance().transaction(async (tx) => {
+						await AptlyAPI.Packages.copyIntoRepo(
+							"leios-stable",
+							packageData.fullname,
+							release.version_with_leios_patch,
+							"all",
+						);
 
-                const release = tx.select().from(DB.Tables.packageReleases).where(
-                    eq(DB.Tables.packageReleases.id, pkgReleaseID)
-                ).get();
+						packageData.latest_stable_release = {
+							amd64: release.version_with_leios_patch,
+							arm64: release.version_with_leios_patch,
+						};
+					} else {
+						if (release.architectures.amd64) {
+							// delete in stable for this package first but ensure we only delete for this architecture
+							await AptlyAPI.Packages.deleteInRepo(
+								"leios-stable",
+								packageData.fullname,
+								undefined,
+								"amd64",
+							);
 
-                if (!release) {
-                    throw new Error(`Package release with ID ${pkgReleaseID} not found.`);
-                }
+							await AptlyAPI.Packages.copyIntoRepo(
+								"leios-stable",
+								packageData.fullname,
+								release.version_with_leios_patch,
+								"amd64",
+							);
 
-                const packageData = tx.select().from(DB.Tables.packagesFullView).where(
-                    eq(DB.Tables.packagesFullView.id, release.package_id)
-                ).get();
+							packageData.latest_stable_release.amd64 = release.version_with_leios_patch;
+						}
+						if (release.architectures.arm64) {
+							// delete in stable for this package first but ensure we only delete for this architecture
+							await AptlyAPI.Packages.deleteInRepo(
+								"leios-stable",
+								packageData.fullname,
+								undefined,
+								"arm64",
+							);
 
-                if (!packageData?.name) {
-                    throw new Error(`Package with ID ${release.package_id} not found for release ID ${pkgReleaseID}.`);
-                }
+							await AptlyAPI.Packages.copyIntoRepo(
+								"leios-stable",
+								packageData.fullname,
+								release.version_with_leios_patch,
+								"arm64",
+							);
 
-                pkgFullName = packageData.fullname;
-                pkgReleaseVersion = release.version_with_leios_patch;
+							packageData.latest_stable_release.arm64 = release.version_with_leios_patch;
+						}
+					}
 
-                const hasUploadedArtifacts = release.architectures.is_all || release.architectures.amd64 || release.architectures.arm64;
-                if (!hasUploadedArtifacts) {
-                    throw new Error(`Package ${packageData.fullname} version ${release.version_with_leios_patch} has no uploaded artifacts.`);
-                }
+					await tx
+						.update(DB.Tables.packages)
+						.set({
+							latest_stable_release: packageData.latest_stable_release,
+						})
+						.where(eq(DB.Tables.packages.id, packageData.id));
+				});
 
-                if (release.architectures.is_all) {
+				logger.info(
+					`Successfully moved package ${pkgFullName} version ${pkgReleaseVersion} to local stable repo.`,
+				);
+			} catch (err) {
+				logger.error(
+					"Error moving package release ID",
+					payload.pkgReleasesToIncludeByID[state.nextPackageIndexToMove],
+					":",
+					err,
+				);
 
-                    if (!release.architectures.amd64 || !release.architectures.arm64) {
-                        throw new Error(`Release ID ${pkgReleaseID} is marked as 'all' architectures but is missing specific architecture flags.`);
-                    }
+				return {
+					success: false,
+					message: Error.isError(err)
+						? err.message
+						: `Failed to move package release ID ${payload.pkgReleasesToIncludeByID[state.nextPackageIndexToMove]}`,
+				};
+			}
+		}
 
-                    // delete in stable for this package first
-                    await AptlyAPI.Packages.deleteInRepo("leios-stable", packageData.fullname);
-
-                    await AptlyAPI.Packages.copyIntoRepo("leios-stable", packageData.fullname, release.version_with_leios_patch, "all");
-
-                    packageData.latest_stable_release = {
-                        amd64: release.version_with_leios_patch,
-                        arm64: release.version_with_leios_patch
-                    };
-
-                } else {
-
-                    if (release.architectures.amd64) {
-
-                        // delete in stable for this package first but ensure we only delete for this architecture
-                        await AptlyAPI.Packages.deleteInRepo("leios-stable", packageData.fullname, undefined, "amd64");
-
-                        await AptlyAPI.Packages.copyIntoRepo("leios-stable", packageData.fullname, release.version_with_leios_patch, "amd64");
-
-                        packageData.latest_stable_release.amd64 = release.version_with_leios_patch;
-                    }
-                    if (release.architectures.arm64) {
-
-                        // delete in stable for this package first but ensure we only delete for this architecture
-                        await AptlyAPI.Packages.deleteInRepo("leios-stable", packageData.fullname, undefined, "arm64");
-
-                        await AptlyAPI.Packages.copyIntoRepo("leios-stable", packageData.fullname, release.version_with_leios_patch, "arm64");
-
-                        packageData.latest_stable_release.arm64 = release.version_with_leios_patch;
-                    }
-
-                }
-
-                await tx.update(DB.Tables.packages).set({
-                    latest_stable_release: packageData.latest_stable_release
-                }).where(
-                    eq(DB.Tables.packages.id, packageData.id)
-                );
-            });
-
-            logger.info(`Successfully moved package ${pkgFullName} version ${pkgReleaseVersion} to local stable repo.`);
-
-        } catch (err) {
-            logger.error("Error moving package release ID", payload.pkgReleasesToIncludeByID[state.nextPackageIndexToMove], ":", err);
-
-            return {
-                success: false,
-                message: Error.isError(err)
-                    ? err.message
-                    : `Failed to move package release ID ${payload.pkgReleasesToIncludeByID[state.nextPackageIndexToMove]}`
-            };
-        }
-    }
-
-    return { success: true };
-
-});
+		return { success: true };
+	},
+);
 
 // OsReleaseTask.addStep("Record OS release data to database", async (payload, logger) => {
 
@@ -187,53 +237,51 @@ OsReleaseTask.addStep("Move packages from archive to local stable repo", async (
 // });
 
 OsReleaseTask.addStep("Create OS release snapshot", async (payload, logger) => {
+	try {
+		const snapshotName = `leios-stable-${payload.version}`;
+		const snapshotResult = await AptlyAPI.Snapshots.createSnapshotOfRepo(
+			"leios-stable",
+			snapshotName,
+			"LeiOS Release",
+		);
 
-    try {
-        const snapshotName = `leios-stable-${payload.version}`;
-        const snapshotResult = await AptlyAPI.Snapshots.createSnapshotOfRepo("leios-stable", snapshotName, "LeiOS Release");
+		if (!snapshotResult) {
+			logger.error("Failed to create snapshot for OS release");
+			return { success: false, message: "Failed to create snapshot" };
+		}
 
-        if (!snapshotResult) {
-            logger.error("Failed to create snapshot for OS release");
-            return { success: false, message: "Failed to create snapshot" };
-        }
-
-        logger.info("OS release snapshot created:", snapshotName);
-        return { success: true };
-
-    } catch (err) {
-        logger.error("Error creating OS release snapshot:", err);
-        return { success: false, message: Error.isError(err) ? err.message : "Unknown error" };
-    }
-
+		logger.info("OS release snapshot created:", snapshotName);
+		return { success: true };
+	} catch (err) {
+		logger.error("Error creating OS release snapshot:", err);
+		return { success: false, message: Error.isError(err) ? err.message : "Unknown error" };
+	}
 });
 
 OsReleaseTask.addStep("Publish OS release snapshot to S3", async (payload, logger) => {
+	try {
+		const snapshotName = `leios-stable-${payload.version}`;
+		const publishResult = await AptlyAPI.Publishing.publishReleaseSnapshotToLiveStable(
+			payload.version,
+		);
 
-    try {
-        const snapshotName = `leios-stable-${payload.version}`;
-        const publishResult = await AptlyAPI.Publishing.publishReleaseSnapshotToLiveStable(payload.version);
+		if (!publishResult) {
+			logger.error("Failed to publish OS release snapshot to live stable repo");
+			return { success: false, message: "Failed to publish snapshot" };
+		}
 
-        if (!publishResult) {
-            logger.error("Failed to publish OS release snapshot to live stable repo");
-            return { success: false, message: "Failed to publish snapshot" };
-        }
-
-        logger.info("OS release published to live stable repo from snapshot:", snapshotName);
-        return { success: true };
-
-    } catch (err) {
-        logger.error("Error publishing OS release snapshot:", err);
-        return { success: false, message: Error.isError(err) ? err.message : "Unknown error" };
-    }
-
+		logger.info("OS release published to live stable repo from snapshot:", snapshotName);
+		return { success: true };
+	} catch (err) {
+		logger.error("Error publishing OS release snapshot:", err);
+		return { success: false, message: Error.isError(err) ? err.message : "Unknown error" };
+	}
 });
 
 OsReleaseTask.addStep("Finalize OS release", async (payload, logger) => {
-
 	await RuntimeMetadata.removeOSReleasePendingPackagesIfExist(payload.pkgReleasesToIncludeByID);
 
-    logger.info("OS release process completed successfully for version", payload.version);
+	logger.info("OS release process completed successfully for version", payload.version);
 
-    return { success: true };
-
+	return { success: true };
 });

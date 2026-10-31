@@ -1,190 +1,216 @@
 import { Hono } from "hono";
-import { AccountAPIKeysModel } from './model'
+import { AccountAPIKeysModel } from "./model";
 import { validator } from "hono-openapi";
 import { DB } from "../../../../../../db";
 import { and, eq } from "drizzle-orm";
 import { APIResponse } from "../../../../../utils/api-res";
 import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers";
-import { APIKeyHandler, AuthHandler, AuthUtils, SessionHandler } from "../../../../../utils/authHandler";
+import {
+	APIKeyHandler,
+	AuthHandler,
+	AuthUtils,
+	SessionHandler,
+} from "../../../../../utils/authHandler";
 import { DOCS_TAGS } from "../../../docs";
 import z from "zod";
 
-export const router = new Hono().basePath('/apikeys');
+export const router = new Hono().basePath("/apikeys");
 
-router.get('/',
-    
-    APIRouteSpec.authenticated({
-        summary: "Get all API keys",
-        description: "Retrieve all API keys for the authenticated user's account.",
-        tags: [DOCS_TAGS.ACCOUNT_API_KEYS],
-        
-        responses: APIResponseSpec.describeBasic(
-            APIResponseSpec.success("API keys retrieved successfully", AccountAPIKeysModel.GetById.Response.array() ),
-        )
+router.get(
+	"/",
 
-    }),
+	APIRouteSpec.authenticated({
+		summary: "Get all API keys",
+		description: "Retrieve all API keys for the authenticated user's account.",
+		tags: [DOCS_TAGS.ACCOUNT_API_KEYS],
 
-    async (c) => {
-        // @ts-ignore
-        const authContext = c.get("authContext") as AuthHandler.SessionAuthContext;
+		responses: APIResponseSpec.describeBasic(
+			APIResponseSpec.success(
+				"API keys retrieved successfully",
+				AccountAPIKeysModel.GetById.Response.array(),
+			),
+		),
+	}),
 
-        const apiKeys = DB.instance().select().from(DB.Tables.apiKeys).where(
-            eq(DB.Tables.apiKeys.user_id, authContext.user_id)
-        ).all();
+	async (c) => {
+		// @ts-ignore
+		const authContext = c.get("authContext") as AuthHandler.SessionAuthContext;
 
-        const apiKeysWithoutSensitive = apiKeys.map(key => ({
-            id: key.id,
-            description: key.description,
-            created_at: key.created_at,
-            expires_at: key.expires_at
-        }));
+		const apiKeys = DB.instance()
+			.select()
+			.from(DB.Tables.apiKeys)
+			.where(eq(DB.Tables.apiKeys.user_id, authContext.user_id))
+			.all();
 
-        return APIResponse.success(c, "API keys retrieved successfully", apiKeysWithoutSensitive);
-    }
+		const apiKeysWithoutSensitive = apiKeys.map((key) => ({
+			id: key.id,
+			description: key.description,
+			created_at: key.created_at,
+			expires_at: key.expires_at,
+		}));
 
+		return APIResponse.success(c, "API keys retrieved successfully", apiKeysWithoutSensitive);
+	},
 );
 
-router.post('/',
-    
-    APIRouteSpec.authenticated({
-        summary: "Create a new API key",
-        description: "Create a new API key for the authenticated user's account.",
-        tags: [DOCS_TAGS.ACCOUNT_API_KEYS],
+router.post(
+	"/",
 
-        responses: APIResponseSpec.describeWithWrongInputs(
-            APIResponseSpec.success("API key created successfully", AccountAPIKeysModel.Create.Response),
-        )
+	APIRouteSpec.authenticated({
+		summary: "Create a new API key",
+		description: "Create a new API key for the authenticated user's account.",
+		tags: [DOCS_TAGS.ACCOUNT_API_KEYS],
 
-    }),
+		responses: APIResponseSpec.describeWithWrongInputs(
+			APIResponseSpec.success("API key created successfully", AccountAPIKeysModel.Create.Response),
+		),
+	}),
 
-    validator("json", AccountAPIKeysModel.Create.Body),
+	validator("json", AccountAPIKeysModel.Create.Body),
 
-    async (c) => {
-        // @ts-ignore
-        const authContext = c.get("authContext") as AuthHandler.SessionAuthContext;
+	async (c) => {
+		// @ts-ignore
+		const authContext = c.get("authContext") as AuthHandler.SessionAuthContext;
 
-        const apiKeyData = c.req.valid("json");
+		const apiKeyData = c.req.valid("json");
 
-        let expirationInDays: number | undefined;
+		let expirationInDays: number | undefined;
 
-        switch (apiKeyData.expires_at) {
-            case "7d":
-                expirationInDays = 7;
-                break;
-            case "30d":
-                expirationInDays = 30;
-                break;
-            case "90d":
-                expirationInDays = 90;
-                break;
-            case "180d":
-                expirationInDays = 180;
-                break;
-            case "365d":
-                expirationInDays = 365;
-                break;
-            default:
-                expirationInDays = undefined;
-                break
-        }
+		switch (apiKeyData.expires_at) {
+			case "7d":
+				expirationInDays = 7;
+				break;
+			case "30d":
+				expirationInDays = 30;
+				break;
+			case "90d":
+				expirationInDays = 90;
+				break;
+			case "180d":
+				expirationInDays = 180;
+				break;
+			case "365d":
+				expirationInDays = 365;
+				break;
+			default:
+				expirationInDays = undefined;
+				break;
+		}
 
-        const key = await APIKeyHandler.createApiKey(authContext.user_id, apiKeyData.description, expirationInDays);
-        const tokenID = AuthUtils.getTokenParts(key.token)?.id;
+		const key = await APIKeyHandler.createApiKey(
+			authContext.user_id,
+			apiKeyData.description,
+			expirationInDays,
+		);
+		const tokenID = AuthUtils.getTokenParts(key.token)?.id;
 
-        if (!tokenID) {
-            throw new Error("Failed to parse token ID from generated API key");
-        }
+		if (!tokenID) {
+			throw new Error("Failed to parse token ID from generated API key");
+		}
 
-        const keyWithoutSensitive = {
-            id: tokenID,
-            token: key.token
-        }
+		const keyWithoutSensitive = {
+			id: tokenID,
+			token: key.token,
+		};
 
-        return APIResponse.success(c, "API key created successfully", keyWithoutSensitive satisfies AccountAPIKeysModel.Create.Response);
-    }
-
+		return APIResponse.success(
+			c,
+			"API key created successfully",
+			keyWithoutSensitive satisfies AccountAPIKeysModel.Create.Response,
+		);
+	},
 );
 
+router.use(
+	"/:apiKeyID/*",
 
-router.use('/:apiKeyID/*',
+	validator(
+		"param",
+		z.object({
+			apiKeyID: z.string().min(1).max(255),
+		}),
+	),
 
-    validator("param", z.object({
-        apiKeyID: z.string().min(1).max(255)
-    })),
+	async (c, next) => {
+		// @ts-ignore
+		const authContext = c.get("authContext") as AuthHandler.SessionAuthContext;
 
-    async (c, next) => {
-        // @ts-ignore
-        const authContext = c.get("authContext") as AuthHandler.SessionAuthContext;
+		// @ts-ignore
+		const apiKeyID = (c.req.valid("param") as { apiKeyID: string }).apiKeyID;
 
-        // @ts-ignore
-        const apiKeyID = (c.req.valid("param") as { apiKeyID: string }).apiKeyID;
+		const apiKey = await DB.instance()
+			.select()
+			.from(DB.Tables.apiKeys)
+			.where(
+				and(eq(DB.Tables.apiKeys.id, apiKeyID), eq(DB.Tables.apiKeys.user_id, authContext.user_id)),
+			)
+			.get();
 
-        const apiKey = await DB.instance().select().from(DB.Tables.apiKeys).where(and(
-            eq(DB.Tables.apiKeys.id, apiKeyID),
-            eq(DB.Tables.apiKeys.user_id, authContext.user_id)
-        )).get();
+		if (!apiKey) {
+			return APIResponse.notFound(c, "API key not found");
+		}
 
-        if (!apiKey) {
-            return APIResponse.notFound(c, "API key not found");
-        }
+		// @ts-ignore
+		c.set("apiKey", apiKey);
 
-        // @ts-ignore
-        c.set("apiKey", apiKey);
-
-        await next();
-    }
-
+		await next();
+	},
 );
 
-router.get('/:apiKeyID',
+router.get(
+	"/:apiKeyID",
 
-    APIRouteSpec.authenticated({
-        summary: "Get API key details",
-        description: "Retrieve details of a specific API key by its ID for the authenticated user's account.",
-        tags: [DOCS_TAGS.ACCOUNT_API_KEYS],
+	APIRouteSpec.authenticated({
+		summary: "Get API key details",
+		description:
+			"Retrieve details of a specific API key by its ID for the authenticated user's account.",
+		tags: [DOCS_TAGS.ACCOUNT_API_KEYS],
 
-        responses: APIResponseSpec.describeBasic(
-            APIResponseSpec.success("API key retrieved successfully", AccountAPIKeysModel.GetById.Response),
-            APIResponseSpec.notFound("API key not found")
-        ) 
-    }),
+		responses: APIResponseSpec.describeBasic(
+			APIResponseSpec.success("API key retrieved successfully", AccountAPIKeysModel.GetById.Response),
+			APIResponseSpec.notFound("API key not found"),
+		),
+	}),
 
-    async (c) => {
-        // @ts-ignore
-        const apiKey = c.get("apiKey") as DB.Models.ApiKey;
+	async (c) => {
+		// @ts-ignore
+		const apiKey = c.get("apiKey") as DB.Models.ApiKey;
 
-        const apiKeyWithoutSensitive = {
-            id: apiKey.id,
-            description: apiKey.description,
-            created_at: apiKey.created_at,
-            expires_at: apiKey.expires_at
-        }
+		const apiKeyWithoutSensitive = {
+			id: apiKey.id,
+			description: apiKey.description,
+			created_at: apiKey.created_at,
+			expires_at: apiKey.expires_at,
+		};
 
-        return APIResponse.success(c, "API key retrieved successfully", apiKeyWithoutSensitive satisfies AccountAPIKeysModel.GetById.Response);
-    }
-
+		return APIResponse.success(
+			c,
+			"API key retrieved successfully",
+			apiKeyWithoutSensitive satisfies AccountAPIKeysModel.GetById.Response,
+		);
+	},
 );
 
-router.delete('/:apiKeyID',
+router.delete(
+	"/:apiKeyID",
 
-    APIRouteSpec.authenticated({
-        summary: "Delete an API key",
-        description: "Delete an API key by its ID for the authenticated user's account.",
-        tags: [DOCS_TAGS.ACCOUNT_API_KEYS],
+	APIRouteSpec.authenticated({
+		summary: "Delete an API key",
+		description: "Delete an API key by its ID for the authenticated user's account.",
+		tags: [DOCS_TAGS.ACCOUNT_API_KEYS],
 
-        responses: APIResponseSpec.describeWithWrongInputs(
-            APIResponseSpec.successNoData("API key deleted successfully"),
-            APIResponseSpec.notFound("API key not found")
-        ) 
-    }),
+		responses: APIResponseSpec.describeWithWrongInputs(
+			APIResponseSpec.successNoData("API key deleted successfully"),
+			APIResponseSpec.notFound("API key not found"),
+		),
+	}),
 
-    async (c) => {
-        // @ts-ignore
-        const apiKey = c.get("apiKey") as DB.Models.ApiKey;
+	async (c) => {
+		// @ts-ignore
+		const apiKey = c.get("apiKey") as DB.Models.ApiKey;
 
-        await APIKeyHandler.deleteApiKey(apiKey.id);
+		await APIKeyHandler.deleteApiKey(apiKey.id);
 
-        return APIResponse.successNoData(c, "API key deleted successfully");
-    }
-
+		return APIResponse.successNoData(c, "API key deleted successfully");
+	},
 );

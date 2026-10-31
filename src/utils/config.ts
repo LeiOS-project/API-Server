@@ -1,89 +1,89 @@
 import { Logger } from "./logger";
 
 interface ConfigSchemaSetting<
-    REQUIRED extends ConfigSchemaSetting.Required,
-    TYPE extends ConfigSchemaSetting.Type = undefined,
-    //DEPENDENCIES extends ConfigSchemaSetting.Dependencies = undefined
+	REQUIRED extends ConfigSchemaSetting.Required,
+	TYPE extends ConfigSchemaSetting.Type = undefined,
+	//DEPENDENCIES extends ConfigSchemaSetting.Dependencies = undefined
 > {
-    required: REQUIRED;
-    type?: TYPE;
-    //dependencies?: DEPENDENCIES;
+	required: REQUIRED;
+	type?: TYPE;
+	//dependencies?: DEPENDENCIES;
 }
 
 namespace ConfigSchemaSetting {
-    export type Required = boolean;
-    export type Type = string[] | boolean[] | undefined;
-    export type Dependencies = Record<string, string[]> | undefined;
-    export type Sample = ConfigSchemaSetting<Required, Type/*, Dependencies*/>;
+	export type Required = boolean;
+	export type Type = string[] | boolean[] | undefined;
+	export type Dependencies = Record<string, string[]> | undefined;
+	export type Sample = ConfigSchemaSetting<Required, Type /*, Dependencies*/>;
 }
 
 type ConfigValueType<
-    T extends ConfigSchemaSetting.Sample,
-    F = [T] extends [ConfigSchemaSetting<any, infer U/*, any*/>]
-    ? U extends (string | boolean)[]
-        ? U[number]
-        : string
-    : string
+	T extends ConfigSchemaSetting.Sample,
+	F = [T] extends [ConfigSchemaSetting<any, infer U /*, any*/>]
+		? U extends (string | boolean)[]
+			? U[number]
+			: string
+		: string,
 > = T["required"] extends true ? F : F | undefined;
 
 interface ConfigSchemaSettings {
-    [key: string]: ConfigSchemaSetting.Sample;
+	[key: string]: ConfigSchemaSetting.Sample;
 }
 
 type ConfigLike<T extends ConfigSchemaSettings> = {
-    [K in keyof T]: ConfigValueType<T[K]>;
-}
+	[K in keyof T]: ConfigValueType<T[K]>;
+};
 
 class ConfigSchema<T extends ConfigSchemaSettings = {}> {
+	readonly schema: T = {} as any;
 
-    readonly schema: T = {} as any;
+	public add<
+		KEY extends string,
+		Setings extends ConfigSchemaSetting<ISREQUIRED, TYPE /*, DEPENDENCIES*/>,
+		ISREQUIRED extends boolean,
+		const TYPE extends ConfigSchemaSetting.Type = undefined,
+		//const DEPENDENCIES extends ConfigSchemaSetting.Dependencies = undefined
+	>(
+		key: KEY,
+		required = false as ISREQUIRED,
+		type?: TYPE,
+		//dependencies?: DEPENDENCIES
+	) {
+		(this.schema as any)[key] = { required, type /*, dependencies*/ };
+		return this as any as ConfigSchema<T & { [K in KEY]: Setings }>;
+	}
 
-    public add<
-        KEY extends string,
-        Setings extends ConfigSchemaSetting<ISREQUIRED, TYPE/*, DEPENDENCIES*/>,
-        ISREQUIRED extends boolean,
-        const TYPE extends ConfigSchemaSetting.Type = undefined,
-        //const DEPENDENCIES extends ConfigSchemaSetting.Dependencies = undefined
-    >(
-        key: KEY,
-        required = false as ISREQUIRED,
-        type?: TYPE,
-        //dependencies?: DEPENDENCIES
-    ) {
-        (this.schema as any)[key] = { required, type/*, dependencies*/ };
-        return this as any as ConfigSchema<T & { [K in KEY]: Setings }>;
-    }
+	public parse() {
+		const result: ConfigLike<T> = {} as ConfigLike<T>;
 
-    public parse() {
-        const result: ConfigLike<T> = {} as ConfigLike<T>;
+		for (const [key, settings] of Object.entries(this.schema)) {
+			const value = process.env[key];
 
-        for (const [key, settings] of Object.entries(this.schema)) {
-            
-            const value = process.env[key];
+			if (!value) {
+				if (settings.required) {
+					Logger.error(`The environment variable ${key} is required but not set.`);
+					process.exit(1);
+				}
+				continue;
+			}
 
-            if (!value) {
-                if (settings.required) {
-                    Logger.error(`The environment variable ${key} is required but not set.`);
-                    process.exit(1);
-                }
-                continue;
-            }
+			if (settings.type) {
+				if (typeof settings.type[0] === "boolean") {
+					(result[key] as any) = value.toLowerCase() === "true" ? true : false;
+					continue;
+				}
+				// Case-insensitive comparison for string enum values
+				if (!(settings.type as string[]).some((t) => t.toLowerCase() === value.toLowerCase())) {
+					Logger.error(
+						`The environment variable ${key} has to be one of the following: ${settings.type.join(", ")}`,
+					);
+					process.exit(1);
+				}
+			}
 
-            if (settings.type) {
-                if (typeof settings.type[0] === "boolean") {
-                    (result[key] as any) = value.toLowerCase() === "true" ? true : false;
-                    continue;
-                }
-                // Case-insensitive comparison for string enum values
-                if (!(settings.type as string[]).some(t => t.toLowerCase() === value.toLowerCase())) {
-                    Logger.error(`The environment variable ${key} has to be one of the following: ${settings.type.join(", ")}`);
-                    process.exit(1);
-                }
-            }
+			(result[key] as any) = value;
 
-            (result[key] as any) = value;
-
-            /*if (settings.dependencies) {
+			/*if (settings.dependencies) {
                 const dependencies = settings.dependencies[process.env[key]] || settings.dependencies["any"];
                 if (!dependencies) continue;
 
@@ -94,67 +94,62 @@ class ConfigSchema<T extends ConfigSchemaSettings = {}> {
                     }
                 }
             }*/
-        }
-        return result;
-    }
-
+		}
+		return result;
+	}
 }
 
 // @ts-ignore
 export type ParsedConfig = ConfigLike<typeof ConfigHandler.schema.schema>;
 
 export class ConfigHandler {
+	private static schema = new ConfigSchema()
+		.add("LRA_LOG_LEVEL", false, ["debug", "info", "warn", "error", "critical"])
 
-    private static schema = new ConfigSchema()
-        .add("LRA_LOG_LEVEL", false, ["debug", "info", "warn", "error", "critical"])
+		.add("LRA_HUB_URL", false)
 
-        .add("LRA_HUB_URL", false)
+		.add("LRA_API_HOST", false)
+		.add("LRA_API_PORT", false)
+		.add("LRA_API_DISABLE_DOCS", false, [true, false])
 
-        .add("LRA_API_HOST", false)
-        .add("LRA_API_PORT", false)
-        .add("LRA_API_DISABLE_DOCS", false, [true, false])
+		.add("LRA_LOG_DIR", false)
 
-        .add("LRA_LOG_DIR", false)
+		.add("LRA_DB_PATH", false)
+		.add("LRA_DB_AUTO_MIGRATE", false, [true, false])
 
-        .add("LRA_DB_PATH", false)
-        .add("LRA_DB_AUTO_MIGRATE", false, [true, false])
+		.add("LRA_APTLY_ROOT", false)
+		.add("LRA_APTLY_PORT", false)
 
-        .add("LRA_APTLY_ROOT", false)
-        .add("LRA_APTLY_PORT", false)
+		.add("LRA_BRANDING_META_FILES_DATA_PATH", false)
 
-        .add("LRA_BRANDING_META_FILES_DATA_PATH", false)
+		.add("LRA_CONFIG_BASE_DIR", false)
+		.add("LRA_PRIVATE_KEY_PATH", true)
+		.add("LRA_PUBLIC_KEY_PATH", true)
 
-        .add("LRA_CONFIG_BASE_DIR", false)
-        .add("LRA_PRIVATE_KEY_PATH", true)
-        .add("LRA_PUBLIC_KEY_PATH", true)
+		.add("LRA_S3_ENDPOINT", true)
+		.add("LRA_S3_REGION", true)
+		.add("LRA_S3_BUCKET", true)
+		.add("LRA_S3_PREFIX", false)
+		.add("LRA_S3_ACCESS_KEY_ID", true)
+		.add("LRA_S3_SECRET_ACCESS_KEY", true)
 
-        .add("LRA_S3_ENDPOINT", true)
-        .add("LRA_S3_REGION", true)
-        .add("LRA_S3_BUCKET", true)
-        .add("LRA_S3_PREFIX", false)
-        .add("LRA_S3_ACCESS_KEY_ID", true)
-        .add("LRA_S3_SECRET_ACCESS_KEY", true)
+		.add("LRA_SMTP_HOST", false)
+		.add("LRA_SMTP_PORT", false)
+		.add("LRA_SMTP_USERNAME", false)
+		.add("LRA_SMTP_PASSWORD", false)
+		.add("LRA_SMTP_FROM", false)
+		.add("LRA_SMTP_SECURE", false, [true, false]);
 
-        .add("LRA_SMTP_HOST", false)
-        .add("LRA_SMTP_PORT", false)
-        .add("LRA_SMTP_USERNAME", false)
-        .add("LRA_SMTP_PASSWORD", false)
-        .add("LRA_SMTP_FROM", false)
-        .add("LRA_SMTP_SECURE", false, [true, false])
-    ;
+	private static config: ParsedConfig | null = null;
 
+	/** You have to call {@link ConfigHandler.parseConfigFile} before trying to access the config. */
+	static getConfig() {
+		return this.config;
+	}
 
-    private static config: ParsedConfig | null = null;
-
-    /** You have to call {@link ConfigHandler.parseConfigFile} before trying to access the config. */
-    static getConfig() {
-        return this.config;
-    }
-
-    static async loadConfig() {
-        if (this.config) return this.config;
-        this.config = this.schema.parse();
-        return this.config;
-    }
-
+	static async loadConfig() {
+		if (this.config) return this.config;
+		this.config = this.schema.parse();
+		return this.config;
+	}
 }

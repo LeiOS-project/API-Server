@@ -3,78 +3,86 @@ import { DB } from "../../db";
 import { z } from "zod";
 
 export class RuntimeMetadata {
+	protected static readonly schemas = {
+		"os-release-pending-packages": z.array(z.number()).default([]),
+	} as const;
 
-    protected static readonly schemas = {
-        "os-release-pending-packages": z.array(z.number()).default([]),
-    } as const;
+	protected static async getMetadata<T extends keyof typeof this.schemas>(
+		key: T,
+		createIfNotFound = false,
+	): Promise<z.infer<(typeof this.schemas)[T]>> {
+		const record = await DB.instance()
+			.select()
+			.from(DB.Tables.metadata)
+			.where(eq(DB.Tables.metadata.key, key))
+			.get();
 
-    protected static async getMetadata<T extends keyof typeof this.schemas>(key: T, createIfNotFound = false): Promise<z.infer<(typeof this.schemas)[T]>> {
-        const record = await DB.instance().select().from(DB.Tables.metadata).where(
-            eq(DB.Tables.metadata.key, key)
-        ).get();
+		if (!record) {
+			if (!createIfNotFound) {
+				throw new Error(`Metadata with key '${key}' not found`);
+			}
 
-        if (!record) {
+			const defaultData = this.schemas[key].parse(undefined);
+			await DB.instance().insert(DB.Tables.metadata).values({
+				key: key,
+				data: defaultData,
+			});
+			return defaultData;
+		}
 
-            if (!createIfNotFound) {
-                throw new Error(`Metadata with key '${key}' not found`);
-            }
+		return this.schemas[key].parse(record.data);
+	}
 
-            const defaultData = this.schemas[key].parse(undefined);
-            await DB.instance().insert(DB.Tables.metadata).values({
-                key: key,
-                data: defaultData,
-            });
-            return defaultData;
-        }
+	protected static async setMetadata<T extends keyof typeof this.schemas>(
+		key: T,
+		data: z.infer<(typeof this.schemas)[T]>,
+	): Promise<void> {
+		await DB.instance()
+			.update(DB.Tables.metadata)
+			.set({
+				data: data,
+			})
+			.where(eq(DB.Tables.metadata.key, key));
+	}
 
-        return this.schemas[key].parse(record.data);
-    }
+	static async getOSReleasePendingPackages() {
+		return await this.getMetadata("os-release-pending-packages", true);
+	}
 
-    protected static async setMetadata<T extends keyof typeof this.schemas>(key: T, data: z.infer<(typeof this.schemas)[T]>): Promise<void> {
-        await DB.instance().update(DB.Tables.metadata).set({
-            data: data,
-        }).where(
-            eq(DB.Tables.metadata.key, key)
-        );
-    }
+	static async addOSReleasePendingPackage(packageReleaseId: number) {
+		const pendingPackages = await this.getOSReleasePendingPackages();
+		if (!pendingPackages.includes(packageReleaseId)) {
+			pendingPackages.push(packageReleaseId);
+			await this.setMetadata("os-release-pending-packages", pendingPackages);
+		}
+	}
 
-    static async getOSReleasePendingPackages() {
-        return await this.getMetadata("os-release-pending-packages", true);
-    }
+	static async removeOSReleasePendingPackageIfExists(packageReleaseId: number) {
+		const pendingPackages = await this.getOSReleasePendingPackages();
+		const index = pendingPackages.indexOf(packageReleaseId);
+		if (index !== -1) {
+			pendingPackages.splice(index, 1);
+			await this.setMetadata("os-release-pending-packages", pendingPackages);
+		}
+	}
 
-    static async addOSReleasePendingPackage(packageReleaseId: number) {
-        const pendingPackages = await this.getOSReleasePendingPackages();
-        if (!pendingPackages.includes(packageReleaseId)) {
-            pendingPackages.push(packageReleaseId);
-            await this.setMetadata("os-release-pending-packages", pendingPackages);
-        }
-    }
+	static async removeOSReleasePendingPackagesIfExist(packageReleaseIds: number[]) {
+		if (packageReleaseIds.length === 0) {
+			return;
+		}
 
-    static async removeOSReleasePendingPackageIfExists(packageReleaseId: number) {
-        const pendingPackages = await this.getOSReleasePendingPackages();
-        const index = pendingPackages.indexOf(packageReleaseId);
-        if (index !== -1) {
-            pendingPackages.splice(index, 1);
-            await this.setMetadata("os-release-pending-packages", pendingPackages);
-        }
-    }
+		const idsToRemove = new Set(packageReleaseIds);
+		const pendingPackages = await this.getOSReleasePendingPackages();
+		const remainingPackages = pendingPackages.filter(
+			(packageReleaseId) => !idsToRemove.has(packageReleaseId),
+		);
 
-    static async removeOSReleasePendingPackagesIfExist(packageReleaseIds: number[]) {
-        if (packageReleaseIds.length === 0) {
-            return;
-        }
+		if (remainingPackages.length !== pendingPackages.length) {
+			await this.setMetadata("os-release-pending-packages", remainingPackages);
+		}
+	}
 
-        const idsToRemove = new Set(packageReleaseIds);
-        const pendingPackages = await this.getOSReleasePendingPackages();
-        const remainingPackages = pendingPackages.filter((packageReleaseId) => !idsToRemove.has(packageReleaseId));
-
-        if (remainingPackages.length !== pendingPackages.length) {
-            await this.setMetadata("os-release-pending-packages", remainingPackages);
-        }
-    }
-
-    static async clearOSReleasePendingPackages() {
-        await this.setMetadata("os-release-pending-packages", []);
-    }
-
+	static async clearOSReleasePendingPackages() {
+		await this.setMetadata("os-release-pending-packages", []);
+	}
 }

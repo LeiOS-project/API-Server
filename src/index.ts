@@ -11,117 +11,120 @@ import { EmailService } from "./api/utils/email";
 import { BrandingBuilder } from "./utils/branding-builder";
 
 export class Main {
+	static async main() {
+		process.once("SIGINT", (type) => Main.gracefulShutdown(type, 0));
+		process.once("SIGTERM", (type) => Main.gracefulShutdown(type, 0));
 
-    static async main() {
+		process.once("uncaughtException", Main.handleUncaughtException);
+		process.once("unhandledRejection", Main.handleUnhandledRejection);
 
-        process.once("SIGINT", (type) => Main.gracefulShutdown(type, 0));
-        process.once("SIGTERM", (type) => Main.gracefulShutdown(type, 0));
+		const config = await ConfigHandler.loadConfig();
 
-        process.once("uncaughtException", Main.handleUncaughtException);
-        process.once("unhandledRejection", Main.handleUnhandledRejection);
+		Logger.setLogLevel(config.LRA_LOG_LEVEL ?? "info");
 
-        const config = await ConfigHandler.loadConfig();
+		await DB.init(
+			config.LRA_DB_PATH ?? "./data/db.sqlite",
+			config.LRA_DB_AUTO_MIGRATE,
+			config.LRA_CONFIG_BASE_DIR ?? "./config",
+		);
 
-        Logger.setLogLevel(config.LRA_LOG_LEVEL ?? "info");
+		await PermissionHelper.init();
 
-        await DB.init(
-            config.LRA_DB_PATH ?? "./data/db.sqlite",
-            config.LRA_DB_AUTO_MIGRATE,
-            config.LRA_CONFIG_BASE_DIR ?? "./config"
-        );
+		EmailService.init();
 
-        await PermissionHelper.init();
+		await Utils.ensureDirectoryExists(config.LRA_LOG_DIR ?? "./data/logs");
 
-        EmailService.init();
+		// Ensure the branding meta files repository is available. It is cloned
+		// once into the data directory on first startup and synced with git
+		// pull on subsequent starts (failures are logged but non-fatal).
+		await BrandingBuilder.ensureRepo(
+			config.LRA_BRANDING_META_FILES_DATA_PATH ?? "./data/branding-meta-files",
+		);
 
-        await Utils.ensureDirectoryExists(config.LRA_LOG_DIR ?? "./data/logs");
+		await AptlyAPIServer.init({
+			aptlyRoot: config.LRA_APTLY_ROOT ?? "./data/aptly",
+			// Port 0 lets Aptly pick a random free port from the dynamic range.
+			aptlyPort: config.LRA_APTLY_PORT ? parseInt(config.LRA_APTLY_PORT) : 0,
+			s3Settings: {
+				endpoint: config.LRA_S3_ENDPOINT,
+				region: config.LRA_S3_REGION,
+				bucket: config.LRA_S3_BUCKET,
+				prefix: config.LRA_S3_PREFIX || "leios/",
+				accessKeyId: config.LRA_S3_ACCESS_KEY_ID,
+				secretAccessKey: config.LRA_S3_SECRET_ACCESS_KEY,
+			},
+			keySettings: {
+				publicKeyPath: config.LRA_PUBLIC_KEY_PATH ?? "./config/keys/public-key.gpg",
+				privateKeyPath: config.LRA_PRIVATE_KEY_PATH ?? "./config/keys/private-key.gpg",
+			},
+		});
 
-        // Ensure the branding meta files repository is available. It is cloned
-        // once into the data directory on first startup and synced with git
-        // pull on subsequent starts (failures are logged but non-fatal).
-        await BrandingBuilder.ensureRepo(config.LRA_BRANDING_META_FILES_DATA_PATH ?? "./data/branding-meta-files");
+		await LiveRepoUtils.uploadAdditionalFilesIfNeeded(
+			{
+				endpoint: config.LRA_S3_ENDPOINT,
+				region: config.LRA_S3_REGION,
+				bucket: config.LRA_S3_BUCKET,
+				accessKeyId: config.LRA_S3_ACCESS_KEY_ID,
+				secretAccessKey: config.LRA_S3_SECRET_ACCESS_KEY,
+			},
+			config.LRA_PUBLIC_KEY_PATH ?? "./config/keys/public-key.gpg",
+		);
 
-        await AptlyAPIServer.init({
-            aptlyRoot: config.LRA_APTLY_ROOT ?? "./data/aptly",
-            // Port 0 lets Aptly pick a random free port from the dynamic range.
-            aptlyPort: config.LRA_APTLY_PORT ? parseInt(config.LRA_APTLY_PORT) : 0,
-            s3Settings: {
-                endpoint: config.LRA_S3_ENDPOINT,
-                region: config.LRA_S3_REGION,
-                bucket: config.LRA_S3_BUCKET,
-                prefix: config.LRA_S3_PREFIX || "leios/",
-                accessKeyId: config.LRA_S3_ACCESS_KEY_ID,
-                secretAccessKey: config.LRA_S3_SECRET_ACCESS_KEY
-            },
-            keySettings: {
-                publicKeyPath: config.LRA_PUBLIC_KEY_PATH ?? "./config/keys/public-key.gpg",
-                privateKeyPath: config.LRA_PRIVATE_KEY_PATH ?? "./config/keys/private-key.gpg",
-            }
-        });
+		await API.init(
+			[config.LRA_HUB_URL || "https://hub.leios.dev"],
+			config.LRA_API_DISABLE_DOCS === true,
+		);
 
-        await LiveRepoUtils.uploadAdditionalFilesIfNeeded({
-            endpoint: config.LRA_S3_ENDPOINT,
-            region: config.LRA_S3_REGION,
-            bucket: config.LRA_S3_BUCKET,
-            accessKeyId: config.LRA_S3_ACCESS_KEY_ID,
-            secretAccessKey: config.LRA_S3_SECRET_ACCESS_KEY
-        }, config.LRA_PUBLIC_KEY_PATH ?? "./config/keys/public-key.gpg");
+		await AptlyAPIServer.start();
 
-        await API.init([config.LRA_HUB_URL || "https://hub.leios.dev"], config.LRA_API_DISABLE_DOCS === true);
+		// Resume the task queue only once the aptly server is ready: resumed
+		// tasks like testing-repo updates call aptly directly. Fire-and-forget
+		// so a longer backlog of resumed tasks does not hold up API startup.
+		TaskScheduler.processQueue().catch((err) => {
+			Logger.error("Task queue processing failed:", err);
+		});
 
-        await AptlyAPIServer.start();
+		await API.start(parseInt(config.LRA_API_PORT ?? "12151"), config.LRA_API_HOST ?? "::");
+	}
 
-        // Resume the task queue only once the aptly server is ready: resumed
-        // tasks like testing-repo updates call aptly directly. Fire-and-forget
-        // so a longer backlog of resumed tasks does not hold up API startup.
-        TaskScheduler.processQueue().catch(err => {
-            Logger.error("Task queue processing failed:", err);
-        });
+	private static async gracefulShutdown(type: NodeJS.Signals, code: number) {
+		try {
+			Logger.log(`Received ${type}, shutting down...`);
 
-        await API.start(
-            parseInt(config.LRA_API_PORT ?? "12151"),
-            config.LRA_API_HOST ?? "::"
-        );
+			await API.stop();
+			await AptlyAPIServer.stop(type);
+			await EmailService.reset();
+			await TaskScheduler.stopProcessing();
+			await DB.close();
 
-    }
+			Logger.log("Shutdown complete, exiting.");
+			process.exit(code);
+		} catch {
+			Logger.critical("Error during shutdown, forcing exit");
+			Main.forceShutdown();
+		}
+	}
 
-    private static async gracefulShutdown(type: NodeJS.Signals, code: number) {
-        try {
-            Logger.log(`Received ${type}, shutting down...`);
+	private static forceShutdown() {
+		process.once("SIGTERM", () => {});
+		process.exit(1);
+	}
 
-            await API.stop();
-            await AptlyAPIServer.stop(type);
-            await EmailService.reset();
-            await TaskScheduler.stopProcessing();
-            await DB.close();
+	private static async handleUncaughtException(error: Error) {
+		Logger.critical(
+			`Uncaught Exception:\n${Error.isError(error) ? (error.stack ? error.stack : error.message) : error}`,
+		);
+		Main.gracefulShutdown("SIGTERM", 1);
+	}
 
-            Logger.log("Shutdown complete, exiting.");
-            process.exit(code);
-        } catch {
-            Logger.critical("Error during shutdown, forcing exit");
-            Main.forceShutdown();
-        }
-        }
-
-    private static forceShutdown() {
-        process.once("SIGTERM", ()=>{});
-        process.exit(1);
-    }
-
-    private static async handleUncaughtException(error: Error) {
-        Logger.critical(`Uncaught Exception:\n${Error.isError(error) ? error.stack ? error.stack : error.message : error}`);
-        Main.gracefulShutdown("SIGTERM", 1);
-    }
-
-    private static async handleUnhandledRejection(reason: any) {
-        if (Error.isError(reason)) {
-            // reason is an error
-            return Main.handleUncaughtException(reason);
-        }
-        Logger.critical(`Unhandled Rejection:\n${reason}`);
-        Main.gracefulShutdown("SIGTERM", 1);
-    }
-
+	private static async handleUnhandledRejection(reason: any) {
+		if (Error.isError(reason)) {
+			// reason is an error
+			return Main.handleUncaughtException(reason);
+		}
+		Logger.critical(`Unhandled Rejection:\n${reason}`);
+		Main.gracefulShutdown("SIGTERM", 1);
+	}
 }
 
-Main.main()
+Main.main();

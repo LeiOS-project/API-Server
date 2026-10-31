@@ -3,75 +3,70 @@ import z from "zod";
 import { DB } from "../../../db";
 
 export namespace StablePromotionRequestsModel {
+	export const Status = z.enum(["pending", "approved", "denied"]);
+	export type Status = z.infer<typeof Status>;
 
-    export const Status = z.enum(["pending", "approved", "denied"]);
-    export type Status = z.infer<typeof Status>;
+	export const Entity = createSelectSchema(DB.Tables.stablePromotionRequests).extend({
+		package_name: z.string(),
+		package_release_version: z.string(),
+	});
+	export type Entity = z.infer<typeof Entity>;
 
-    export const Entity = createSelectSchema(DB.Tables.stablePromotionRequests).extend({
-        package_name: z.string(),
-        package_release_version: z.string()
-    });
-    export type Entity = z.infer<typeof Entity>;
+	export const Pending = Entity.extend({
+		status: z.literal("pending"),
+		admin_note: z.null(),
+	});
+	export type Pending = z.infer<typeof Pending>;
 
-    export const Pending = Entity.extend({
-        status: z.literal("pending"),
-        admin_note: z.null()
-    });
-    export type Pending = z.infer<typeof Pending>;
+	export const Approved = Entity.extend({
+		status: z.literal("approved"),
+		admin_note: z.string().nullable(),
+	});
+	export type Approved = z.infer<typeof Approved>;
 
-    export const Approved = Entity.extend({
-        status: z.literal("approved"),
-        admin_note: z.string().nullable()
-    });
-    export type Approved = z.infer<typeof Approved>;
+	export const Denied = Entity.extend({
+		status: z.literal("denied"),
+		admin_note: z.string().nullable(),
+	});
+	export type Denied = z.infer<typeof Denied>;
 
-    export const Denied = Entity.extend({
-        status: z.literal("denied"),
-        admin_note: z.string().nullable()
-    });
-    export type Denied = z.infer<typeof Denied>;
+	export const Union = z.union([Pending, Approved, Denied]);
+	export type Union = z.infer<typeof Union>;
 
-    export const Union = z.union([Pending, Approved, Denied]);
-    export type Union = z.infer<typeof Union>;
+	export type AsUnion<T extends Entity> = T extends Pending
+		? Pending
+		: T extends Approved
+			? Approved
+			: T extends Denied
+				? Denied
+				: never;
 
-    
-    export type AsUnion<T extends Entity> =
-        T extends Pending ? Pending :
-        T extends Approved ? Approved :
-        T extends Denied ? Denied :
-        never;
+	export type MergegedUnion<T extends Union> = Entity;
 
-    export type MergegedUnion<T extends Union> = Entity
-
-    export type MergegedUnions<T extends (Approved | Denied | Pending)[]> = MergegedUnion<T[number]>;
-
+	export type MergegedUnions<T extends (Approved | Denied | Pending)[]> = MergegedUnion<T[number]>;
 }
 
 export namespace StablePromotionRequestsModel.GetByID {
-
-    export const Response = StablePromotionRequestsModel.Union;
-    export type Response = z.infer<typeof Response>;
+	export const Response = StablePromotionRequestsModel.Union;
+	export type Response = z.infer<typeof Response>;
 }
 
 export namespace StablePromotionRequestsModel.GetAll {
+	export const Query = z.object({
+		status: Status.optional(),
+	});
+	export type Query = z.infer<typeof Query>;
 
-    export const Query = z.object({
-        status: Status.optional()
-    });
-    export type Query = z.infer<typeof Query>;
-
-    export const Response = z.array(StablePromotionRequestsModel.GetByID.Response);
-    export type Response = z.infer<typeof Response>;
+	export const Response = z.array(StablePromotionRequestsModel.GetByID.Response);
+	export type Response = z.infer<typeof Response>;
 }
 
 export namespace StablePromotionRequestsModel.Create {
+	export const Body = z.object({}).strict();
 
-    export const Body = z.object({}).strict();
-
-    export const Response = z.object({
-        id: z.number()
-    });
-    export type Body = z.infer<typeof Body>;
-    export type Response = z.infer<typeof Response>;
+	export const Response = z.object({
+		id: z.number(),
+	});
+	export type Body = z.infer<typeof Body>;
+	export type Response = z.infer<typeof Response>;
 }
-

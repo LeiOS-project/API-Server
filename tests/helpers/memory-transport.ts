@@ -13,25 +13,25 @@ import type { CapturedEmail } from "../../src/api/utils/email";
  *   EmailService.init(transport);
  */
 export function createMemoryTransport(capture: CapturedEmail[]): Transporter {
-    return nodemailer.createTransport({
-        name: "memory",
-        version: "1.0.0",
-        send: (mail: MailMessage, callback: (err: Error | null, info: any) => void) => {
-            capture.push({
-                from: (mail.data.from as string) ?? "",
-                to: (Array.isArray(mail.data.to) ? mail.data.to.join(", ") : mail.data.to ?? "") as string,
-                subject: (mail.data.subject as string) ?? "",
-                html: (mail.data.html as string) ?? "",
-                text: (mail.data.text as string) ?? "",
-            });
-            callback(null, {
-                messageId: `mock-${Date.now()}@memory`,
-                envelope: { from: mail.data.from as string, to: [mail.data.to as string].flat() },
-                accepted: [mail.data.to as string].flat(),
-                rejected: [],
-                pending: [],
-                response: "250 OK (memory)",
-            });
-        },
-    } as any);
+	return nodemailer.createTransport({
+		name: "memory",
+		version: "1.0.0",
+		send: (mail: MailMessage, callback: (err: Error | null, info: any) => void) => {
+			capture.push({
+				from: (mail.data.from as string) ?? "",
+				to: (Array.isArray(mail.data.to) ? mail.data.to.join(", ") : (mail.data.to ?? "")) as string,
+				subject: (mail.data.subject as string) ?? "",
+				html: (mail.data.html as string) ?? "",
+				text: (mail.data.text as string) ?? "",
+			});
+			callback(null, {
+				messageId: `mock-${Date.now()}@memory`,
+				envelope: { from: mail.data.from as string, to: [mail.data.to as string].flat() },
+				accepted: [mail.data.to as string].flat(),
+				rejected: [],
+				pending: [],
+				response: "250 OK (memory)",
+			});
+		},
+	} as any);
 }

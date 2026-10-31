@@ -1,55 +1,51 @@
-import { createMiddleware } from 'hono/factory'
+import { createMiddleware } from "hono/factory";
 import { APIResponse } from "../../../utils/api-res";
-import { AuthHandler } from '../../../utils/authHandler';
-
+import { AuthHandler } from "../../../utils/authHandler";
 
 export const authMiddlewareV1 = createMiddleware(async (c, next) => {
+	const authHeader = c.req.header("Authorization");
 
-    const authHeader = c.req.header("Authorization");
+	if (!authHeader) {
+		const authContext: AuthHandler.UnauthenticatedAuthContext = { type: "unauthenticated" };
 
-    if (!authHeader) {
-        const authContext: AuthHandler.UnauthenticatedAuthContext = { type: 'unauthenticated' };
+		c.set("authContext", authContext);
 
-        c.set("authContext", authContext);
+		return await next();
+	}
 
-        return await next();
-    }
+	if (!authHeader.startsWith("Bearer ")) {
+		// Allow unauthenticated access to the login endpoint and password reset request endpoint, which may be accessed with an invalid or missing token.
+		if (c.req.path.startsWith("/v1/auth/login") || c.req.path.startsWith("/v1/auth/reset-password")) {
+			const authContext: AuthHandler.UnauthenticatedAuthContext = { type: "unauthenticated" };
 
-    if (!authHeader.startsWith("Bearer ")) {
+			c.set("authContext", authContext);
 
-        // Allow unauthenticated access to the login endpoint and password reset request endpoint, which may be accessed with an invalid or missing token.
-        if (c.req.path.startsWith("/v1/auth/login") || c.req.path.startsWith("/v1/auth/reset-password")) {
+			return await next();
+		}
 
-            const authContext: AuthHandler.UnauthenticatedAuthContext = { type: 'unauthenticated' };
+		return APIResponse.unauthorized(c, "Invalid Authorization header");
+	}
 
-            c.set("authContext", authContext);
+	const token = authHeader.substring("Bearer ".length);
 
-            return await next();
-        }
+	const authContext: AuthHandler.AuthenticatedAuthContext | null =
+		await AuthHandler.getAuthContext(token);
 
-        return APIResponse.unauthorized(c, "Invalid Authorization header");
-    }
+	if (!authContext || !(await AuthHandler.isValidAuthContext(authContext))) {
+		if (c.req.path.startsWith("/v1/auth/login") || c.req.path.startsWith("/v1/auth/reset-password")) {
+			const unauthenticatedContext: AuthHandler.UnauthenticatedAuthContext = {
+				type: "unauthenticated",
+			};
 
-    const token = authHeader.substring("Bearer ".length);
+			c.set("authContext", unauthenticatedContext);
 
-    const authContext: AuthHandler.AuthenticatedAuthContext | null = await AuthHandler.getAuthContext(token);
+			return await next();
+		}
 
-    if (!authContext || !(await AuthHandler.isValidAuthContext(authContext))) {
+		return APIResponse.unauthorized(c, "Invalid or expired token");
+	}
 
-        if (c.req.path.startsWith("/v1/auth/login") || c.req.path.startsWith("/v1/auth/reset-password")) {
+	c.set("authContext", authContext);
 
-            const unauthenticatedContext: AuthHandler.UnauthenticatedAuthContext = { type: 'unauthenticated' };
-
-            c.set("authContext", unauthenticatedContext);
-
-            return await next();
-        }
-
-        return APIResponse.unauthorized(c, "Invalid or expired token");
-    }
-
-    c.set("authContext", authContext);
-
-    return await next();
-
+	return await next();
 });
