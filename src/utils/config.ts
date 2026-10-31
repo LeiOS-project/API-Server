@@ -124,6 +124,11 @@ export class ConfigHandler {
 		API_HOST: CS.string().default("::"),
 		API_PORT: CS.number().default(AppConstants.APP_API_DEFAULT_PORT),
 		API_DISABLE_DOCS: CS.boolean().default(false),
+		/**
+		 * Behind a reverse proxy: take the client address for rate limits from the first
+		 * X-Forwarded-For entry. Leave off when clients reach the API directly (they could spoof it).
+		 */
+		API_TRUST_PROXY: CS.boolean().default(false),
 
 		DB_PATH: CS.string().default("./data/db.sqlite"),
 		DB_AUTO_MIGRATE: CS.boolean().default(true),

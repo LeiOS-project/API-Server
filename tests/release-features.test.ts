@@ -131,6 +131,34 @@ describe("Signup and email verification", () => {
 		);
 	});
 
+	test("signup attempts are limited per client address", async () => {
+		const attempt = (clientIP: string, expected: number) =>
+			makeAPIRequest(
+				"/v1/auth/signup",
+				{
+					method: "POST",
+					// A taken username: the attempt counts, but no account is created.
+					body: {
+						username,
+						display_name: "Flood",
+						email: `${randomUUID()}@example.com`,
+						password,
+					},
+					additionalOptions: { headers: { "X-Forwarded-For": clientIP } },
+				},
+				expected,
+			);
+
+		const flooder = `198.51.100.${Math.floor(Math.random() * 200) + 1}`;
+		for (let i = 0; i < 10; i++) {
+			await attempt(flooder, 409);
+		}
+		await attempt(flooder, 429);
+
+		// Another client behind the same proxy is not affected.
+		await attempt(`203.0.113.${Math.floor(Math.random() * 200) + 1}`, 409);
+	});
+
 	test("POST /auth/signup rejects a weak password", async () => {
 		await makeAPIRequest(
 			"/v1/auth/signup",

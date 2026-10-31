@@ -1,5 +1,6 @@
 import type { Context } from "hono";
 import { getConnInfo } from "hono/bun";
+import { ConfigHandler } from "../../utils/config";
 
 /**
  * Fixed-window, in-memory attempt counter. Per process and reset on restart, which is enough for a
@@ -47,11 +48,17 @@ export class RateLimiter {
 
 export namespace RateLimiter {
 	/**
-	 * The client's address as Bun sees it, or "unknown" when the request did not come through
-	 * Bun.serve (tests calling API.getApp().request()). Behind a reverse proxy this is the proxy's
-	 * address, so per-client limits then act as one shared bucket.
+	 * The client's address for per-client limits. With LRA_API_TRUST_PROXY it is the first
+	 * X-Forwarded-For entry (set by the reverse proxy); otherwise the address Bun sees — the proxy's
+	 * own address when there is one, which turns per-client limits into one shared bucket.
+	 * "unknown" when neither is available (tests calling API.getApp().request()).
 	 */
 	export function clientId(c: Context) {
+		if (ConfigHandler.getConfig()?.API_TRUST_PROXY) {
+			const forwarded = c.req.header("X-Forwarded-For")?.split(",")[0]?.trim();
+			if (forwarded) return forwarded;
+		}
+
 		try {
 			return getConnInfo(c).remote.address ?? "unknown";
 		} catch {

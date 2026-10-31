@@ -16,6 +16,8 @@ services:
       LRA_APP_URL: https://hub.leios.dev
 
       LRA_API_DISABLE_DOCS: false
+      # true behind a reverse proxy that sets X-Forwarded-For (per-client rate limits)
+      LRA_API_TRUST_PROXY: true
 
       LRA_S3_ENDPOINT: "https://s3.example.com"
       LRA_S3_REGION: "garage"

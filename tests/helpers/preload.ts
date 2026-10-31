@@ -20,6 +20,7 @@ function setTestEnv(rootDir: string) {
 		LRA_API_HOST: "::",
 		LRA_API_PORT: 12151,
 		LRA_API_DISABLE_DOCS: false,
+		LRA_API_TRUST_PROXY: true,
 
 		LRA_LOG_DIR: path.join(rootDir, "logs"),
 
