@@ -1,7 +1,7 @@
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "drizzle-zod";
 import z from "zod";
 import { DB } from "../../../../../../db";
-import { UserDataPolicys } from "../../../../../utils/shared-models/accountData";
+import { UserDataPolicies } from "../../../../../utils/shared-models/accountData";
 import { ApiHelperModels } from "../../../../../utils/shared-models/api-helper-models";
 
 export namespace UsersModel {
@@ -25,7 +25,7 @@ export namespace UsersModel {
 
 	export namespace Create {
 		const InsertSchema = createInsertSchema(DB.Tables.users, {
-			username: UserDataPolicys.Username,
+			username: UserDataPolicies.Username,
 			display_name: z.string().min(1).max(64),
 			email: z.email(),
 		}).omit({
@@ -44,7 +44,11 @@ export namespace UsersModel {
 	}
 
 	export namespace Update {
-		export const Body = createUpdateSchema(DB.Tables.users)
+		export const Body = createUpdateSchema(DB.Tables.users, {
+			username: UserDataPolicies.Username,
+			display_name: z.string().min(1).max(64),
+			email: z.email(),
+		})
 			.omit({
 				id: true,
 				password_hash: true,
@@ -59,7 +63,7 @@ export namespace UsersModel {
 
 	export namespace UpdatePassword {
 		export const Body = z.object({
-			password: UserDataPolicys.Password,
+			password: UserDataPolicies.Password,
 		});
 		export type Body = z.infer<typeof Body>;
 	}

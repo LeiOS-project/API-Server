@@ -5,10 +5,10 @@ import { mkdir } from "fs/promises";
 import { API } from "../src/api";
 import { AuthHandler, AuthUtils, SessionHandler } from "../src/api/utils/authHandler";
 import { RuntimeMetadata } from "../src/api/utils/metadata";
-import { PackageModel } from "../src/api/versions/v1/routes/packages/model";
 import { AccountModel } from "../src/api/versions/v1/routes/account/model";
 import { AuthModel } from "../src/api/versions/v1/routes/auth/model";
 import { hashResetToken } from "../src/api/versions/v1/routes/auth/reset-password";
+import { PackageModel } from "../src/api/versions/v1/routes/packages/model";
 import { AptlyAPI } from "../src/aptly/api";
 import { DB } from "../src/db";
 import { TaskScheduler } from "../src/tasks";
@@ -724,6 +724,29 @@ describe("Global API routes", async () => {
 		const res = await API.getApp().request("/");
 		expect(res.status).toBe(302);
 		expect(res.headers.get("location")).toBe("/docs/v1");
+	});
+
+	test("every operation tag is declared and every declared tag is used", async () => {
+		const res = await API.getApp().request("/docs/v1/openapi");
+		const spec = (await res.json()) as any;
+
+		const declared = new Set<string>(spec.tags.map((tag: any) => tag.name));
+		const used = new Set<string>();
+		for (const operations of Object.values<any>(spec.paths)) {
+			for (const operation of Object.values<any>(operations)) {
+				for (const tag of operation.tags ?? []) used.add(tag);
+			}
+		}
+
+		expect([...used].filter((tag) => !declared.has(tag))).toEqual([]);
+		expect([...declared].filter((tag) => !used.has(tag))).toEqual([]);
+	});
+
+	test("the bearer scheme does not claim the opaque tokens are JWTs", async () => {
+		const res = await API.getApp().request("/docs/v1/openapi");
+		const spec = (await res.json()) as any;
+
+		expect(spec.components.securitySchemes.bearerAuth.bearerFormat).toBeUndefined();
 	});
 });
 

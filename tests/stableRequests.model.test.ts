@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { StablePromotionRequestsModel } from "../src/api/versions/v1/routes/packages/releases/stable-promotion-requests/model";
 import { AdminStablePromotionRequestModel } from "../src/api/versions/v1/routes/admin/stable-promotion-requests/model";
+import { StablePromotionRequestsModel } from "../src/api/versions/v1/routes/packages/releases/stable-promotion-requests/model";
 
 describe("StableRequestModel schemas", () => {
 	test("accepts empty create payload", () => {

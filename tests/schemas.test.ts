@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { UserDataPolicys } from "../src/api/utils/shared-models/accountData";
+import { UserDataPolicies } from "../src/api/utils/shared-models/accountData";
 import { PackageModel } from "../src/api/versions/v1/routes/packages/model";
 
 describe("Package Schema Testing", () => {
@@ -73,7 +73,7 @@ describe("User Account Policy Schema Testing", () => {
 		];
 
 		for (const username of invalidUsernames) {
-			expect(UserDataPolicys.Username.safeParse(username)).toEqual({
+			expect(UserDataPolicies.Username.safeParse(username)).toEqual({
 				success: false,
 				error: expect.anything(),
 			});
@@ -90,7 +90,7 @@ describe("User Account Policy Schema Testing", () => {
 
 		for (const username of validUsernames) {
 			// console.log(`Testing valid username: ${username}`);
-			expect(UserDataPolicys.Username.safeParse(username)).toEqual({
+			expect(UserDataPolicies.Username.safeParse(username)).toEqual({
 				success: true,
 				data: expect.anything(),
 			});
@@ -108,7 +108,7 @@ describe("User Account Policy Schema Testing", () => {
 		];
 
 		for (const password of invalidPasswords) {
-			expect(UserDataPolicys.Password.safeParse(password)).toEqual({
+			expect(UserDataPolicies.Password.safeParse(password)).toEqual({
 				success: false,
 				error: expect.anything(),
 			});
@@ -123,7 +123,7 @@ describe("User Account Policy Schema Testing", () => {
 		];
 
 		for (const password of validPasswords) {
-			expect(UserDataPolicys.Password.safeParse(password)).toEqual({
+			expect(UserDataPolicies.Password.safeParse(password)).toEqual({
 				success: true,
 				data: expect.anything(),
 			});

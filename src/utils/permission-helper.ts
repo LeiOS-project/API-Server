@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import type { AuthHandler } from "../api/utils/authHandler";
 import type { DB } from "../db";
+import { Logger } from "./logger";
 
 export class PermissionHelper {
 	private static _dbModule: typeof DB | null = null;
@@ -82,7 +83,7 @@ export class PermissionHelper {
 			.get();
 
 		if (!row) {
-			console.warn(`isPublisherOwner: publisher with id ${params.publisherId} not found`);
+			Logger.warn(`isPublisherOwner: publisher with id ${params.publisherId} not found`);
 			return false;
 		}
 

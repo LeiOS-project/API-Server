@@ -1,7 +1,7 @@
 import { createSelectSchema, createUpdateSchema } from "drizzle-zod";
 import { z } from "zod";
 import { DB } from "../../../../../db";
-import { UserDataPolicys } from "../../../../utils/shared-models/accountData";
+import { UserDataPolicies } from "../../../../utils/shared-models/accountData";
 
 export namespace AccountModel.GetInfo {
 	export const Response = createSelectSchema(DB.Tables.users).omit({
@@ -12,7 +12,7 @@ export namespace AccountModel.GetInfo {
 
 export namespace AccountModel.UpdateInfo {
 	export const Body = createUpdateSchema(DB.Tables.users, {
-		username: UserDataPolicys.Username,
+		username: UserDataPolicies.Username,
 		email: z.email("Invalid email"),
 	})
 		.omit({
@@ -40,7 +40,7 @@ export namespace AccountModel.UpdateInfo {
 export namespace AccountModel.UpdatePassword {
 	export const Body = z.object({
 		current_password: z.string().describe("Current password of the account"),
-		new_password: UserDataPolicys.Password,
+		new_password: UserDataPolicies.Password,
 	});
 
 	export type Body = z.infer<typeof Body>;

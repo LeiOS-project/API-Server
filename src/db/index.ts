@@ -26,16 +26,15 @@ export class DB {
 		if (autoMigrate) {
 			Logger.info("Running database migrations...");
 
-			// `Bun.isStandaloneExecutable` is newer than this repo's bun-types; compiled binaries also
-			// run from the embedded `/$bunfs` file system.
-			const isStandaloneExecutable =
-				(Bun as { isStandaloneExecutable?: boolean }).isStandaloneExecutable ??
-				import.meta.dir.startsWith("/$bunfs");
-
-			if (isStandaloneExecutable) {
-				// `bun build --compile --asset ./drizzle/migrations` embeds the files as `migrations/...`
-				// next to the entry (`/$bunfs/root/migrations` on Linux) — without the `drizzle/` segment.
-				migrationsFolder = path_join(import.meta.dir, "migrations");
+			// `bun build --compile --asset ./drizzle/migrations` embeds the files as `migrations/...`
+			// next to the entry (`/$bunfs/root/migrations` on Linux) — without the `drizzle/` segment.
+			// A binary built by a Bun without `--asset` has no embedded copy and reads migrationsFolder.
+			const embeddedMigrations = path_join(import.meta.dir, "migrations");
+			if (
+				this.isStandaloneExecutable() &&
+				(await Bun.file(path_join(embeddedMigrations, "meta", "_journal.json")).exists())
+			) {
+				migrationsFolder = embeddedMigrations;
 			}
 
 			await migrate(this.db, { migrationsFolder });
@@ -47,6 +46,14 @@ export class DB {
 		await this.createInitialLeiOSPublisherIfNeeded(adminUserID ?? 1);
 
 		Logger.info(`Database initialized at ${path}`);
+	}
+
+	/** `Bun.isStandaloneExecutable` is newer than this repo's bun-types; binaries also run from `/$bunfs`. */
+	private static isStandaloneExecutable() {
+		return (
+			(Bun as { isStandaloneExecutable?: boolean }).isStandaloneExecutable ??
+			import.meta.dir.startsWith("/$bunfs")
+		);
 	}
 
 	private static async createInitialAdminUserIfNeeded(configBaseDir: string) {
