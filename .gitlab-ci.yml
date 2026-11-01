@@ -1,4 +1,4 @@
-# .gitlab-ci.yml — root include for LeiCraftMC projects (see the style guide, docs/13-git-and-ci.md).
+# .gitlab-ci.yml — root CI config; layout from the LeiCraftMC Style Guide (docs/13-git-and-ci.md).
 
 workflow:
   rules:

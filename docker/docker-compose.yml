@@ -34,5 +34,5 @@ services:
       LRA_SMTP_SECURE: true
 
     volumes:
-      - /opt/leicraftmc/leios-api/data:/opt/leicraftmc/leios-api/data
-      - /opt/leicraftmc/leios-api/config:/opt/leicraftmc/leios-api/config
+      - /opt/leios/api/data:/opt/leios/api/data
+      - /opt/leios/api/config:/opt/leios/api/config

@@ -1,8 +1,8 @@
 # AGENTS.md — operating manual for AI coding agents
 
-This is the LeiOS API server: a LeiCraftMC backend service (Bun + Hono + Zod + hono-openapi +
-Drizzle/SQLite) in front of an Aptly package repository published to S3. It follows the LeiCraftMC
-Style Guide: https://git.leicraftmc.de/LeiCraftMC/Style-Guides. The guide plus this repo are the
+This is the LeiOS API server: a backend service (Bun + Hono + Zod + hono-openapi + Drizzle/SQLite)
+in front of an Aptly package repository published to S3. LeiOS is its own product (initiated by
+LeiCraft_MC, not a LeiCraft_MC product); its code follows the LeiCraftMC Style Guide: https://git.leicraftmc.de/LeiCraftMC/Style-Guides. The guide plus this repo are the
 authority; generic internet advice is not.
 
 ## Must read
