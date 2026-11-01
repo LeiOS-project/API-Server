@@ -56,7 +56,11 @@ export namespace PackageModel.GetPackageByFullName {
 			arm64: z.string().nullable(),
 		}),
 	}).extend({
+		// Computed columns of packages_full_view: drizzle-zod types sql<…> expressions as unknown.
 		fullname: z.string(),
+		last_release_at: z.number().int().nullable(),
+		publisher_display_name: z.string(),
+		publisher_verified_at: z.number().int().nullable(),
 	});
 
 	export type Response = z.infer<typeof Response>;
