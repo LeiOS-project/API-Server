@@ -31,6 +31,11 @@ CI builds the binary and the Docker image (`docker/Dockerfile`) from the default
 `docker/docker-compose.yml`; configuration is `LRA_*` environment variables (see `example.env`).
 Everything stateful lives in the `data/` and `config/` volumes.
 
+The API refuses to start when the S3 bucket already serves a published LeiOS repository that its
+Aptly data (`LRA_APTLY_ROOT`) does not know, for example after a volume was moved or not mounted.
+Publishing from an empty Aptly state would replace the live repository and break `apt` for every
+installation, so fix the data path instead.
+
 ## License
 
 [AGPL-3.0](LICENSE)

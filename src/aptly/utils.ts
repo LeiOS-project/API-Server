@@ -160,6 +160,55 @@ export class AptlyUtils {
 		}
 	}
 
+	/** The distributions published to the live S3 repository (`dists/<distribution>/`). */
+	static readonly LIVE_DISTRIBUTIONS = ["testing", "stable"] as const;
+
+	/** Bucket key of a file in the live repository, below LRA_S3_PREFIX. */
+	static liveRepoKey(relativePath: string) {
+		const prefix = AptlyAPIServer.settings.s3Settings.prefix ?? "";
+		if (!prefix) return relativePath;
+		return prefix.endsWith("/") ? `${prefix}${relativePath}` : `${prefix}/${relativePath}`;
+	}
+
+	/** Whether the bucket already serves `distribution` (its signed Release index exists). */
+	static async isPublishedInBucket(distribution: string) {
+		const s3 = AptlyAPIServer.settings.s3Settings;
+		const client = new Bun.S3Client({
+			endpoint: s3.endpoint,
+			region: s3.region,
+			bucket: s3.bucket,
+			accessKeyId: s3.accessKeyId,
+			secretAccessKey: s3.secretAccessKey,
+		});
+		return await client.exists(AptlyUtils.liveRepoKey(`dists/${distribution}/Release`));
+	}
+
+	/**
+	 * Refuses to start when the bucket serves a distribution that Aptly's local state does not know.
+	 * That happens when LRA_APTLY_ROOT points at a new or empty directory (a moved or missing Docker
+	 * volume, a typo in the path): the initial publish would then replace the live repository with an
+	 * empty one and break apt for every LeiOS installation. Errors from S3 propagate, so an unreachable
+	 * bucket also stops the startup instead of skipping the check.
+	 */
+	static async assertNoUnknownLivePublications(locallyPublished: readonly string[]) {
+		for (const distribution of AptlyUtils.LIVE_DISTRIBUTIONS) {
+			if (locallyPublished.includes(distribution)) continue;
+
+			if (await AptlyUtils.isPublishedInBucket(distribution)) {
+				const s3 = AptlyAPIServer.settings.s3Settings;
+				const location = `s3://${s3.bucket}/${AptlyUtils.liveRepoKey(`dists/${distribution}/`)}`;
+				const repository = `s3://${s3.bucket}/${AptlyUtils.liveRepoKey("")}`;
+				throw new Error(
+					`Refusing to publish '${distribution}': ${location} is already published, but the Aptly ` +
+						`state in ${AptlyAPIServer.settings.aptlyRoot} does not know it. Publishing now would ` +
+						"replace the live repository with an empty one. Point LRA_APTLY_ROOT (and the data " +
+						"volume) at the existing Aptly data. To deliberately start an empty repository, delete " +
+						`the published repository (dists/ and pool/ under ${repository}) first.`,
+				);
+			}
+		}
+	}
+
 	static async initialRepoPublishIfNeeded() {
 		const publishPrefix = "s3:leios-live-repo:";
 
@@ -170,6 +219,12 @@ export class AptlyUtils {
 			);
 		}
 		const existingPublishedRepos = existingPublishedReposResult.data;
+
+		await AptlyUtils.assertNoUnknownLivePublications(
+			existingPublishedRepos
+				.filter((pub) => pub.Storage === "s3:leios-live-repo")
+				.map((pub) => pub.Distribution ?? ""),
+		);
 
 		if (
 			!existingPublishedRepos.some(

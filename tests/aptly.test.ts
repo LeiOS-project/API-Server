@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { AptlyAPI } from "../src/aptly/api";
 import { AptlyAPIServer } from "../src/aptly/server";
+import { AptlyUtils } from "../src/aptly/utils";
 
 describe("Aptly Package Tests for fastfetch arch: amd64", () => {
 	test("Upload and Verify Package", async () => {
@@ -269,5 +270,28 @@ describe("Aptly task runner", () => {
 		await Promise.all([cleanup("first"), cleanup("second")]);
 
 		expect(events).toEqual(["start first", "end first", "start second", "end second"]);
+	});
+});
+
+describe("Live repository guard", () => {
+	// The preload published 'testing' and 'stable' into the local S3 server.
+	test("detects distributions that are published in the bucket", async () => {
+		expect(await AptlyUtils.isPublishedInBucket("testing")).toBe(true);
+		expect(await AptlyUtils.isPublishedInBucket("stable")).toBe(true);
+		expect(await AptlyUtils.isPublishedInBucket("not-a-distribution")).toBe(false);
+	});
+
+	test("allows publishing when Aptly knows every live distribution", async () => {
+		await AptlyUtils.assertNoUnknownLivePublications(["testing", "stable"]);
+	});
+
+	test("refuses to publish over a live repository that Aptly does not know", async () => {
+		// What a fresh LRA_APTLY_ROOT looks like next to an existing bucket.
+		await expect(AptlyUtils.assertNoUnknownLivePublications([])).rejects.toThrow(
+			/Refusing to publish 'testing'.*already published/,
+		);
+		await expect(AptlyUtils.assertNoUnknownLivePublications(["testing"])).rejects.toThrow(
+			/Refusing to publish 'stable'/,
+		);
 	});
 });
