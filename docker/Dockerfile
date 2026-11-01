@@ -2,8 +2,8 @@
 # Build the binary first (CI does this): `bun run compile linux-x64-baseline --no-version-tag`
 # → build/bin/leios-api-linux-x64-baseline (AppConstants.BINARY_NAME in src/utils/constants.ts).
 # Layout: binary under app/, data/ and config/ are volumes beside it. The binary embeds the Drizzle
-# migrations when it was built by a Bun with `bun build --asset`; the image also copies them next to
-# it as a fallback (LRA_DB_MIGRATION_DIR). Runtime config: LRA_* env (see example.env).
+# migrations (`bun build --asset`, Bun >= 1.4.4) and applies them on startup while
+# LRA_DB_AUTO_MIGRATE is true. Runtime config: LRA_* env (see example.env).
 FROM debian:stable-slim
 
 # Host tools the API runs at runtime: git (branding repo), dpkg/dpkg-dev/build-essential (.deb checks
@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /opt/leicraftmc/leios-api
 
 COPY ./build/bin/leios-api-linux-x64-baseline /opt/leicraftmc/leios-api/app/leios-api
-COPY ./drizzle/migrations /opt/leicraftmc/leios-api/app/drizzle/migrations
+# The migrations are embedded in the binary; no need to copy them.
 
 RUN chmod u+x /opt/leicraftmc/leios-api/app/leios-api
 
@@ -29,7 +29,6 @@ ENV LRA_API_PORT=12151
 
 ENV LRA_DB_PATH=/opt/leicraftmc/leios-api/data/db.sqlite
 ENV LRA_DB_AUTO_MIGRATE=true
-ENV LRA_DB_MIGRATION_DIR=/opt/leicraftmc/leios-api/app/drizzle/migrations
 
 ENV LRA_LOG_DIR=/opt/leicraftmc/leios-api/data/logs
 ENV LRA_APTLY_ROOT=/opt/leicraftmc/leios-api/data/aptly

@@ -54,6 +54,9 @@ class CompilerCommand {
 }
 
 export class Compiler {
+	/** First Bun release whose `bun build --compile` supports `--asset`. */
+	static readonly MIN_BUN_VERSION = "1.4.4";
+
 	private command = new CompilerCommand();
 
 	constructor(
@@ -76,24 +79,16 @@ export class Compiler {
 
 		this.command.env.APP_VERSION = this.version;
 
-		// Embed the migrations so the binary can migrate on its own. `--asset` needs a newer Bun than
-		// some dev machines run; older ones would treat the folder as a second entry point. Without it
-		// the binary reads DB_MIGRATION_DIR instead (the Docker image ships the folder).
-		if (Compiler.supportsAssetFlag()) {
-			this.command.addArg("--asset ./drizzle/migrations");
-		} else {
-			console.warn(
-				`Bun ${Bun.version} does not support \`bun build --asset\`; the binary will not embed the migrations.`,
-			);
-		}
-	}
-
-	protected static supportsAssetFlag() {
-		const help = Bun.spawnSync(["bun", "build", "--help"]).stdout.toString();
-		return /--asset[\s=]/.test(help);
+		this.command.addArg("--asset ./drizzle/migrations");
 	}
 
 	async build() {
+		if (!Bun.semver.satisfies(Bun.version, `>=${Compiler.MIN_BUN_VERSION}`)) {
+			throw new Error(
+				`Compiling needs Bun >= ${Compiler.MIN_BUN_VERSION} to embed the migrations (bun build --asset); this is Bun ${Bun.version}.`,
+			);
+		}
+
 		try {
 			console.log(`Building from sources. Version: ${this.version} Platform: ${this.platform}`);
 

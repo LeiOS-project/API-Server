@@ -23,7 +23,7 @@ the password-reset link for it is logged and written to
 | `bun run typecheck` | TypeScript check of `src`, `tests`, `scripts` |
 | `bun test` | Integration tests (temp DB, local S3, Aptly; needs `dpkg`, `dpkg-dev`, `build-essential`) |
 | `bun run db:generate` | Generate a migration after editing `src/db/schema.ts` |
-| `bun run compile linux-x64-baseline --no-version-tag` | Build the binary the Docker image uses |
+| `bun run compile linux-x64-baseline --no-version-tag` | Build the binary the Docker image uses (needs Bun ≥ 1.4.4, which embeds the migrations) |
 
 ## Deployment
 
