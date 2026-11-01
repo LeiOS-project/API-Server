@@ -74,6 +74,8 @@ export class DB {
 						password_hash: await Bun.password.hash(crypto_randomBytes(32).toString("hex")),
 						display_name: "Default Administrator",
 						role: "admin",
+						// admin@leios.local cannot receive mail; the operator owns this account.
+						email_verified_at: Date.now(),
 					})
 					.returning()
 					.get().id;

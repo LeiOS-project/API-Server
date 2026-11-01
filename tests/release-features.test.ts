@@ -90,6 +90,15 @@ describe("Meta", () => {
 	});
 });
 
+test("the initial admin account starts with a confirmed email address", () => {
+	const initialAdmin = DB.instance()
+		.select()
+		.from(DB.Tables.users)
+		.where(eq(DB.Tables.users.username, "admin"))
+		.get();
+	expect(initialAdmin?.email_verified_at).toBeNumber();
+});
+
 describe("Signup and email verification", () => {
 	const username = uniqueName("signup");
 	const email = `${randomUUID()}@example.com`;
