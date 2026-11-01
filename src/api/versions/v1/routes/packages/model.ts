@@ -109,13 +109,14 @@ export namespace PackageModel.CreatePackage {
 			.url("Homepage URL must be a valid URL.")
 			.max(500, "Homepage URL cannot exceed 500 characters."),
 		requires_patching: z.boolean().default(false),
-	}).omit({
-		id: true,
-		created_at: true,
-		flags: true,
-		top_level_alias: true,
-		latest_stable_release: true,
-		latest_testing_release: true,
+		// Allowlist: flags, moderation_note and the release pointers are server-/admin-managed.
+	}).pick({
+		publisher_id: true,
+		name: true,
+		display_name: true,
+		description: true,
+		homepage_url: true,
+		requires_patching: true,
 	});
 
 	export type Body = z.infer<typeof Body>;

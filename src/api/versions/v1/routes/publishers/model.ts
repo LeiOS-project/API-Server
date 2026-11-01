@@ -116,10 +116,14 @@ export namespace PublisherModel.CreatePublisher {
 		maintainer_contact_email: z
 			.email("Maintainer contact email must be a valid email address.")
 			.max(254, "Maintainer contact email cannot exceed 200 characters."),
-	}).omit({
-		id: true,
-		created_at: true,
-		owner_user_id: true,
+		// Allowlist: owner_user_id and verified_at are server-managed and must never come from a client.
+	}).pick({
+		name: true,
+		display_name: true,
+		description: true,
+		homepage_url: true,
+		maintainer_contact_name: true,
+		maintainer_contact_email: true,
 	});
 
 	export type Body = z.infer<typeof Body>;

@@ -513,6 +513,58 @@ describe("Publisher verification and package moderation", () => {
 		expect(list.items[0]).toMatchObject({ name: publisher.name, package_count: 1, member_count: 1 });
 	});
 
+	test("owners cannot set server-managed fields through the normal update routes", async () => {
+		const own = await seedPublisher(owner.id);
+		const ownPackage = await seedPackage(own.id);
+
+		await makeAPIRequest(`/v1/publishers/${own.name}`, {
+			method: "PUT",
+			authToken: ownerToken,
+			body: { display_name: "Self Verified?", verified_at: Date.now() },
+		});
+		const publisherRow = DB.instance()
+			.select()
+			.from(DB.Tables.publishers)
+			.where(eq(DB.Tables.publishers.id, own.id))
+			.get();
+		expect(publisherRow?.display_name).toBe("Self Verified?");
+		expect(publisherRow?.verified_at).toBeNull();
+
+		await makeAPIRequest(`/v1/packages/${own.name}.${ownPackage.name}`, {
+			method: "PUT",
+			authToken: ownerToken,
+			body: { description: "Updated", moderation_note: "cleared by owner", flags: [] },
+		});
+		const packageRow = DB.instance()
+			.select()
+			.from(DB.Tables.packages)
+			.where(eq(DB.Tables.packages.id, ownPackage.id))
+			.get();
+		expect(packageRow?.description).toBe("Updated");
+		expect(packageRow?.moderation_note).toBeNull();
+	});
+
+	test("admin-created users start active regardless of the request body", async () => {
+		const created = await makeAPIRequest(
+			"/v1/admin/users",
+			{
+				method: "POST",
+				authToken: adminToken,
+				body: {
+					username: uniqueName("created"),
+					display_name: "Created",
+					email: `${randomUUID()}@example.com`,
+					password: "Str0ng!Pass",
+					status: "suspended",
+					suspended_reason: "sneaky",
+				},
+			},
+			201,
+		);
+		expect(created.status).toBe("active");
+		expect(created.suspended_reason).toBeNull();
+	});
+
 	test("hidden packages disappear for the public but stay visible to members and admins", async () => {
 		await makeAPIRequest(`/v1/admin/packages/${fullname}/moderation`, {
 			method: "PUT",

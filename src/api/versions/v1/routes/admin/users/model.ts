@@ -34,10 +34,12 @@ export namespace UsersModel {
 			username: UserDataPolicies.Username,
 			display_name: z.string().min(1).max(64),
 			email: z.email(),
-		}).omit({
-			id: true,
-			password_hash: true,
-			created_at: true,
+			// Allowlist: suspension and email confirmation have their own (audited) endpoints.
+		}).pick({
+			username: true,
+			display_name: true,
+			email: true,
+			role: true,
 		});
 
 		export const Body = InsertSchema.extend({
