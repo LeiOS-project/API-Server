@@ -11,7 +11,7 @@
 		"lint": "bunx --bun biome lint",
 		"typecheck": "bunx --bun tsc -p ./tsconfig/tsconfig.typecheck.json && echo 'Typecheck passed!'",
 		"test": "bun test",
-		"test:ci": "bun test --coverage --reporter=junit --reporter-outfile=./junit.xml",
+		"test:ci": "bun test --timeout 30000 --coverage --reporter=junit --reporter-outfile=./junit.xml",
 		"db:generate": "bun scripts/db-utils && bunx --bun drizzle-kit generate --config=drizzle/configs/drizzle.config.ts",
 		"db:migrate": "bun scripts/db-utils && bunx --bun drizzle-kit migrate --config=drizzle/configs/drizzle.config.ts",
 		"dev": "bun run --watch src/index.ts",

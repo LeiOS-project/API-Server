@@ -16,6 +16,7 @@ import { ConfigHandler } from "../src/utils/config";
 import { PermissionHelper } from "../src/utils/permission-helper";
 import { makeAPIRequest } from "./helpers/api";
 import { TEST_PACKAGE_FIXTURES } from "./helpers/package-fixtures";
+import { hashTestPassword } from "./helpers/seed";
 
 // type Arch = AptlyAPI.Utils.Architectures;
 
@@ -40,7 +41,7 @@ async function seedUser(
 			username: overrides.username ?? `user_${randomUUID().slice(0, 8)}`,
 			display_name: overrides.display_name ?? "Test User",
 			email: overrides.email ?? `${randomUUID()}@example.com`,
-			password_hash: await Bun.password.hash(password),
+			password_hash: await hashTestPassword(password),
 			role,
 			// Seeded accounts count as confirmed unless a test says otherwise.
 			email_verified_at:

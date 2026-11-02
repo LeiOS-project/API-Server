@@ -1,5 +1,6 @@
 import { afterAll, beforeAll } from "bun:test";
 import fs from "fs/promises";
+import os from "os";
 import path from "path";
 import S3rver from "s3rver";
 import { API } from "../../src/api";
@@ -137,7 +138,10 @@ async function generateTestGPGKeyPair(rootDir: string) {
 }
 
 async function createIsolatedDataDir(): Promise<string> {
-	const root = await fs.mkdtemp(path.join(process.cwd(), "tmp-data-"));
+	// gpg-agent puts its sockets into the GnuPG home inside this directory, and Unix socket paths
+	// max out at 108 bytes, so deep checkouts (such as git worktrees) use the system temp directory.
+	const base = process.cwd().length > 60 ? os.tmpdir() : process.cwd();
+	const root = await fs.mkdtemp(path.join(base, "tmp-data-"));
 	return root;
 }
 

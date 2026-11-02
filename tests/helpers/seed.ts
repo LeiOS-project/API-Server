@@ -7,6 +7,21 @@ export type SeededUser = Omit<DB.Models.User, "password_hash"> & { password: str
 
 const DEFAULT_PASSWORD = "TestP@ssw0rd";
 
+const passwordHashes = new Map<string, Promise<string>>();
+
+/**
+ * Password hashing is deliberately slow (argon2), so seeded users share one hash per password.
+ * Hashing for every seeded user made the tests that create many users time out on CI runners.
+ */
+export function hashTestPassword(password: string): Promise<string> {
+	let hash = passwordHashes.get(password);
+	if (!hash) {
+		hash = Bun.password.hash(password);
+		passwordHashes.set(password, hash);
+	}
+	return hash;
+}
+
 export async function seedUser(
 	role: DB.Models.User["role"] = "user",
 	overrides: Partial<DB.Models.User> = {},
@@ -18,7 +33,7 @@ export async function seedUser(
 			username: overrides.username ?? `user_${randomUUID().slice(0, 8)}`,
 			display_name: overrides.display_name ?? "Test User",
 			email: overrides.email ?? `${randomUUID()}@example.com`,
-			password_hash: await Bun.password.hash(password),
+			password_hash: await hashTestPassword(password),
 			role,
 			// Seeded accounts count as confirmed unless a test says otherwise.
 			email_verified_at:
