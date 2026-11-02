@@ -1,6 +1,6 @@
 import { TaskHandler } from "@cleverjs/utils";
 import { eq } from "drizzle-orm";
-import { RuntimeMetadata } from "../api/utils/metadata";
+import { StablePromotion } from "../api/utils/stablePromotion";
 import { AptlyAPI } from "../aptly/api";
 import { DB } from "../db";
 import { BrandingBuilder } from "../utils/branding-builder";
@@ -279,7 +279,11 @@ OsReleaseTask.addStep("Publish OS release snapshot to S3", async (payload, logge
 });
 
 OsReleaseTask.addStep("Finalize OS release", async (payload, logger) => {
-	await RuntimeMetadata.removeOSReleasePendingPackagesIfExist(payload.pkgReleasesToIncludeByID);
+	// The included requests leave the stable queue; their conversations get a note.
+	await StablePromotion.markReleased({
+		packageReleaseIDs: payload.pkgReleasesToIncludeByID,
+		osReleaseVersion: payload.version,
+	});
 
 	logger.info("OS release process completed successfully for version", payload.version);
 

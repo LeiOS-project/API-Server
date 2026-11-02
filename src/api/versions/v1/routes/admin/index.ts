@@ -1,18 +1,23 @@
 import { Hono } from "hono";
+import { PermissionHelper } from "../../../../../utils/permission-helper";
 import { APIResponse } from "../../../../utils/api-res";
 import { AuthHandler } from "../../../../utils/authHandler";
 
 export const router = new Hono().basePath("/admin");
 
-// Site-admin gate. Everything under /admin/* requires user_role === 'admin'.
+// Staff gate: everything under /admin/* needs a site admin or moderator. Routes that only admins
+// may use (OS release writes, tasks, account administration) also check PermissionHelper.isSiteAdmin.
 router.use("*", async (c, next) => {
 	const authContext = AuthHandler.AuthContext.get(c);
 
 	if (authContext.type === "unauthenticated") {
 		return APIResponse.unauthorized(c, "Authentication required");
 	}
-	if (authContext.user_role !== "admin") {
-		return APIResponse.forbidden(c, "This endpoint is restricted to site administrators");
+	if (!PermissionHelper.isSiteStaff(authContext)) {
+		return APIResponse.forbidden(
+			c,
+			"This endpoint is restricted to site administrators and moderators",
+		);
 	}
 
 	await next();

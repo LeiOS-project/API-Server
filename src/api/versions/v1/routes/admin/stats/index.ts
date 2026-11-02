@@ -52,6 +52,10 @@ router.get(
 				DB.Tables.stablePromotionRequests,
 				eq(DB.Tables.stablePromotionRequests.status, "pending"),
 			),
+			stable_queue: await db.$count(
+				DB.Tables.stablePromotionRequests,
+				eq(DB.Tables.stablePromotionRequests.status, "queued"),
+			),
 			reports_open: await db.$count(DB.Tables.reports, eq(DB.Tables.reports.status, "open")),
 			tasks: {
 				running: await taskStatus("running"),

@@ -1,88 +1,39 @@
 import { eq } from "drizzle-orm";
-import { z } from "zod";
+import type { z } from "zod";
 import { DB } from "../../db";
 
+/**
+ * Small server-side key/value store in the `metadata` table. Each key has a Zod schema whose
+ * `.default(...)` is the value of a key that was never written.
+ *
+ * Add a key by adding its schema to `schemas` and a typed accessor below. (The stable queue that
+ * used to live here as `os-release-pending-packages` is now the `queued` status of
+ * `stable_promotion_requests`.)
+ */
 export class RuntimeMetadata {
-	protected static readonly schemas = {
-		"os-release-pending-packages": z.array(z.number()).default([]),
-	} as const;
+	protected static readonly schemas = {} as const satisfies Record<string, z.ZodType>;
 
 	protected static async getMetadata<T extends keyof typeof this.schemas>(
 		key: T,
-		createIfNotFound = false,
 	): Promise<z.infer<(typeof this.schemas)[T]>> {
+		const schema: z.ZodType = this.schemas[key];
 		const record = await DB.instance()
 			.select()
 			.from(DB.Tables.metadata)
 			.where(eq(DB.Tables.metadata.key, key))
 			.get();
 
-		if (!record) {
-			if (!createIfNotFound) {
-				throw new Error(`Metadata with key '${key}' not found`);
-			}
-
-			const defaultData = this.schemas[key].parse(undefined);
-			await DB.instance().insert(DB.Tables.metadata).values({
-				key: key,
-				data: defaultData,
-			});
-			return defaultData;
-		}
-
-		return this.schemas[key].parse(record.data);
+		return schema.parse(record?.data) as z.infer<(typeof this.schemas)[T]>;
 	}
 
 	protected static async setMetadata<T extends keyof typeof this.schemas>(
 		key: T,
-		data: z.infer<(typeof this.schemas)[T]>,
+		value: z.infer<(typeof this.schemas)[T]>,
 	): Promise<void> {
+		const data = value as DB.Models.Metadata["data"];
 		await DB.instance()
-			.update(DB.Tables.metadata)
-			.set({
-				data: data,
-			})
-			.where(eq(DB.Tables.metadata.key, key));
-	}
-
-	static async getOSReleasePendingPackages() {
-		return await this.getMetadata("os-release-pending-packages", true);
-	}
-
-	static async addOSReleasePendingPackage(packageReleaseId: number) {
-		const pendingPackages = await this.getOSReleasePendingPackages();
-		if (!pendingPackages.includes(packageReleaseId)) {
-			pendingPackages.push(packageReleaseId);
-			await this.setMetadata("os-release-pending-packages", pendingPackages);
-		}
-	}
-
-	static async removeOSReleasePendingPackageIfExists(packageReleaseId: number) {
-		const pendingPackages = await this.getOSReleasePendingPackages();
-		const index = pendingPackages.indexOf(packageReleaseId);
-		if (index !== -1) {
-			pendingPackages.splice(index, 1);
-			await this.setMetadata("os-release-pending-packages", pendingPackages);
-		}
-	}
-
-	static async removeOSReleasePendingPackagesIfExist(packageReleaseIds: number[]) {
-		if (packageReleaseIds.length === 0) {
-			return;
-		}
-
-		const idsToRemove = new Set(packageReleaseIds);
-		const pendingPackages = await this.getOSReleasePendingPackages();
-		const remainingPackages = pendingPackages.filter(
-			(packageReleaseId) => !idsToRemove.has(packageReleaseId),
-		);
-
-		if (remainingPackages.length !== pendingPackages.length) {
-			await this.setMetadata("os-release-pending-packages", remainingPackages);
-		}
-	}
-
-	static async clearOSReleasePendingPackages() {
-		await this.setMetadata("os-release-pending-packages", []);
+			.insert(DB.Tables.metadata)
+			.values({ key, data })
+			.onConflictDoUpdate({ target: DB.Tables.metadata.key, set: { data } });
 	}
 }

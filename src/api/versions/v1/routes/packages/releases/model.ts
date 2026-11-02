@@ -1,6 +1,7 @@
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import z from "zod";
 import { DB } from "../../../../../../db";
+import { StablePromotionSettings } from "../../../../../utils/shared-models/stablePromotion";
 
 export namespace PackageReleaseModel {
 	// Matches versions that optionally end with a `leios` patch suffix (e.g. leios1, leios1.1.1)
@@ -19,6 +20,18 @@ export namespace PackageReleaseModel {
 	});
 }
 
+export namespace PackageReleaseModel {
+	/** The release's stable promotion request, if it has one: shows whether it is queued for stable. */
+	export const StablePromotion = z
+		.object({
+			request_id: z.number().int(),
+			status: StablePromotionSettings.Status,
+			os_release_version: z.string().nullable().describe("The OS release that released it"),
+		})
+		.nullable();
+	export type StablePromotion = z.infer<typeof StablePromotion>;
+}
+
 export namespace PackageReleaseModel.GetReleaseByVersion {
 	export const Response = createSelectSchema(DB.Tables.packageReleases, {
 		architectures: z.object({
@@ -26,9 +39,13 @@ export namespace PackageReleaseModel.GetReleaseByVersion {
 			arm64: z.boolean(),
 			is_all: z.boolean(),
 		}),
-	}).omit({
-		package_id: true,
-	});
+	})
+		.omit({
+			package_id: true,
+		})
+		.extend({
+			stable_promotion: PackageReleaseModel.StablePromotion,
+		});
 	export type Response = z.infer<typeof Response>;
 }
 
@@ -43,7 +60,8 @@ export namespace PackageReleaseModel.CreateRelease {
 		changelog: z
 			.string()
 			.min(1, "Changelog cannot be empty")
-			.max(10000, "Changelog cannot exceed 10,000 characters"),
+			.max(10000, "Changelog cannot exceed 10,000 characters")
+			.describe("Markdown"),
 	}).omit({
 		id: true,
 		package_id: true,

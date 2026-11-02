@@ -19,6 +19,7 @@ export namespace AdminStatsModel.Get {
 		}),
 		releases: z.number().int(),
 		stable_promotion_requests_pending: z.number().int(),
+		stable_queue: z.number().int().describe("Releases queued for the next OS release"),
 		reports_open: z.number().int(),
 		tasks: z.object({
 			running: z.number().int(),

@@ -45,7 +45,7 @@ router.get(
 
 		let canSeeHidden = false;
 		if (authContext.type !== "unauthenticated") {
-			if (authContext.user_role === "admin") {
+			if (PermissionHelper.isSiteStaff(authContext)) {
 				canSeeHidden = true;
 			} else {
 				// Check if the user is a member of the publisher, which allows them to see hidden members
@@ -241,7 +241,7 @@ router.get(
 		if (member.is_publicly_hidden) {
 			let canSeeHidden = false;
 			if (authContext.type !== "unauthenticated") {
-				if (authContext.user_role === "admin") {
+				if (PermissionHelper.isSiteStaff(authContext)) {
 					canSeeHidden = true;
 				} else {
 					// Check if the user is a member of the publisher, which allows them to see hidden members

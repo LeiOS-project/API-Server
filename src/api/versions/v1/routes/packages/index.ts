@@ -9,8 +9,8 @@ import { PermissionHelper } from "../../../../../utils/permission-helper";
 import { APIResponse } from "../../../../utils/api-res";
 import { AuditLog } from "../../../../utils/auditLog";
 import { AuthHandler } from "../../../../utils/authHandler";
-import { RuntimeMetadata } from "../../../../utils/metadata";
 import { APIResponseSpec, APIRouteSpec } from "../../../../utils/specHelpers";
+import { StablePromotion } from "../../../../utils/stablePromotion";
 import { DOCS_TAGS } from "../../docs";
 import { PackageModel } from "./model";
 
@@ -116,10 +116,8 @@ router.get(
 			);
 		}
 
-		// Hidden packages only show up in a member's own list and for site admins.
-		const seesHidden =
-			onlyMembershipByMe ||
-			(authContext.type !== "unauthenticated" && authContext.user_role === "admin");
+		// Hidden packages only show up in a member's own list and for site staff.
+		const seesHidden = onlyMembershipByMe || PermissionHelper.isSiteStaff(authContext);
 		if (!seesHidden) {
 			filters.push(not(PackageUtils.hasFlag("HIDDEN")));
 		}
@@ -380,6 +378,7 @@ router.delete(
 			APIResponseSpec.forbidden(
 				"System-managed packages cannot be deleted / You do not have permission to delete this package",
 			),
+			APIResponseSpec.conflict("A release of this package is being published with an OS release"),
 			APIResponseSpec.serverError("Failed to delete package from Aptly repositories"),
 		),
 	}),
@@ -410,6 +409,16 @@ router.delete(
 			.from(DB.Tables.packageReleases)
 			.where(eq(DB.Tables.packageReleases.package_id, pkg.id));
 
+		const publishing = await StablePromotion.getPublishingOSRelease(
+			packageReleaseIDs.map((release) => release.id),
+		);
+		if (publishing) {
+			return APIResponse.conflict(
+				c,
+				`A release of this package is being published with LeiOS ${publishing.version}; delete it once that finished`,
+			);
+		}
+
 		let aptlyDeleted: boolean;
 
 		try {
@@ -422,14 +431,9 @@ router.delete(
 			return APIResponse.serverError(c, "Failed to delete package from Aptly repositories");
 		}
 
-		for (const pkgRelease of packageReleaseIDs) {
-			await RuntimeMetadata.removeOSReleasePendingPackageIfExists(pkgRelease.id);
-		}
-
 		await DB.instance().transaction(async (tx) => {
-			await tx
-				.delete(DB.Tables.stablePromotionRequests)
-				.where(eq(DB.Tables.stablePromotionRequests.package_id, pkg.id));
+			// Queued requests leave the stable queue with the package.
+			await StablePromotion.deleteRequests({ packageID: pkg.id }, tx);
 
 			await tx
 				.delete(DB.Tables.packageReleases)

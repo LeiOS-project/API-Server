@@ -1,5 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import type { AuthHandler } from "../api/utils/authHandler";
+import { UserAccountSettings } from "../api/utils/shared-models/accountData";
 import type { DB } from "../db";
 import { Logger } from "./logger";
 
@@ -90,9 +91,26 @@ export class PermissionHelper {
 		return row.owner_user_id === params.userId;
 	}
 
+	/** Whether the caller is a site admin. */
+	static isSiteAdmin(authContext: AuthHandler.AuthContext): boolean {
+		return authContext.type !== "unauthenticated" && authContext.user_role === "admin";
+	}
+
+	/**
+	 * Whether the caller is site staff (admin or moderator): may use the moderation area and see
+	 * everything a moderator reviews, such as hidden packages and hidden publisher members.
+	 * Staff get no publisher or package rights from this; `can` grants those to admins only.
+	 */
+	static isSiteStaff(authContext: AuthHandler.AuthContext): boolean {
+		return (
+			authContext.type !== "unauthenticated" &&
+			(UserAccountSettings.StaffRoles as readonly string[]).includes(authContext.user_role)
+		);
+	}
+
 	/**
 	 * Whether the caller may see a package. Listed packages are public; packages flagged HIDDEN
-	 * stay visible to site admins, the publisher owner and anyone with a publisher or package role.
+	 * stay visible to site staff, the publisher owner and anyone with a publisher or package role.
 	 */
 	static async canViewPackage(
 		authContext: AuthHandler.AuthContext,
@@ -100,7 +118,7 @@ export class PermissionHelper {
 	): Promise<boolean> {
 		if (!pkg.flags.includes("HIDDEN")) return true;
 		if (authContext.type === "unauthenticated") return false;
-		if (authContext.user_role === "admin") return true;
+		if (this.isSiteStaff(authContext)) return true;
 
 		if (await this.isPublisherOwner({ userId: authContext.user_id, publisherId: pkg.publisher_id })) {
 			return true;

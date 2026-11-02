@@ -188,8 +188,10 @@ export namespace DB.Tables {
 	export const packagesFullView = TableSchema.packagesFullView;
 
 	export const stablePromotionRequests = TableSchema.stablePromotionRequests;
+	export const stablePromotionRequestMessages = TableSchema.stablePromotionRequestMessages;
 
 	export const os_releases = TableSchema.os_releases;
+	export const osReleasePackages = TableSchema.osReleasePackages;
 
 	export const scheduled_tasks = TableSchema.scheduled_tasks;
 	export const scheduled_tasks_paused_state = TableSchema.scheduled_tasks_paused_state;
@@ -217,8 +219,11 @@ export namespace DB.Models {
 	export type PackageFullView = typeof DB.Tables.packagesFullView.$inferSelect;
 
 	export type StablePromotionRequest = typeof DB.Tables.stablePromotionRequests.$inferSelect;
+	export type StablePromotionRequestMessage =
+		typeof DB.Tables.stablePromotionRequestMessages.$inferSelect;
 
 	export type OSRelease = typeof DB.Tables.os_releases.$inferSelect;
+	export type OSReleasePackage = typeof DB.Tables.osReleasePackages.$inferSelect;
 
 	export type ScheduledTask = typeof DB.Tables.scheduled_tasks.$inferSelect;
 	export type ScheduledTaskPausedState = typeof DB.Tables.scheduled_tasks_paused_state.$inferSelect;

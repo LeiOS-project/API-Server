@@ -9,8 +9,8 @@ import { PermissionHelper } from "../../../../../../utils/permission-helper";
 import { APIResponse } from "../../../../../utils/api-res";
 import { AuditLog } from "../../../../../utils/auditLog";
 import { AuthHandler } from "../../../../../utils/authHandler";
-import { RuntimeMetadata } from "../../../../../utils/metadata";
 import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers";
+import { StablePromotion } from "../../../../../utils/stablePromotion";
 import { DOCS_TAGS } from "../../../docs";
 import { PackageReleaseModel } from "./model";
 
@@ -49,7 +49,9 @@ router.get(
 		return APIResponse.success(
 			c,
 			"Package releases retrieved successfully",
-			releases satisfies PackageReleaseModel.GetAll.Response,
+			(await StablePromotion.withStablePromotion(
+				releases,
+			)) satisfies PackageReleaseModel.GetAll.Response,
 		);
 	},
 );
@@ -193,11 +195,11 @@ router.get(
 	}),
 
 	async (c) => {
-		const release = c.get("release");
+		const [release] = await StablePromotion.withStablePromotion([c.get("release")]);
 		return APIResponse.success(
 			c,
 			"Package release retrieved successfully",
-			release satisfies PackageReleaseModel.GetReleaseByVersion.Response,
+			release! satisfies PackageReleaseModel.GetReleaseByVersion.Response,
 		);
 	},
 );
@@ -439,6 +441,7 @@ router.delete(
 			APIResponseSpec.successNoData("Package release deleted successfully"),
 			APIResponseSpec.notFound("Package release with specified version not found"),
 			APIResponseSpec.forbidden("You do not have permission to delete releases for this package"),
+			APIResponseSpec.conflict("The release is being published with an OS release"),
 			APIResponseSpec.serverError("Failed to delete release from Aptly repositories"),
 		),
 	}),
@@ -466,6 +469,14 @@ router.delete(
 			);
 		}
 
+		const publishing = await StablePromotion.getPublishingOSRelease([release.id]);
+		if (publishing) {
+			return APIResponse.conflict(
+				c,
+				`The release is being published with LeiOS ${publishing.version}; delete it once that finished`,
+			);
+		}
+
 		let aptlyDeleted: boolean;
 
 		try {
@@ -482,8 +493,6 @@ router.delete(
 			return APIResponse.serverError(c, "Failed to delete release from Aptly repositories");
 		}
 
-		await RuntimeMetadata.removeOSReleasePendingPackageIfExists(release.id);
-
 		// Testing and stable hold one version per architecture, so a deleted release that was the
 		// latest one there leaves that architecture empty.
 		const withoutDeletedVersion = (latest: DB.Models.Package["latest_testing_release"]) => ({
@@ -492,9 +501,8 @@ router.delete(
 		});
 
 		await DB.instance().transaction(async (tx) => {
-			await tx
-				.delete(DB.Tables.stablePromotionRequests)
-				.where(eq(DB.Tables.stablePromotionRequests.package_release_id, release.id));
+			// A queued request leaves the stable queue with its release.
+			await StablePromotion.deleteRequests({ packageReleaseID: release.id }, tx);
 
 			await tx.delete(DB.Tables.packageReleases).where(eq(DB.Tables.packageReleases.id, release.id));
 

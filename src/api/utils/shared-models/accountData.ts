@@ -32,9 +32,17 @@ export namespace UserDataPolicies {
 }
 
 export namespace UserAccountSettings {
-	export const Roles = ["admin", "developer", "user"] as const;
+	/**
+	 * Site roles. `admin` runs the whole hub. `moderator` reviews reports, packages, publishers,
+	 * users and stable promotion requests (and the stable queue), but cannot create or edit OS
+	 * releases, run tasks or administer accounts. `developer` and `user` have no site-wide rights.
+	 */
+	export const Roles = ["admin", "moderator", "developer", "user"] as const;
 	export const Role = z.enum(Roles);
 	export type Role = z.infer<typeof Role>;
+
+	/** Roles with access to the moderation area (`/admin/*`). */
+	export const StaffRoles = ["admin", "moderator"] as const satisfies readonly Role[];
 
 	/** A suspended user cannot sign in; suspending ends all their sessions and API keys. */
 	export const Statuses = ["active", "suspended"] as const;

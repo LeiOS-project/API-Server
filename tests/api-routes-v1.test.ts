@@ -4,7 +4,7 @@ import { and, desc, eq, gte } from "drizzle-orm";
 import { mkdir } from "fs/promises";
 import { API } from "../src/api";
 import { AuthHandler, AuthUtils, SessionHandler } from "../src/api/utils/authHandler";
-import { RuntimeMetadata } from "../src/api/utils/metadata";
+import { StablePromotion } from "../src/api/utils/stablePromotion";
 import { AccountModel } from "../src/api/versions/v1/routes/account/model";
 import { AuthModel } from "../src/api/versions/v1/routes/auth/model";
 import { hashResetToken } from "../src/api/versions/v1/routes/auth/reset-password";
@@ -179,7 +179,7 @@ async function seedStablePromotionRequest(
 			package_id,
 			package_release_id,
 			status: overrides.status ?? "pending",
-			admin_note: overrides.admin_note,
+			requested_by_user_id: overrides.requested_by_user_id,
 		})
 		.returning()
 		.get();
@@ -3312,12 +3312,41 @@ describe("Admin sub-routes coverage", async () => {
 				authToken: adminSessionToken,
 				body: {
 					changelog: "Queued OS release from coverage test",
+					stable_promotion_request_ids: [],
 				},
 			},
 			202,
 		);
 
 		expect(created.version).toBeString();
+		expect(created.publishing_status).toBe("pending");
+		expect(created.packages).toEqual([]);
+
+		// The task queue is not running here, so the release stays unpublished and blocks a second one.
+		await makeAPIRequest(
+			"/v1/admin/os-releases",
+			{
+				method: "POST",
+				authToken: adminSessionToken,
+				body: {
+					changelog: "Second OS release while the first is publishing",
+					stable_promotion_request_ids: [],
+				},
+			},
+			409,
+		);
+	});
+
+	test("POST /admin/os-releases requires the list of included requests", async () => {
+		await makeAPIRequest(
+			"/v1/admin/os-releases",
+			{
+				method: "POST",
+				authToken: adminSessionToken,
+				body: { changelog: "No selection" },
+			},
+			400,
+		);
 	});
 
 	test("GET /admin/stable-promotion-requests lists requests", async () => {
@@ -3345,71 +3374,298 @@ describe("Admin sub-routes coverage", async () => {
 		expect(request.id).toBe(stableRequestID);
 	});
 
-	test("POST /admin/stable-promotion-requests/:stablePromotionRequestID/decide updates request status", async () => {
+	test("PUT /admin/stable-promotion-requests/:id/status denies with a comment in the conversation", async () => {
 		await makeAPIRequest(
-			`/v1/admin/stable-promotion-requests/${stableRequestID}/decide`,
+			`/v1/admin/stable-promotion-requests/${stableRequestID}/status`,
 			{
-				method: "POST",
+				method: "PUT",
 				authToken: adminSessionToken,
 				body: {
 					status: "denied",
-					admin_note: "Not ready for stable",
+					message: "Not ready for stable",
 				},
 			},
 			200,
 		);
 
-		const updatedRequest = DB.instance()
-			.select()
-			.from(DB.Tables.stablePromotionRequests)
-			.where(eq(DB.Tables.stablePromotionRequests.id, stableRequestID))
-			.get();
+		const request = await makeAPIRequest(
+			`/v1/admin/stable-promotion-requests/${stableRequestID}`,
+			{ authToken: adminSessionToken },
+			200,
+		);
+		expect(request.status).toBe("denied");
+		expect(request.status_changed_by_user_id).toBe(adminUser.id);
+		expect(request.status_changed_at).toBeNumber();
 
-		expect(updatedRequest?.status).toBe("denied");
+		const messages = await makeAPIRequest(
+			`/v1/admin/stable-promotion-requests/${stableRequestID}/messages`,
+			{ authToken: adminSessionToken },
+			200,
+		);
+		expect(messages).toHaveLength(1);
+		expect(messages[0]).toMatchObject({
+			kind: "status_change",
+			status: "denied",
+			body: "Not ready for stable",
+			author_user_id: adminUser.id,
+			author_role: "admin",
+		});
+
+		// Setting the same status again changes nothing.
+		await makeAPIRequest(
+			`/v1/admin/stable-promotion-requests/${stableRequestID}/status`,
+			{ method: "PUT", authToken: adminSessionToken, body: { status: "denied" } },
+			409,
+		);
 	});
 
-	test("POST /admin/stable-promotion-requests/:stablePromotionRequestID/decide approval adds pending OS release metadata", async () => {
-		await RuntimeMetadata.clearOSReleasePendingPackages();
-
-		const approvalOwner = await seedUser("user");
-		const approvalPublisher = await seedPublisherWithOwner(approvalOwner.id);
-		const approvalPackage = await seedPackageForPublisher(approvalPublisher.id, {
-			name: `approved-stable-${randomUUID().slice(0, 8)}`,
+	test("queueing, unqueueing and releasing a request moves it through the stable queue", async () => {
+		const owner = await seedUser("user");
+		const publisher = await seedPublisherWithOwner(owner.id);
+		const pkg = await seedPackageForPublisher(publisher.id, {
+			name: `queued-stable-${randomUUID().slice(0, 8)}`,
 		});
-		const approvalRelease = await seedPackageRelease(approvalPackage.id, {
+		const release = await seedPackageRelease(pkg.id, {
 			version_with_leios_patch: `7.0.${Math.floor(Math.random() * 9000) + 1000}`,
 		});
-		const approvalRequest = await seedStablePromotionRequest(approvalPackage.id, approvalRelease.id, {
-			status: "pending",
-		});
+		const request = await seedStablePromotionRequest(pkg.id, release.id);
+		const statusURL = `/v1/admin/stable-promotion-requests/${request.id}/status`;
+		const releaseURL = `/v1/packages/${publisher.name}.${pkg.name}/releases/${release.version_with_leios_patch}`;
 
 		await makeAPIRequest(
-			`/v1/admin/stable-promotion-requests/${approvalRequest.id}/decide`,
-			{
-				method: "POST",
-				authToken: adminSessionToken,
-				body: {
-					status: "approved",
-					admin_note: "Ready for OS release",
-				},
-			},
+			statusURL,
+			{ method: "PUT", authToken: adminSessionToken, body: { status: "queued", message: "Ready" } },
 			200,
 		);
 
-		const pendingPackages = await RuntimeMetadata.getOSReleasePendingPackages();
-		expect(pendingPackages.includes(approvalRelease.id)).toBe(true);
+		const queue = await makeAPIRequest(
+			"/v1/admin/stable-promotion-requests?status=queued&limit=100",
+			{ authToken: adminSessionToken },
+			200,
+		);
+		expect(queue.items.some((entry: any) => entry.id === request.id)).toBe(true);
 
+		// The release itself shows that it is queued, also without signing in.
+		const publicRelease = await makeAPIRequest(releaseURL, {}, 200);
+		expect(publicRelease.stable_promotion).toEqual({
+			request_id: request.id,
+			status: "queued",
+			os_release_version: null,
+		});
+
+		// Back to pending takes it out of the queue.
 		await makeAPIRequest(
-			`/v1/admin/stable-promotion-requests/${approvalRequest.id}/decide`,
+			statusURL,
+			{ method: "PUT", authToken: adminSessionToken, body: { status: "pending" } },
+			200,
+		);
+		expect((await makeAPIRequest(releaseURL, {}, 200)).stable_promotion.status).toBe("pending");
+
+		// An OS release can only include queued requests.
+		await makeAPIRequest(
+			"/v1/admin/os-releases/generate-changelog",
 			{
 				method: "POST",
 				authToken: adminSessionToken,
-				body: {
-					status: "denied",
-					admin_note: "Should not be allowed twice",
-				},
+				body: { stable_promotion_request_ids: [request.id] },
 			},
 			400,
+		);
+
+		await makeAPIRequest(
+			statusURL,
+			{ method: "PUT", authToken: adminSessionToken, body: { status: "queued" } },
+			200,
+		);
+
+		const notes = await makeAPIRequest(
+			"/v1/admin/os-releases/generate-changelog",
+			{
+				method: "POST",
+				authToken: adminSessionToken,
+				body: { stable_promotion_request_ids: [request.id] },
+			},
+			200,
+		);
+		expect(notes.version).toMatch(/^\d{4}\.\d{2}\.\d{3}$/);
+		expect(notes.changelog).toContain("1 new package");
+		expect(notes.changelog).toContain(
+			`(\`${publisher.name}.${pkg.name}\`) ${release.version_with_leios_patch}: Seeded release`,
+		);
+
+		// What the OS release task does when it finished publishing.
+		await StablePromotion.markReleased({
+			packageReleaseIDs: [release.id],
+			osReleaseVersion: manualOSReleaseVersion,
+		});
+
+		const released = await makeAPIRequest(releaseURL, {}, 200);
+		expect(released.stable_promotion).toEqual({
+			request_id: request.id,
+			status: "released",
+			os_release_version: manualOSReleaseVersion,
+		});
+
+		// Released requests are final and their conversation is closed.
+		await makeAPIRequest(
+			statusURL,
+			{ method: "PUT", authToken: adminSessionToken, body: { status: "pending" } },
+			409,
+		);
+		await makeAPIRequest(
+			`/v1/admin/stable-promotion-requests/${request.id}/messages`,
+			{ method: "POST", authToken: adminSessionToken, body: { body: "Too late" } },
+			409,
+		);
+
+		const messages = await makeAPIRequest(
+			`/v1/admin/stable-promotion-requests/${request.id}/messages`,
+			{ authToken: adminSessionToken },
+			200,
+		);
+		expect(messages.map((message: any) => message.status)).toEqual([
+			"queued",
+			"pending",
+			"queued",
+			"released",
+		]);
+		expect(messages.at(-1)).toMatchObject({ author_user_id: null, kind: "status_change" });
+	});
+
+	test("publisher members and staff talk in a request's conversation", async () => {
+		const owner = await seedUser("user");
+		const ownerToken = (await seedSession(owner.id)).token;
+		const outsider = await seedUser("user");
+		const outsiderToken = (await seedSession(outsider.id)).token;
+		const moderator = await seedUser("moderator");
+		const moderatorToken = (await seedSession(moderator.id)).token;
+
+		const publisher = await seedPublisherWithOwner(owner.id);
+		const pkg = await seedPackageForPublisher(publisher.id, {
+			name: `talk-${randomUUID().slice(0, 8)}`,
+		});
+		const release = await seedPackageRelease(pkg.id, {
+			architectures: { amd64: true, arm64: false, is_all: false },
+		});
+		const requestsURL = `/v1/packages/${publisher.name}.${pkg.name}/releases/${release.version_with_leios_patch}/stable-promotion-requests`;
+
+		const { id } = await makeAPIRequest(
+			requestsURL,
+			{
+				method: "POST",
+				authToken: ownerToken,
+				body: { message: "Fixes **CVE-2026-0001**, please ship it soon." },
+			},
+			201,
+		);
+
+		await makeAPIRequest(
+			`${requestsURL}/${id}/messages`,
+			{ method: "POST", authToken: outsiderToken, body: { body: "Me too" } },
+			403,
+		);
+		await makeAPIRequest(`${requestsURL}/${id}/messages`, { authToken: outsiderToken }, 403);
+		await makeAPIRequest(`${requestsURL}/${id}/messages`, {}, 401);
+
+		await makeAPIRequest(
+			`/v1/admin/stable-promotion-requests/${id}/messages`,
+			{ method: "POST", authToken: moderatorToken, body: { body: "Which versions are affected?" } },
+			201,
+		);
+		await makeAPIRequest(
+			`${requestsURL}/${id}/messages`,
+			{ method: "POST", authToken: ownerToken, body: { body: "All before 2.0." } },
+			201,
+		);
+
+		const thread = await makeAPIRequest(
+			`${requestsURL}/${id}/messages`,
+			{ authToken: ownerToken },
+			200,
+		);
+		expect(thread.map((message: any) => [message.author_user_id, message.body])).toEqual([
+			[owner.id, "Fixes **CVE-2026-0001**, please ship it soon."],
+			[moderator.id, "Which versions are affected?"],
+			[owner.id, "All before 2.0."],
+		]);
+		expect(thread[1].author_role).toBe("moderator");
+
+		const [publicRequest] = await makeAPIRequest(requestsURL, {}, 200);
+		expect(publicRequest).toMatchObject({ id, status: "pending", comment_count: 3 });
+		expect(publicRequest.requested_by_user_id).toBeUndefined();
+
+		const adminView = await makeAPIRequest(
+			`/v1/admin/stable-promotion-requests/${id}`,
+			{ authToken: moderatorToken },
+			200,
+		);
+		expect(adminView).toMatchObject({
+			requested_by_user_id: owner.id,
+			requested_by_username: owner.username,
+			comment_count: 3,
+			package_release_architectures: { amd64: true, arm64: false, is_all: false },
+		});
+
+		// Withdrawing deletes the request with its conversation.
+		await makeAPIRequest(`${requestsURL}/${id}`, { method: "DELETE", authToken: ownerToken }, 200);
+		const leftover = await DB.instance()
+			.select()
+			.from(DB.Tables.stablePromotionRequestMessages)
+			.where(eq(DB.Tables.stablePromotionRequestMessages.request_id, id));
+		expect(leftover).toEqual([]);
+	});
+
+	test("moderators review but cannot create OS releases or administer accounts", async () => {
+		const moderator = await seedUser("moderator");
+		const moderatorToken = (await seedSession(moderator.id)).token;
+		const otherModerator = await seedUser("moderator");
+		const regular = await seedUser("user");
+
+		await makeAPIRequest("/v1/admin/os-releases", { authToken: moderatorToken }, 200);
+		await makeAPIRequest("/v1/admin/stable-promotion-requests", { authToken: moderatorToken }, 200);
+		await makeAPIRequest("/v1/admin/reports", { authToken: moderatorToken }, 200);
+		await makeAPIRequest("/v1/admin/users", { authToken: moderatorToken }, 200);
+
+		await makeAPIRequest(
+			"/v1/admin/os-releases",
+			{
+				method: "POST",
+				authToken: moderatorToken,
+				body: { changelog: "Moderator release", stable_promotion_request_ids: [] },
+			},
+			403,
+		);
+		await makeAPIRequest(
+			`/v1/admin/os-releases/${manualOSReleaseVersion}`,
+			{ method: "PUT", authToken: moderatorToken, body: { changelog: "Edited" } },
+			403,
+		);
+		await makeAPIRequest(
+			`/v1/admin/users/${regular.id}`,
+			{ method: "PUT", authToken: moderatorToken, body: { role: "admin" } },
+			403,
+		);
+		await makeAPIRequest(
+			`/v1/admin/users/${regular.id}`,
+			{ method: "DELETE", authToken: moderatorToken },
+			403,
+		);
+
+		// Suspending regular users is moderation; suspending staff is not.
+		await makeAPIRequest(
+			`/v1/admin/users/${otherModerator.id}/suspend`,
+			{ method: "POST", authToken: moderatorToken, body: { reason: "test" } },
+			403,
+		);
+		await makeAPIRequest(
+			`/v1/admin/users/${regular.id}/suspend`,
+			{ method: "POST", authToken: moderatorToken, body: { reason: "Spam" } },
+			200,
+		);
+		await makeAPIRequest(
+			`/v1/admin/users/${regular.id}/unsuspend`,
+			{ method: "POST", authToken: moderatorToken },
+			200,
 		);
 	});
 
@@ -3444,7 +3700,6 @@ describe("Task queue execution coverage", async () => {
 	});
 
 	afterAll(async () => {
-		await RuntimeMetadata.clearOSReleasePendingPackages();
 		await AptlyAPI.Packages.deleteAllInAllRepos("fastfetch.fastfetch").catch(() => null);
 		await AptlyAPI.Packages.deleteAllInAllRepos("leios.system.base-files").catch(() => null);
 		await TaskScheduler.stopProcessing();
@@ -3692,8 +3947,6 @@ describe("Task queue execution coverage", async () => {
 	test(
 		"os-release route executes async release task to completion",
 		async () => {
-			await RuntimeMetadata.clearOSReleasePendingPackages();
-
 			const pkg = await seedPackageForPublisher(1, {
 				name: "system.base-files",
 				display_name: "Base Files Queue Coverage",
@@ -3729,7 +3982,15 @@ describe("Task queue execution coverage", async () => {
 			const uploadTask = await waitForLatestTaskByFunction("testing-repo:update", uploadTaskStartTime);
 			expect(uploadTask.status).toBe("completed");
 
-			await RuntimeMetadata.addOSReleasePendingPackage(release.id);
+			const queued = await seedStablePromotionRequest(pkg.id, release.id, { status: "queued" });
+			// Queued too, but left out of this release: it stays in the queue.
+			const otherRelease = await seedPackageRelease(pkg.id, {
+				version_with_leios_patch: "100.2",
+				changelog: "Not selected",
+			});
+			const skipped = await seedStablePromotionRequest(pkg.id, otherRelease.id, {
+				status: "queued",
+			});
 
 			const created = await makeAPIRequest(
 				"/v1/admin/os-releases",
@@ -3737,10 +3998,25 @@ describe("Task queue execution coverage", async () => {
 					method: "POST",
 					authToken: siteAdminSessionToken,
 					body: {
-						changelog: "Async OS release queue execution test",
+						changelog: "## Security\n\n- Async OS release queue execution test",
+						stable_promotion_request_ids: [queued.id],
 					},
 				},
 				202,
+			);
+			expect(created.packages).toEqual([
+				{
+					package_release_id: release.id,
+					package_fullname: `leios.${pkg.name}`,
+					version_with_leios_patch: "100.1",
+				},
+			]);
+
+			// While it publishes, the included request keeps its status.
+			await makeAPIRequest(
+				`/v1/admin/stable-promotion-requests/${queued.id}/status`,
+				{ method: "PUT", authToken: siteAdminSessionToken, body: { status: "pending" } },
+				409,
 			);
 
 			const osRelease = DB.instance()
@@ -3756,8 +4032,17 @@ describe("Task queue execution coverage", async () => {
 			expect(task.status).toBe("completed");
 			expect(task.finished_at).toBeNumber();
 
-			const pendingPackages = await RuntimeMetadata.getOSReleasePendingPackages();
-			expect(pendingPackages.includes(release.id)).toBe(false);
+			const requestStatus = (id: number) =>
+				DB.instance()
+					.select()
+					.from(DB.Tables.stablePromotionRequests)
+					.where(eq(DB.Tables.stablePromotionRequests.id, id))
+					.get();
+			expect(requestStatus(queued.id)).toMatchObject({
+				status: "released",
+				os_release_id: osRelease.id,
+			});
+			expect(requestStatus(skipped.id)?.status).toBe("queued");
 
 			const refreshedPackage = DB.instance()
 				.select()
@@ -3936,7 +4221,6 @@ describe("List filters and pagination", async () => {
 		const release = await seedPackageRelease(memberPackage.id);
 		const denied = await seedStablePromotionRequest(memberPackage.id, release.id, {
 			status: "denied",
-			admin_note: "no",
 		});
 
 		const list = await makeAPIRequest(
@@ -3950,6 +4234,28 @@ describe("List filters and pagination", async () => {
 		expect(list.items.every((item: any) => item.status === "denied")).toBe(true);
 		const item = list.items.find((entry: any) => entry.id === denied.id);
 		expect(item?.package_fullname).toBe(`${memberPublisher.name}.${memberPackage.name}`);
+	});
+
+	test("GET /admin/stable-promotion-requests?search= matches the package and version", async () => {
+		const release = await seedPackageRelease(memberPackage.id, {
+			version_with_leios_patch: `9.9.${Math.floor(Math.random() * 9000) + 1000}`,
+		});
+		const request = await seedStablePromotionRequest(memberPackage.id, release.id);
+
+		const byVersion = await makeAPIRequest(
+			`/v1/admin/stable-promotion-requests?search=${release.version_with_leios_patch}`,
+			{ authToken: adminSessionToken },
+			200,
+		);
+		expect(byVersion.items.map((entry: any) => entry.id)).toEqual([request.id]);
+		expect(byVersion.total).toBe(1);
+
+		const none = await makeAPIRequest(
+			"/v1/admin/stable-promotion-requests?search=no-such-package-anywhere",
+			{ authToken: adminSessionToken },
+			200,
+		);
+		expect(none).toEqual({ items: [], total: 0 });
 	});
 
 	test("GET /admin/tasks?status= filters by task status", async () => {

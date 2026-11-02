@@ -4,16 +4,25 @@ import { Hono } from "hono";
 import { validator as zValidator } from "hono-openapi";
 import { DB } from "../../../../../../db";
 import { ConfigHandler } from "../../../../../../utils/config";
+import { PermissionHelper } from "../../../../../../utils/permission-helper";
 import { APIResponse } from "../../../../../utils/api-res";
 import { AuditLog } from "../../../../../utils/auditLog";
 import { AuthHandler } from "../../../../../utils/authHandler";
 import { EmailService } from "../../../../../utils/email";
+import { UserAccountSettings } from "../../../../../utils/shared-models/accountData";
 import { APIResponseSpec, APIRouteSpec } from "../../../../../utils/specHelpers";
 import { DOCS_TAGS } from "../../../docs";
 import { hashResetToken } from "../../auth/reset-password";
 import { UsersModel } from "./model";
 
 const sanitizeUser = (user: DB.Models.User) => UsersModel.SafeUser.parse(user);
+
+// Moderators can look users up and suspend regular accounts; everything else is for admins.
+const ADMIN_ONLY_MESSAGE = "Only site administrators can manage accounts";
+const ADMIN_ONLY_RESPONSE = APIResponseSpec.forbidden(ADMIN_ONLY_MESSAGE);
+
+const isStaffRole = (role: UserAccountSettings.Role) =>
+	(UserAccountSettings.StaffRoles as readonly UserAccountSettings.Role[]).includes(role);
 
 /** Per-request values loaded by the parameter middlewares (this router's or a parent's). */
 type Variables = {
@@ -96,6 +105,7 @@ router.post(
 		tags: [DOCS_TAGS.ADMIN_USERS],
 
 		responses: APIResponseSpec.describeWithWrongInputs(
+			ADMIN_ONLY_RESPONSE,
 			APIResponseSpec.created("User created successfully", UsersModel.Create.Response),
 			APIResponseSpec.conflict("Conflict: Username or email already exists"),
 		),
@@ -105,6 +115,10 @@ router.post(
 
 	async (c) => {
 		const authContext = AuthHandler.AuthContext.get(c);
+
+		if (!PermissionHelper.isSiteAdmin(authContext)) {
+			return APIResponse.forbidden(c, ADMIN_ONLY_MESSAGE);
+		}
 		const body = c.req.valid("json") as UsersModel.Create.Body;
 
 		const duplicate = await DB.instance()
@@ -207,6 +221,7 @@ router.put(
 		tags: [DOCS_TAGS.ADMIN_USERS],
 
 		responses: APIResponseSpec.describeWithWrongInputs(
+			ADMIN_ONLY_RESPONSE,
 			APIResponseSpec.success("User updated successfully", UsersModel.Create.Response),
 			APIResponseSpec.notFound("User not found"),
 			APIResponseSpec.conflict("Conflict: Username or email already exists"),
@@ -218,6 +233,10 @@ router.put(
 	async (c) => {
 		const authContext = AuthHandler.AuthContext.get(c);
 		const user = c.get("targetUser");
+
+		if (!PermissionHelper.isSiteAdmin(authContext)) {
+			return APIResponse.forbidden(c, ADMIN_ONLY_MESSAGE);
+		}
 		const updateBody = c.req.valid("json") as UsersModel.Update.Body;
 
 		const updates = Object.fromEntries(
@@ -303,6 +322,7 @@ router.put(
 		tags: [DOCS_TAGS.ADMIN_USERS],
 
 		responses: APIResponseSpec.describeWithWrongInputs(
+			ADMIN_ONLY_RESPONSE,
 			APIResponseSpec.successNoData("Password reset successfully"),
 			APIResponseSpec.notFound("User not found"),
 		),
@@ -313,6 +333,10 @@ router.put(
 	async (c) => {
 		const authContext = AuthHandler.AuthContext.get(c);
 		const user = c.get("targetUser");
+
+		if (!PermissionHelper.isSiteAdmin(authContext)) {
+			return APIResponse.forbidden(c, ADMIN_ONLY_MESSAGE);
+		}
 		const { password } = c.req.valid("json") as UsersModel.UpdatePassword.Body;
 
 		const passwordHash = await Bun.password.hash(password);
@@ -359,6 +383,7 @@ router.delete(
 		tags: [DOCS_TAGS.ADMIN_USERS],
 
 		responses: APIResponseSpec.describeBasic(
+			ADMIN_ONLY_RESPONSE,
 			APIResponseSpec.successNoData("User deleted successfully"),
 			APIResponseSpec.notFound("User not found"),
 			APIResponseSpec.badRequest(
@@ -370,6 +395,10 @@ router.delete(
 	async (c) => {
 		const authContext = AuthHandler.AuthContext.get(c);
 		const user = c.get("targetUser");
+
+		if (!PermissionHelper.isSiteAdmin(authContext)) {
+			return APIResponse.forbidden(c, ADMIN_ONLY_MESSAGE);
+		}
 
 		if (authContext.type !== "unauthenticated" && authContext.user_id === user.id) {
 			return APIResponse.badRequest(c, "Use the account settings to delete your own account");
@@ -418,6 +447,7 @@ router.post(
 		tags: [DOCS_TAGS.ADMIN_USERS],
 
 		responses: APIResponseSpec.describeWithWrongInputs(
+			APIResponseSpec.forbidden("Only site administrators can suspend or reinstate site staff"),
 			APIResponseSpec.successNoData("User suspended"),
 			APIResponseSpec.notFound("User not found"),
 			APIResponseSpec.conflict("User is already suspended / You cannot suspend yourself"),
@@ -429,6 +459,10 @@ router.post(
 	async (c) => {
 		const authContext = AuthHandler.AuthContext.get(c);
 		const user = c.get("targetUser");
+
+		if (!PermissionHelper.isSiteAdmin(authContext) && isStaffRole(user.role)) {
+			return APIResponse.forbidden(c, "Only site administrators can suspend or reinstate site staff");
+		}
 		const { reason } = c.req.valid("json");
 
 		if (authContext.type !== "unauthenticated" && authContext.user_id === user.id) {
@@ -473,6 +507,7 @@ router.post(
 		tags: [DOCS_TAGS.ADMIN_USERS],
 
 		responses: APIResponseSpec.describeBasic(
+			APIResponseSpec.forbidden("Only site administrators can suspend or reinstate site staff"),
 			APIResponseSpec.successNoData("Suspension lifted"),
 			APIResponseSpec.notFound("User not found"),
 			APIResponseSpec.conflict("User is not suspended"),
@@ -482,6 +517,10 @@ router.post(
 	async (c) => {
 		const authContext = AuthHandler.AuthContext.get(c);
 		const user = c.get("targetUser");
+
+		if (!PermissionHelper.isSiteAdmin(authContext) && isStaffRole(user.role)) {
+			return APIResponse.forbidden(c, "Only site administrators can suspend or reinstate site staff");
+		}
 
 		if (user.status !== "suspended") {
 			return APIResponse.conflict(c, "User is not suspended");
@@ -520,6 +559,7 @@ router.post(
 		tags: [DOCS_TAGS.ADMIN_USERS],
 
 		responses: APIResponseSpec.describeWithWrongInputs(
+			ADMIN_ONLY_RESPONSE,
 			APIResponseSpec.created("Password reset link created", UsersModel.PasswordResetLink.Response),
 			APIResponseSpec.notFound("User not found"),
 		),
@@ -530,6 +570,10 @@ router.post(
 	async (c) => {
 		const authContext = AuthHandler.AuthContext.get(c);
 		const user = c.get("targetUser");
+
+		if (!PermissionHelper.isSiteAdmin(authContext)) {
+			return APIResponse.forbidden(c, ADMIN_ONLY_MESSAGE);
+		}
 		const { send_email } = c.req.valid("json");
 
 		const rawToken = crypto_randomBytes(64).toString("hex");
@@ -583,6 +627,7 @@ router.post(
 		tags: [DOCS_TAGS.ADMIN_USERS],
 
 		responses: APIResponseSpec.describeBasic(
+			ADMIN_ONLY_RESPONSE,
 			APIResponseSpec.successNoData("All sessions and API keys revoked"),
 			APIResponseSpec.notFound("User not found"),
 		),
@@ -591,6 +636,10 @@ router.post(
 	async (c) => {
 		const authContext = AuthHandler.AuthContext.get(c);
 		const user = c.get("targetUser");
+
+		if (!PermissionHelper.isSiteAdmin(authContext)) {
+			return APIResponse.forbidden(c, ADMIN_ONLY_MESSAGE);
+		}
 
 		await DB.instance().transaction(async (tx) => {
 			await AuthHandler.invalidateAllAuthContextsForUser(user.id, tx);
@@ -621,6 +670,7 @@ router.post(
 		tags: [DOCS_TAGS.ADMIN_USERS],
 
 		responses: APIResponseSpec.describeBasic(
+			ADMIN_ONLY_RESPONSE,
 			APIResponseSpec.successNoData("Email address marked as confirmed"),
 			APIResponseSpec.notFound("User not found"),
 			APIResponseSpec.conflict("Email address is already confirmed"),
@@ -630,6 +680,10 @@ router.post(
 	async (c) => {
 		const authContext = AuthHandler.AuthContext.get(c);
 		const user = c.get("targetUser");
+
+		if (!PermissionHelper.isSiteAdmin(authContext)) {
+			return APIResponse.forbidden(c, ADMIN_ONLY_MESSAGE);
+		}
 
 		if (user.email_verified_at !== null) {
 			return APIResponse.conflict(c, "Email address is already confirmed");
