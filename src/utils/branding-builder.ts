@@ -1,6 +1,9 @@
+import { eq } from "drizzle-orm";
 import fs from "fs/promises";
 import path from "path";
+import { DB } from "../db";
 import { Logger } from "./logger";
+import { SystemPackages } from "./system-packages";
 
 export interface BuildBrandingPackageOptions {
 	version: string;
@@ -169,5 +172,72 @@ export class BrandingBuilder {
 		}
 
 		return info;
+	}
+
+	/**
+	 * Records a published build on the branding system package, so the Hub shows its versions: a
+	 * testing build becomes the package's testing version; a stable build (one per OS release) its
+	 * stable version and a release with the OS release notes as changelog. Logs instead of
+	 * throwing, so this bookkeeping can never fail a publish.
+	 */
+	static async recordPublishedBuild(params: {
+		distribution: BuildBrandingPackageOptions["distribution"];
+		/** The version of the published .deb. */
+		version: string;
+		/** Release notes (Markdown) of the OS release, for stable builds. */
+		changelog?: string;
+	}) {
+		const { distribution, version } = params;
+
+		try {
+			const pkg = await DB.instance()
+				.select({ id: DB.Tables.packagesFullView.id })
+				.from(DB.Tables.packagesFullView)
+				.where(eq(DB.Tables.packagesFullView.fullname, SystemPackages.BRANDING_META_FILES_FULLNAME))
+				.get();
+
+			if (!pkg) {
+				Logger.warn(
+					`System package ${SystemPackages.BRANDING_META_FILES_FULLNAME} not found; its ${distribution} version ${version} is not recorded.`,
+				);
+				return;
+			}
+
+			// The branding package is architecture-independent (`all`).
+			const versions = { amd64: version, arm64: version };
+
+			await DB.instance().transaction(async (tx) => {
+				if (distribution === "stable") {
+					const release = {
+						changelog: params.changelog?.trim() || `LeiOS ${version}`,
+						architectures: { amd64: true, arm64: true, is_all: true },
+					};
+					await tx
+						.insert(DB.Tables.packageReleases)
+						.values({ package_id: pkg.id, version_with_leios_patch: version, ...release })
+						.onConflictDoUpdate({
+							target: [
+								DB.Tables.packageReleases.package_id,
+								DB.Tables.packageReleases.version_with_leios_patch,
+							],
+							set: release,
+						});
+				}
+
+				await tx
+					.update(DB.Tables.packages)
+					.set(
+						distribution === "stable"
+							? { latest_stable_release: versions }
+							: { latest_testing_release: versions },
+					)
+					.where(eq(DB.Tables.packages.id, pkg.id));
+			});
+		} catch (error) {
+			Logger.error(
+				`Failed to record the ${distribution} version ${version} of ${SystemPackages.BRANDING_META_FILES_FULLNAME}:`,
+				error,
+			);
+		}
 	}
 }

@@ -50,6 +50,11 @@ export const UpdateTestingRepoTask = new TaskHandler.BasicTaskFn(
 
 		await AptlyAPI.Publishing.updateLiveTestingRepo();
 
+		await BrandingBuilder.recordPublishedBuild({
+			distribution: "testing",
+			version: brandingPackage.version,
+		});
+
 		// Drop packages that nothing references any more (e.g. after deletions).
 		// Done once here rather than after every change.
 		if (!(await AptlyAPI.DB.cleanup())) {

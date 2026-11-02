@@ -72,6 +72,13 @@ src/
 - Descriptions, changelogs and conversation messages are Markdown (the Hub renders them).
 - Signup (`LRA_SIGNUP_ENABLED` + SMTP) creates unconfirmed accounts; publishers and reports need a
   confirmed email (`users.email_verified_at`). Suspended users (`users.status`) cannot sign in.
+- System packages (`src/utils/system-packages.ts`, created by `DB.init` under the `leios`
+  publisher) carry `SYSTEM-MANAGED` and are read-only through the API for everyone: the
+  package-loading middleware in `routes/packages` refuses every non-GET request on them (package,
+  releases, uploads, stable requests, role assignments), and admin moderation refuses them too.
+  Today that is `leios.system.branding-meta-files`, which the tasks build themselves; they record
+  each published build with `BrandingBuilder.recordPublishedBuild` (testing version per testing
+  update, stable version and a release with the OS release notes per OS release).
 - Packages flagged `HIDDEN` are visible only to site staff, the owner and members
   (`PermissionHelper.canViewPackage`, applied by the package-loading middleware and the list).
 - Record admin and publisher-management actions with `AuditLog.record(...)` (inside the action's

@@ -82,10 +82,6 @@ router.post(
 		const authContext = AuthHandler.AuthContext.get(c);
 		const body = c.req.valid("json");
 
-		if (pkg.flags.includes("SYSTEM-MANAGED")) {
-			return APIResponse.forbidden(c, "System-managed packages cannot have new releases created");
-		}
-
 		const allowed = await PermissionHelper.can({
 			authContext,
 			publisherId: pkg.publisher_id,
@@ -228,10 +224,6 @@ router.put(
 		const authContext = AuthHandler.AuthContext.get(c);
 		const body = c.req.valid("json");
 
-		if (pkg.flags.includes("SYSTEM-MANAGED")) {
-			return APIResponse.forbidden(c, "System-managed packages cannot have their releases updated");
-		}
-
 		const allowed = await PermissionHelper.can({
 			authContext,
 			publisherId: pkg.publisher_id,
@@ -289,10 +281,6 @@ router.post(
 		const authContext = AuthHandler.AuthContext.get(c);
 		const { file } = c.req.valid("form");
 		const { arch } = c.req.valid("param");
-
-		if (pkg.flags.includes("SYSTEM-MANAGED")) {
-			return APIResponse.forbidden(c, "System-managed packages cannot have their releases updated");
-		}
 
 		const allowed = await PermissionHelper.can({
 			authContext,
@@ -450,10 +438,6 @@ router.delete(
 		const pkg = c.get("package");
 		const release = c.get("release");
 		const authContext = AuthHandler.AuthContext.get(c);
-
-		if (pkg.flags.includes("SYSTEM-MANAGED")) {
-			return APIResponse.forbidden(c, "System-managed packages cannot have their releases deleted");
-		}
 
 		const allowed = await PermissionHelper.can({
 			authContext,

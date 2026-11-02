@@ -28,6 +28,11 @@ type Variables = {
 
 export const router = new Hono<{ Variables: Variables }>().basePath("/packages");
 
+/** Requests that only read; a system-managed package refuses every other one. */
+const READ_ONLY_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+const SYSTEM_MANAGED_MESSAGE =
+	"This is a system package: the LeiOS API builds and publishes it, so it cannot be changed";
+
 router.get(
 	"/",
 
@@ -273,6 +278,13 @@ router.use(
 			return APIResponse.notFound(c, "Package with specified name not found");
 		}
 
+		// The API builds system packages itself (SystemPackages): they are read-only for everyone,
+		// admins included. This covers the package, its releases and uploads, stable promotion
+		// requests and role assignments.
+		if (row.flags.includes("SYSTEM-MANAGED") && !READ_ONLY_METHODS.has(c.req.method)) {
+			return APIResponse.forbidden(c, SYSTEM_MANAGED_MESSAGE);
+		}
+
 		c.set("package", row satisfies DB.Models.PackageFullView);
 
 		return await next();
@@ -331,10 +343,6 @@ router.put(
 		const authContext = AuthHandler.AuthContext.get(c);
 		const updateData = c.req.valid("json");
 
-		if (pkg.flags.includes("SYSTEM-MANAGED")) {
-			return APIResponse.forbidden(c, "System-managed packages cannot be updated");
-		}
-
 		const allowed = await PermissionHelper.can({
 			authContext,
 			publisherId: pkg.publisher_id,
@@ -386,10 +394,6 @@ router.delete(
 	async (c) => {
 		const pkg = c.get("package");
 		const authContext = AuthHandler.AuthContext.get(c);
-
-		if (pkg.flags.includes("SYSTEM-MANAGED")) {
-			return APIResponse.forbidden(c, "System-managed packages cannot be deleted");
-		}
 
 		const allowed = await PermissionHelper.can({
 			authContext,

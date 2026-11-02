@@ -14,6 +14,7 @@ import { DB } from "../src/db";
 import { TaskScheduler } from "../src/tasks";
 import { ConfigHandler } from "../src/utils/config";
 import { PermissionHelper } from "../src/utils/permission-helper";
+import { SystemPackages } from "../src/utils/system-packages";
 import { makeAPIRequest } from "./helpers/api";
 import { TEST_PACKAGE_FIXTURES } from "./helpers/package-fixtures";
 import { hashTestPassword } from "./helpers/seed";
@@ -3784,6 +3785,13 @@ describe("Task queue execution coverage", async () => {
 			);
 			expect(testingBrandingRefs.length).toBeGreaterThan(0);
 
+			const brandingTesting = DB.instance()
+				.select()
+				.from(DB.Tables.packagesFullView)
+				.where(eq(DB.Tables.packagesFullView.fullname, SystemPackages.BRANDING_META_FILES_FULLNAME))
+				.get();
+			expect(brandingTesting?.latest_testing_release.amd64).toMatch(/^\d{14}$/);
+
 			await AptlyAPI.Packages.deleteAllInAllRepos("fastfetch.fastfetch").catch(() => null);
 			await AptlyAPI.Packages.deleteAllInAllRepos("leios.system.branding-meta-files").catch(
 				() => null,
@@ -4064,6 +4072,17 @@ describe("Task queue execution coverage", async () => {
 				"leios.system.branding-meta-files",
 			);
 			expect(stableBrandingRefs.length).toBeGreaterThan(0);
+
+			// The published branding build shows up on its system package, with the release notes.
+			const brandingStable = DB.instance()
+				.select()
+				.from(DB.Tables.packagesFullView)
+				.where(eq(DB.Tables.packagesFullView.fullname, SystemPackages.BRANDING_META_FILES_FULLNAME))
+				.get();
+			expect(brandingStable?.latest_stable_release).toEqual({
+				amd64: created.version,
+				arm64: created.version,
+			});
 
 			const releaseStatus = await makeAPIRequest(
 				`/v1/admin/os-releases/${created.version}`,
