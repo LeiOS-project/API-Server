@@ -13,6 +13,8 @@ interface Payload {
 }
 interface StepState {
 	nextPackageIndexToMove: number;
+	/** Version of the branding package built for this release, recorded once it is published. */
+	brandingVersion?: string;
 }
 
 export const OsReleaseTask = new TaskHandler.StepBasedTaskFn(
@@ -26,7 +28,7 @@ export const OsReleaseTask = new TaskHandler.StepBasedTaskFn(
 
 OsReleaseTask.addStep(
 	"Build and add LeiOS branding package to stable repo",
-	async (payload, logger) => {
+	async (payload, logger, state) => {
 		try {
 			logger.info(
 				`Building leios.system.branding-meta-files for stable release ${payload.version}...`,
@@ -40,6 +42,7 @@ OsReleaseTask.addStep(
 
 			logger.info(`Uploading branding package to archive repo: ${debPath}`);
 			const brandingPackage = await AptlyAPI.Packages.uploadLocalDebIntoArchiveRepo(debPath);
+			state.brandingVersion = brandingPackage.version;
 
 			// Remove any previous branding package versions from stable so only the
 			// newly built one remains (matching how normal package releases are replaced).
@@ -278,11 +281,23 @@ OsReleaseTask.addStep("Publish OS release snapshot to S3", async (payload, logge
 	}
 });
 
-OsReleaseTask.addStep("Finalize OS release", async (payload, logger) => {
+OsReleaseTask.addStep("Finalize OS release", async (payload, logger, state) => {
 	// The included requests leave the stable queue; their conversations get a note.
 	await StablePromotion.markReleased({
 		packageReleaseIDs: payload.pkgReleasesToIncludeByID,
 		osReleaseVersion: payload.version,
+	});
+
+	// The branding package is live in stable now: show it on its system package.
+	const osRelease = await DB.instance()
+		.select({ changelog: DB.Tables.os_releases.changelog })
+		.from(DB.Tables.os_releases)
+		.where(eq(DB.Tables.os_releases.version, payload.version))
+		.get();
+	await BrandingBuilder.recordPublishedBuild({
+		distribution: "stable",
+		version: state.brandingVersion ?? payload.version,
+		changelog: osRelease?.changelog ?? payload.changelogLines?.join("\n"),
 	});
 
 	logger.info("OS release process completed successfully for version", payload.version);

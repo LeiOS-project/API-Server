@@ -1,12 +1,13 @@
 import { createHash as crypto_createHash, randomBytes as crypto_randomBytes } from "node:crypto";
 import { mkdir as fs_mkdir } from "node:fs/promises";
 import { dirname as path_dirname, join as path_join } from "node:path";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/bun-sqlite";
 import { migrate } from "drizzle-orm/bun-sqlite/migrator";
 import { ConfigHandler } from "../utils/config";
 import { Logger } from "../utils/logger";
 import { PermissionHelper } from "../utils/permission-helper";
+import { SystemPackages } from "../utils/system-packages";
 import * as TableSchema from "./schema";
 import type { DrizzleDB } from "./utils";
 
@@ -39,6 +40,7 @@ export class DB {
 
 		const adminUserID = await this.createInitialAdminUserIfNeeded(configBaseDir);
 		await this.createInitialLeiOSPublisherIfNeeded(adminUserID ?? 1);
+		await this.ensureSystemPackages();
 
 		Logger.info(`Database initialized at ${path}`);
 	}
@@ -103,7 +105,7 @@ export class DB {
 		const publisherExists = await this.db
 			.select()
 			.from(DB.Tables.publishers)
-			.where(eq(DB.Tables.publishers.name, "leios"))
+			.where(eq(DB.Tables.publishers.name, SystemPackages.PUBLISHER_NAME))
 			.get();
 
 		if (publisherExists) {
@@ -127,7 +129,7 @@ export class DB {
 			const publisherID = await tx
 				.insert(DB.Tables.publishers)
 				.values({
-					name: "leios",
+					name: SystemPackages.PUBLISHER_NAME,
 
 					display_name: "LeiOS Project",
 					description: "Official LeiOS Project Publisher",
@@ -149,6 +151,53 @@ export class DB {
 
 			Logger.info("Created initial LeiOS Project publisher and assigned admin user.");
 		});
+	}
+
+	/**
+	 * Creates the packages the API builds itself (`SystemPackages`) under the LeiOS publisher, so
+	 * the Hub lists them. A package of that name that already exists gets the `SYSTEM-MANAGED`
+	 * flag, which makes it read-only through the API.
+	 */
+	private static async ensureSystemPackages() {
+		const publisher = await this.db
+			.select({ id: DB.Tables.publishers.id })
+			.from(DB.Tables.publishers)
+			.where(eq(DB.Tables.publishers.name, SystemPackages.PUBLISHER_NAME))
+			.get();
+
+		if (!publisher) {
+			throw new Error(
+				`Publisher '${SystemPackages.PUBLISHER_NAME}' not found. Cannot create the system packages.`,
+			);
+		}
+
+		for (const systemPackage of SystemPackages.ALL) {
+			const existing = await this.db
+				.select({ id: DB.Tables.packages.id, flags: DB.Tables.packages.flags })
+				.from(DB.Tables.packages)
+				.where(
+					and(
+						eq(DB.Tables.packages.publisher_id, publisher.id),
+						eq(DB.Tables.packages.name, systemPackage.name),
+					),
+				)
+				.get();
+
+			if (!existing) {
+				await this.db.insert(DB.Tables.packages).values({
+					publisher_id: publisher.id,
+					...systemPackage,
+					flags: ["SYSTEM-MANAGED"],
+				});
+				Logger.info(`Created system package ${SystemPackages.PUBLISHER_NAME}.${systemPackage.name}.`);
+			} else if (!existing.flags.includes("SYSTEM-MANAGED")) {
+				await this.db
+					.update(DB.Tables.packages)
+					.set({ flags: [...existing.flags, "SYSTEM-MANAGED"] })
+					.where(eq(DB.Tables.packages.id, existing.id));
+				Logger.info(`Marked ${SystemPackages.PUBLISHER_NAME}.${systemPackage.name} as system-managed.`);
+			}
+		}
 	}
 
 	static instance() {
