@@ -564,7 +564,7 @@ router.post(
 			await EmailService.sendPasswordResetEmail(user.email, rawToken);
 		}
 
-		const appUrl = (ConfigHandler.getConfig()?.APP_URL ?? "").replace(/\/+$/, "");
+		const appUrl = (ConfigHandler.getConfig()?.HUB_URL ?? "").replace(/\/+$/, "");
 
 		return APIResponse.created(c, "Password reset link created", {
 			reset_url: `${appUrl}/auth/reset-password?token=${encodeURIComponent(rawToken)}`,

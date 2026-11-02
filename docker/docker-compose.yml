@@ -13,7 +13,7 @@ services:
     environment:
       LRA_LOG_LEVEL: info
 
-      LRA_APP_URL: https://hub.leios.dev
+      LRA_HUB_URL: https://hub.leios.dev
 
       LRA_API_DISABLE_DOCS: false
       # true behind a reverse proxy that sets X-Forwarded-For (per-client rate limits)

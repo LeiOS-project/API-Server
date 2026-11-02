@@ -69,7 +69,7 @@ export class Main {
 			config.PUBLIC_KEY_PATH,
 		);
 
-		await API.init([config.APP_URL], config.API_DISABLE_DOCS);
+		await API.init([config.HUB_URL], config.API_DISABLE_DOCS);
 
 		await AptlyAPIServer.start();
 

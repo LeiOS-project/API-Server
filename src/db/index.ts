@@ -84,8 +84,8 @@ export class DB {
 			throw error;
 		}
 
-		const APP_URL = ConfigHandler.getConfig()?.APP_URL ?? "https://<hub-url>";
-		const resetUrl = `${APP_URL}/auth/reset-password?token=${passwordResetToken}`;
+		const HUB_URL = ConfigHandler.getConfig()?.HUB_URL ?? "https://<hub-url>";
+		const resetUrl = `${HUB_URL}/auth/reset-password?token=${passwordResetToken}`;
 		const tokenFile = `${configBaseDir}/initial_admin_password_reset_token.txt`;
 
 		await Bun.write(tokenFile, resetUrl, { mode: 0o600, createPath: true });

@@ -16,7 +16,7 @@ function setTestEnv(rootDir: string) {
 	const envVars = {
 		LRA_LOG_LEVEL: "debug",
 
-		LRA_APP_URL: "http://localhost:12153",
+		LRA_HUB_URL: "http://localhost:12153",
 
 		LRA_API_HOST: "::",
 		LRA_API_PORT: 12151,
@@ -203,7 +203,7 @@ beforeAll(async () => {
 		},
 	});
 
-	await API.init([config.APP_URL], config.API_DISABLE_DOCS);
+	await API.init([config.HUB_URL], config.API_DISABLE_DOCS);
 
 	await AptlyAPIServer.start();
 

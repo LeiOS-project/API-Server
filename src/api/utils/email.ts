@@ -100,7 +100,7 @@ export class EmailService {
 		const config = ConfigHandler.getConfig() as NonNullable<
 			ReturnType<typeof ConfigHandler.getConfig>
 		>;
-		const appUrl = config.APP_URL.replace(/\/+$/, "");
+		const appUrl = config.HUB_URL.replace(/\/+$/, "");
 		const resetUrl = `${appUrl}/auth/reset-password?token=${encodeURIComponent(rawToken)}`;
 
 		const html = [
@@ -153,7 +153,7 @@ export class EmailService {
 		const config = ConfigHandler.getConfig() as NonNullable<
 			ReturnType<typeof ConfigHandler.getConfig>
 		>;
-		const appUrl = config.APP_URL.replace(/\/+$/, "");
+		const appUrl = config.HUB_URL.replace(/\/+$/, "");
 		const verifyUrl = `${appUrl}/auth/verify-email?token=${encodeURIComponent(rawToken)}`;
 
 		const intro =

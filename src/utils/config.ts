@@ -138,7 +138,7 @@ export class ConfigHandler {
 		CONFIG_BASE_DIR: CS.string().default("./config"),
 
 		/** The Hub's public URL: CORS origin and base of the links in emails. */
-		APP_URL: CS.string().default(AppConstants.APP_DEFAULT_HUB_URL),
+		HUB_URL: CS.string().default(AppConstants.APP_DEFAULT_HUB_URL),
 
 		APTLY_ROOT: CS.string().default("./data/aptly"),
 		/** 0 lets Aptly bind to a random free port from the dynamic range. */
@@ -176,28 +176,7 @@ export class ConfigHandler {
 
 	static async loadConfig() {
 		if (this.config) return this.config;
-		this.applyDeprecatedEnvNames();
 		this.config = this.schema.parse();
 		return this.config;
-	}
-
-	/** Env names that were renamed, mapped to their replacement. */
-	protected static readonly DEPRECATED_ENV_NAMES = {
-		LRA_HUB_URL: "LRA_APP_URL",
-	} as const;
-
-	/** Copies a deprecated env var to its new name when only the old one is set, with a warning. */
-	protected static applyDeprecatedEnvNames() {
-		for (const [oldName, newName] of Object.entries(this.DEPRECATED_ENV_NAMES)) {
-			const oldValue = process.env[oldName];
-			if (oldValue === undefined) continue;
-
-			if (process.env[newName] === undefined) {
-				process.env[newName] = oldValue;
-			}
-			Logger.warn(
-				`${oldName} is deprecated and will be removed in a future release; use ${newName} instead.`,
-			);
-		}
 	}
 }
