@@ -16,7 +16,7 @@ export namespace UsersModel {
 
 	export namespace GetAll {
 		export const Query = z.object({
-			role: z.enum(["admin", "developer", "user"]).optional(),
+			role: UserAccountSettings.Role.optional(),
 			status: UserAccountSettings.Status.optional(),
 			verified: ApiHelperModels.QueryBoolean.optional(),
 			search: z.string().min(1).max(64).optional(),

@@ -14,6 +14,7 @@ import {
 } from "drizzle-orm/sqlite-core";
 import { UserAccountSettings } from "../api/utils/shared-models/accountData";
 import { ModerationSettings } from "../api/utils/shared-models/moderation";
+import { StablePromotionSettings } from "../api/utils/shared-models/stablePromotion";
 import type { PackageModel } from "../api/versions/v1/routes/packages/model";
 import { PermissionHelper } from "../utils/permission-helper";
 import { SQLUtils } from "./utils";
@@ -328,21 +329,56 @@ export const packagesFullView = sqliteView("packages_full_view").as((db) => {
 /**
  * @deprecated Use DB.Tables.stablePromotionRequests to access this table.
  */
-export const stablePromotionRequests = sqliteTable("stable_promotion_requests", {
-	id: integer().primaryKey({ autoIncrement: true }),
-	package_id: integer()
-		.notNull()
-		.references(() => packages.id),
-	package_release_id: integer()
-		.unique()
-		.notNull()
-		.references(() => packageReleases.id),
-	status: text({ enum: ["pending", "approved", "denied"] })
-		.default("pending")
-		.notNull(),
-	created_at: SQLUtils.getCreatedAtColumn(),
-	admin_note: text(),
-});
+export const stablePromotionRequests = sqliteTable(
+	"stable_promotion_requests",
+	{
+		id: integer().primaryKey({ autoIncrement: true }),
+		package_id: integer()
+			.notNull()
+			.references(() => packages.id),
+		package_release_id: integer()
+			.unique()
+			.notNull()
+			.references(() => packageReleases.id),
+		// queued = approved and waiting for an OS release; see StablePromotionSettings.Statuses
+		status: text({ enum: StablePromotionSettings.Statuses }).default("pending").notNull(),
+		created_at: SQLUtils.getCreatedAtColumn(),
+
+		// No foreign keys on the columns below: SQLite's ALTER TABLE ADD COLUMN, which added them,
+		// drops drizzle's ON DELETE clause, and a plain reference would block deleting the user.
+		// Readers left-join them, so an id of a deleted user reads as "no user".
+		requested_by_user_id: integer(),
+		status_changed_at: integer(),
+		status_changed_by_user_id: integer(),
+		// the OS release that moved this release into stable (status `released`)
+		os_release_id: integer(),
+	},
+	(table) => [index("stable_promotion_requests_status_idx").on(table.status)],
+);
+
+/**
+ * The conversation on a stable promotion request: comments by the publisher's members and the
+ * reviewers, plus one entry per status change.
+ * @deprecated Use DB.Tables.stablePromotionRequestMessages to access this table.
+ */
+export const stablePromotionRequestMessages = sqliteTable(
+	"stable_promotion_request_messages",
+	{
+		id: integer().primaryKey({ autoIncrement: true }),
+		request_id: integer()
+			.notNull()
+			.references(() => stablePromotionRequests.id, { onDelete: "cascade" }),
+		// null after the author's account was deleted
+		author_user_id: integer().references(() => users.id, { onDelete: "set null" }),
+		kind: text({ enum: StablePromotionSettings.MessageKinds }).notNull().default("comment"),
+		// the new status, for `status_change` messages
+		status: text({ enum: StablePromotionSettings.Statuses }),
+		// Markdown; may be empty for a status change without a comment
+		body: text().notNull().default(""),
+		created_at: SQLUtils.getCreatedAtColumn(),
+	},
+	(table) => [index("stable_promotion_request_messages_request_idx").on(table.request_id)],
+);
 
 /**
  * @deprecated Use DB.Models.os_releases to access this table.
@@ -358,6 +394,25 @@ export const os_releases = sqliteTable("os_releases", {
 		.references(() => scheduled_tasks.id),
 	// published_at: integer().references(() => scheduled_tasks.finished_at),
 });
+
+/**
+ * The package releases an OS release moves into stable. Name and version are copied so the list
+ * survives deleting the package or release.
+ * @deprecated Use DB.Tables.osReleasePackages to access this table.
+ */
+export const osReleasePackages = sqliteTable(
+	"os_release_packages",
+	{
+		id: integer().primaryKey({ autoIncrement: true }),
+		os_release_id: integer()
+			.notNull()
+			.references(() => os_releases.id, { onDelete: "cascade" }),
+		package_release_id: integer().references(() => packageReleases.id, { onDelete: "set null" }),
+		package_fullname: text().notNull(),
+		version_with_leios_patch: text().notNull(),
+	},
+	(table) => [index("os_release_packages_os_release_idx").on(table.os_release_id)],
+);
 
 /**
  * @deprecated Use DB.Tables.scheduled_tasks to access this table.

@@ -390,6 +390,18 @@ export namespace AuthHandler.AuthContext {
 		return authContext;
 	}
 
+	/**
+	 * The auth context of a route behind a gate that already rejected unauthenticated requests
+	 * (such as `/admin/*`). Throws if there is none, which is a server bug.
+	 */
+	export function getAsAuthenticated(c: Context): AuthHandler.AuthenticatedAuthContext {
+		const authContext = AuthHandler.AuthContext.get(c);
+		if (authContext.type === "unauthenticated") {
+			throw new Error("Route expected an authenticated request");
+		}
+		return authContext;
+	}
+
 	export function getAsSession(c: Context): AuthHandler.SessionAuthContext {
 		return AuthHandler.AuthContext.get(c) as AuthHandler.SessionAuthContext;
 	}

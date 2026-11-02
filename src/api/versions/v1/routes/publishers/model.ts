@@ -7,6 +7,7 @@ import { ApiHelperModels } from "../../../../utils/shared-models/api-helper-mode
 export namespace PublisherModel {
 	const ForbiddenPublisherNames = [
 		"admin",
+		"moderator",
 		"user",
 		"users",
 		"package",
@@ -104,7 +105,8 @@ export namespace PublisherModel.CreatePublisher {
 		description: z
 			.string()
 			.min(1, "Description is required")
-			.max(500, "Description cannot exceed 500 characters."),
+			.max(5000, "Description cannot exceed 5,000 characters.")
+			.describe("Markdown"),
 		homepage_url: z
 			.url("Homepage URL must be a valid URL.")
 			.max(500, "Homepage URL cannot exceed 500 characters."),

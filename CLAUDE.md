@@ -56,13 +56,23 @@ src/
   `leios-stable` (one version per architecture, promoted by the `os-release:create` task).
 - Package/release uploads and deletes enqueue `testing-repo:update`. A queued one skips itself when
   a later one is already queued; it ends with Aptly's `db cleanup`.
-- Stable promotion: a publisher member requests it per release, an admin approves or denies, and
-  approved releases are moved into stable by the next OS release.
-- Site roles are `admin | developer | user`; publisher/package roles are
-  `ADMIN > MAINTAINER > DEVELOPER > VIEWER` (`PermissionHelper`).
+- Stable promotion (`StablePromotion` in `src/api/utils/stablePromotion.ts`): a publisher member
+  requests it per release (`pending`); site staff queue (`queued`) or deny it and can set it back
+  to `pending`. The queued requests are the stable queue. An admin creates an OS release with any
+  subset of the queue; when its task finishes, those requests become `released`
+  (`os_release_id`). Every request has a conversation (`stable_promotion_request_messages`:
+  comments and status changes) between the publisher's members and staff. While an OS release
+  publishes, its requests and releases cannot change, and no second OS release can start.
+- `os_release_packages` records what each OS release moves into stable. The `metadata` table
+  (`RuntimeMetadata`) is a free key/value store; the stable queue no longer lives there.
+- Site roles are `admin | moderator | developer | user`. Moderators (`PermissionHelper.isSiteStaff`)
+  use `/admin/*` but cannot create or edit OS releases, administer accounts (only suspend regular
+  users) or get publisher rights; admin-only routes check `PermissionHelper.isSiteAdmin`.
+  Publisher/package roles are `ADMIN > MAINTAINER > DEVELOPER > VIEWER` (`PermissionHelper`).
+- Descriptions, changelogs and conversation messages are Markdown (the Hub renders them).
 - Signup (`LRA_SIGNUP_ENABLED` + SMTP) creates unconfirmed accounts; publishers and reports need a
   confirmed email (`users.email_verified_at`). Suspended users (`users.status`) cannot sign in.
-- Packages flagged `HIDDEN` are visible only to site admins, the owner and members
+- Packages flagged `HIDDEN` are visible only to site staff, the owner and members
   (`PermissionHelper.canViewPackage`, applied by the package-loading middleware and the list).
 - Record admin and publisher-management actions with `AuditLog.record(...)` (inside the action's
   transaction when there is one); paginated lists return `{ items, total }`.

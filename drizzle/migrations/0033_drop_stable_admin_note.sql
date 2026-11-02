@@ -1,0 +1,1 @@
+ALTER TABLE `stable_promotion_requests` DROP COLUMN `admin_note`;
