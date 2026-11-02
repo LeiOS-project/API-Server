@@ -204,6 +204,20 @@
       "when": 1783972220640,
       "tag": "0028_wandering_shooting_star",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "6",
+      "when": 1793471521727,
+      "tag": "0029_sharp_turbo",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "6",
+      "when": 1793471530344,
+      "tag": "0030_backfill_email_verified",
+      "breakpoints": true
     }
   ]
 }

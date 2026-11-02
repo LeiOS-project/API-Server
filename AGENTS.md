@@ -1,43 +1,45 @@
-# AGENTS.md
+# AGENTS.md — operating manual for AI coding agents
 
-## Repo Reality
-- `README.md` is still Bun scaffold text; trust `package.json` scripts instead.
-- This is a single Bun + TypeScript service (not a monorepo).
+This is the LeiOS API server: a backend service (Bun + Hono + Zod + hono-openapi + Drizzle/SQLite)
+in front of an Aptly package repository published to S3. LeiOS is its own product (initiated by
+LeiCraft_MC, not a LeiCraft_MC product); its code follows the LeiCraftMC Style Guide: https://git.leicraftmc.de/LeiCraftMC/Style-Guides. The guide plus this repo are the
+authority; generic internet advice is not.
 
-## Entrypoints and Runtime Flow
-- Main boot is `src/index.ts`: load config -> init DB -> init permission helper -> ensure log dir -> start task queue processing -> init Aptly -> sync additional live-repo files -> init API -> start Aptly -> start Hono API.
-- `bun run start` (and compiled binaries) use `scripts/entrypoint.ts`, which force-sets `LRA_DB_AUTO_MIGRATE=true`.
-- `bun run dev` runs `src/index.ts` directly and does not force migrations.
-- When the users table is empty, startup creates a default `admin` user and writes a reset URL to `${LRA_CONFIG_BASE_DIR}/initial_admin_password_reset_token.txt`.
+## Must read
 
-## Required Env and Host Tools
-- Required env vars are enforced in `src/utils/config.ts`; missing required keys exit the process.
-- Required keys include `LRA_PRIVATE_KEY_PATH`, `LRA_PUBLIC_KEY_PATH`, and all `LRA_S3_*` settings.
-- Boolean env parsing is strict: only the string `"true"` becomes `true`; everything else becomes `false`.
-- First Aptly startup downloads a binary to `${LRA_APTLY_ROOT}/bin/aptly`; host needs network access and `unzip`.
-- Package upload verification runs `dpkg --info`; keep `dpkg` available for release upload flows/tests.
+- [docs/00-overview.md](https://git.leicraftmc.de/LeiCraftMC/Style-Guides/-/blob/main/docs/00-overview.md)
+- [docs/04-backend-hono.md](https://git.leicraftmc.de/LeiCraftMC/Style-Guides/-/blob/main/docs/04-backend-hono.md)
+- [docs/05-api-contract.md](https://git.leicraftmc.de/LeiCraftMC/Style-Guides/-/blob/main/docs/05-api-contract.md)
+- [docs/08-database.md](https://git.leicraftmc.de/LeiCraftMC/Style-Guides/-/blob/main/docs/08-database.md)
+- [docs/10-auth.md](https://git.leicraftmc.de/LeiCraftMC/Style-Guides/-/blob/main/docs/10-auth.md)
+- [docs/12-testing.md](https://git.leicraftmc.de/LeiCraftMC/Style-Guides/-/blob/main/docs/12-testing.md)
 
-## Commands (Source of Truth)
-- Install deps: `bun install`
-- Dev server: `bun run dev`
-- Start server (auto-migrate): `bun run start`
-- Typecheck: `bun run typecheck` (checks `src`, `tests`, `scripts`)
-- Run all tests: `bun test`
-- Run one test file: `bun test tests/permission-helper.test.ts`
-- DB workflow after schema edits: `bun run db:generate` then `bun run db:migrate`
-- Regenerate Aptly API client: `bun run aptly-api-client:generate`
-- Compile binary: `bun run compile <platform|auto|all> [version] [--no-version-tag]`
-- Docker expects `build/bin/leios-api-linux-x64-baseline`; generate with `bun run compile linux-x64-baseline --no-version-tag`.
+## Non-negotiable
 
-## Testing Gotchas
-- `bunfig.toml` preloads `tests/helpers/preload.ts` for every test run.
-- Preload builds a self-contained test env with a temp DB, generated GPG keys, and a local `s3rver`, then starts the Hono API on port `12151` and Aptly on a random free dynamic port.
-- Tests are integration-heavy (DB + Aptly + S3-style publish config + generated local GPG keys), not pure unit tests.
-- The test preload does not start `TaskScheduler.processQueue()`, so routes that enqueue tasks only create DB task records unless a test starts the scheduler explicitly.
-- `tests/aptly.test.ts` needs `.deb` fixtures under `testdata/`.
+- Every route uses the `{ success, code, message, data }` envelope via `APIResponse.*` helpers
+  (errors omit `data`). Paginated lists return `data: { items, total }` (`ApiHelperModels.Paginated`).
+- Register endpoints as `APIRouteSpec.*` → `zValidator(...)` → handler. Validate with
+  `hono-openapi`'s validator (`import { validator as zValidator } from "hono-openapi"`).
+- Read the auth context only through `AuthHandler.AuthContext.get(c)` / `getAsSession(c)`; never
+  `c.get("authContext")`. Other per-request values go in the router's typed `Variables`.
+- Publisher/package permissions go through `PermissionHelper.can(...)` inside handlers.
+- Never hand-edit generated code: `drizzle/migrations/` (use `bun run db:generate`) and
+  `src/aptly/api-client/` (use `bun run aptly-api-client:generate`).
+- Aptly calls that create Aptly tasks go through `AptlyAPI.Tasks.run` (one at a time, polled with a
+  time limit — Aptly's own task queue can deadlock).
+- Static classes for services (`API`, `DB`, `Logger`, `ConfigHandler`, `AuthHandler`,
+  `TaskScheduler`, `AptlyAPIServer`).
+- Before finishing: `bun run check:ci`, `bun run typecheck`, and the relevant `bun test`.
+- Conventional Commits.
 
-## Codegen and Edit Boundaries
-- `src/aptly/api-client/**` is generated by `openapi-ts`; do not hand-edit generated files.
-- After DB schema changes, commit both `drizzle/*.sql` and `drizzle/meta/*`.
-- Keep API responses aligned with `APIResponse`; success responses include `data`, error responses currently return `success`, `code`, and `message`.
-- Package/release delete/upload routes enqueue `testing-repo:update`; these tasks only execute when the task scheduler loop is running.
+## Repo specifics
+
+- Env prefix `LRA_`, token prefix `lra_` (`src/utils/constants.ts`); config schema in
+  `src/utils/config.ts`, documented in `example.env`. Port 12151; the Hub runs on 12153.
+- Startup (`src/index.ts`) deviates from the guide in one place: the task queue starts after
+  Aptly, because resumed tasks call Aptly directly.
+- Host tools: `dpkg` (upload checks), `dpkg-dev` + `build-essential` (branding package build),
+  `git`, `gnupg`, `unzip` + network on first start (Aptly download).
+- Tests are integration tests: `tests/helpers/preload.ts` builds a temp DB, GPG keys, a local
+  `s3rver`, Aptly on a random port and the API on 12151. The preload does not start the task
+  queue; tests that need queued tasks to run start it themselves.

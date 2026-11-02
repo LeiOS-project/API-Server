@@ -1,160 +1,182 @@
+import { z } from "zod";
+import { AppConstants } from "./constants";
 import { Logger } from "./logger";
 
-interface ConfigSchemaSetting<
-    REQUIRED extends ConfigSchemaSetting.Required,
-    TYPE extends ConfigSchemaSetting.Type = undefined,
-    //DEPENDENCIES extends ConfigSchemaSetting.Dependencies = undefined
-> {
-    required: REQUIRED;
-    type?: TYPE;
-    //dependencies?: DEPENDENCIES;
-}
-
-namespace ConfigSchemaSetting {
-    export type Required = boolean;
-    export type Type = string[] | boolean[] | undefined;
-    export type Dependencies = Record<string, string[]> | undefined;
-    export type Sample = ConfigSchemaSetting<Required, Type/*, Dependencies*/>;
-}
-
-type ConfigValueType<
-    T extends ConfigSchemaSetting.Sample,
-    F = [T] extends [ConfigSchemaSetting<any, infer U/*, any*/>]
-    ? U extends (string | boolean)[]
-        ? U[number]
-        : string
-    : string
-> = T["required"] extends true ? F : F | undefined;
-
 interface ConfigSchemaSettings {
-    [key: string]: ConfigSchemaSetting.Sample;
+	[key: string]: CS.ConfigItem<z.ZodType>;
 }
 
 type ConfigLike<T extends ConfigSchemaSettings> = {
-    [K in keyof T]: ConfigValueType<T[K]>;
+	[K in keyof T]: z.infer<T[K]["_schema"]>;
+};
+
+class CS {
+	private constructor() {}
+
+	static string() {
+		return new CS.ConfigItem(z.string());
+	}
+
+	static number() {
+		return new CS.ConfigItem(z.coerce.number());
+	}
+
+	static boolean() {
+		return new CS.ConfigItem(
+			z.union(
+				[
+					z.boolean(),
+					z
+						.string()
+						.refine((val) => val === "true" || val === "false")
+						.transform((val) => val === "true"),
+				],
+				{ error: "Expected a boolean value ('true' or 'false')" },
+			),
+		);
+	}
+
+	static enum<const T extends readonly string[]>(values: T) {
+		return new CS.ConfigItem(z.enum(values));
+	}
+
+	static array() {
+		return new CS.ConfigItem(
+			z.string().transform<string[]>((val) => {
+				if (typeof val === "string") {
+					return val
+						.split(",")
+						.map((v) => v.trim())
+						.filter(Boolean);
+				}
+				return [];
+			}),
+		);
+	}
 }
 
-class ConfigSchema<T extends ConfigSchemaSettings = {}> {
+namespace CS {
+	export class ConfigItem<const Schema extends z.ZodType> {
+		constructor(public _schema: Schema) {}
 
-    readonly schema: T = {} as any;
+		public parse(value: unknown) {
+			return this._schema.safeParse(value);
+		}
 
-    public add<
-        KEY extends string,
-        Setings extends ConfigSchemaSetting<ISREQUIRED, TYPE/*, DEPENDENCIES*/>,
-        ISREQUIRED extends boolean,
-        const TYPE extends ConfigSchemaSetting.Type = undefined,
-        //const DEPENDENCIES extends ConfigSchemaSetting.Dependencies = undefined
-    >(
-        key: KEY,
-        required = false as ISREQUIRED,
-        type?: TYPE,
-        //dependencies?: DEPENDENCIES
-    ) {
-        (this.schema as any)[key] = { required, type/*, dependencies*/ };
-        return this as any as ConfigSchema<T & { [K in KEY]: Setings }>;
-    }
+		public default(value: z.util.NoUndefined<z.core.output<Schema>>) {
+			this._schema = this._schema.default(value) as any;
+			return this as any as ConfigItem<z.ZodDefault<Schema>>;
+		}
 
-    public parse() {
-        const result: ConfigLike<T> = {} as ConfigLike<T>;
-
-        for (const [key, settings] of Object.entries(this.schema)) {
-            
-            const value = process.env[key];
-
-            if (!value) {
-                if (settings.required) {
-                    Logger.error(`The environment variable ${key} is required but not set.`);
-                    process.exit(1);
-                }
-                continue;
-            }
-
-            if (settings.type) {
-                if (typeof settings.type[0] === "boolean") {
-                    (result[key] as any) = value.toLowerCase() === "true" ? true : false;
-                    continue;
-                }
-                // Case-insensitive comparison for string enum values
-                if (!(settings.type as string[]).some(t => t.toLowerCase() === value.toLowerCase())) {
-                    Logger.error(`The environment variable ${key} has to be one of the following: ${settings.type.join(", ")}`);
-                    process.exit(1);
-                }
-            }
-
-            (result[key] as any) = value;
-
-            /*if (settings.dependencies) {
-                const dependencies = settings.dependencies[process.env[key]] || settings.dependencies["any"];
-                if (!dependencies) continue;
-
-                for (const dep of dependencies) {
-                    if (!process.env[dep]) {
-                        Logger.error(`The environment variable ${dep} is required by ${key} but not set.`);
-                        process.exit(1);
-                    }
-                }
-            }*/
-        }
-        return result;
-    }
-
+		public optional() {
+			this._schema = this._schema.optional() as any;
+			return this as any as ConfigItem<z.ZodOptional<Schema>>;
+		}
+	}
 }
 
-// @ts-ignore
+class ConfigSchema<T extends ConfigSchemaSettings> {
+	readonly schema: T;
+
+	constructor(schema: T) {
+		this.schema = schema;
+	}
+
+	public parse() {
+		const result: ConfigLike<T> = {} as ConfigLike<T>;
+
+		for (const [key, settings] of Object.entries(this.schema)) {
+			const value = process.env[`${AppConstants.APP_ENV_PREFIX}_${key}`];
+
+			const parseResult = settings.parse(value);
+			if (!parseResult.success) {
+				Logger.error(
+					`Failed to read the environment variable ${key}: ${parseResult.error.issues[0]?.message}`,
+				);
+				process.exit(1);
+			}
+
+			// Store the parsed (coerced/defaulted) value, not the raw env string —
+			// otherwise numbers/booleans stay strings and defaults/optionals are lost.
+			(result[key] as any) = parseResult.data;
+		}
+		return result;
+	}
+}
+
+export type ENVConfigLike = {
+	[K in Extract<
+		keyof typeof ConfigHandler.schema.schema,
+		string
+	> as `${typeof AppConstants.APP_ENV_PREFIX}_${K}`]: z.infer<
+		(typeof ConfigHandler.schema.schema)[K]["_schema"]
+	>;
+};
+
 export type ParsedConfig = ConfigLike<typeof ConfigHandler.schema.schema>;
 
 export class ConfigHandler {
+	// Public so ENVConfigLike / ParsedConfig can derive from it without @ts-ignore.
+	// Treat it as read-only.
+	static schema = new ConfigSchema({
+		LOG_LEVEL: CS.enum(["debug", "info", "warn", "error", "critical"]).default("info"),
 
-    private static schema = new ConfigSchema()
-        .add("LRA_LOG_LEVEL", false, ["debug", "info", "warn", "error", "critical"])
+		API_HOST: CS.string().default("::"),
+		API_PORT: CS.number().default(AppConstants.APP_API_DEFAULT_PORT),
+		API_DISABLE_DOCS: CS.boolean().default(false),
+		/**
+		 * Behind a reverse proxy: take the client address for rate limits from the first
+		 * X-Forwarded-For entry. Leave off when clients reach the API directly (they could spoof it).
+		 */
+		API_TRUST_PROXY: CS.boolean().default(false),
 
-        .add("LRA_HUB_URL", false)
+		DB_PATH: CS.string().default("./data/db.sqlite"),
+		DB_AUTO_MIGRATE: CS.boolean().default(true),
+		DB_MIGRATION_DIR: CS.string().default("./drizzle/migrations"),
 
-        .add("LRA_API_HOST", false)
-        .add("LRA_API_PORT", false)
-        .add("LRA_API_DISABLE_DOCS", false, [true, false])
+		LOG_DIR: CS.string().default("./data/logs"),
+		CONFIG_BASE_DIR: CS.string().default("./config"),
 
-        .add("LRA_LOG_DIR", false)
+		/** The Hub's public URL: CORS origin and base of the links in emails. */
+		HUB_URL: CS.string().default(AppConstants.APP_DEFAULT_HUB_URL),
 
-        .add("LRA_DB_PATH", false)
-        .add("LRA_DB_AUTO_MIGRATE", false, [true, false])
+		APTLY_ROOT: CS.string().default("./data/aptly"),
+		/** 0 lets Aptly bind to a random free port from the dynamic range. */
+		APTLY_PORT: CS.number().default(0),
 
-        .add("LRA_APTLY_ROOT", false)
-        .add("LRA_APTLY_PORT", false)
+		BRANDING_META_FILES_DATA_PATH: CS.string().default("./data/branding-meta-files"),
 
-        .add("LRA_BRANDING_META_FILES_DATA_PATH", false)
+		PRIVATE_KEY_PATH: CS.string(),
+		PUBLIC_KEY_PATH: CS.string(),
 
-        .add("LRA_CONFIG_BASE_DIR", false)
-        .add("LRA_PRIVATE_KEY_PATH", true)
-        .add("LRA_PUBLIC_KEY_PATH", true)
+		S3_ENDPOINT: CS.string(),
+		S3_REGION: CS.string(),
+		S3_BUCKET: CS.string(),
+		S3_PREFIX: CS.string().default("leios/"),
+		S3_ACCESS_KEY_ID: CS.string(),
+		S3_SECRET_ACCESS_KEY: CS.string(),
 
-        .add("LRA_S3_ENDPOINT", true)
-        .add("LRA_S3_REGION", true)
-        .add("LRA_S3_BUCKET", true)
-        .add("LRA_S3_PREFIX", false)
-        .add("LRA_S3_ACCESS_KEY_ID", true)
-        .add("LRA_S3_SECRET_ACCESS_KEY", true)
+		/** Self-service signup. Stays off while email is not configured (signup needs verification). */
+		SIGNUP_ENABLED: CS.boolean().default(false),
 
-        .add("LRA_SMTP_HOST", false)
-        .add("LRA_SMTP_PORT", false)
-        .add("LRA_SMTP_USERNAME", false)
-        .add("LRA_SMTP_PASSWORD", false)
-        .add("LRA_SMTP_FROM", false)
-        .add("LRA_SMTP_SECURE", false, [true, false])
-    ;
+		SMTP_HOST: CS.string().optional(),
+		SMTP_PORT: CS.number().optional(),
+		SMTP_USERNAME: CS.string().optional(),
+		SMTP_PASSWORD: CS.string().optional(),
+		SMTP_FROM: CS.string().optional(),
+		SMTP_SECURE: CS.boolean().optional(),
+	});
 
+	private static config: ParsedConfig | null = null;
 
-    private static config: ParsedConfig | null = null;
+	/** You have to call {@link ConfigHandler.loadConfig} before trying to access the config. */
+	static getConfig() {
+		return this.config;
+	}
 
-    /** You have to call {@link ConfigHandler.parseConfigFile} before trying to access the config. */
-    static getConfig() {
-        return this.config;
-    }
-
-    static async loadConfig() {
-        if (this.config) return this.config;
-        this.config = this.schema.parse();
-        return this.config;
-    }
-
+	static async loadConfig() {
+		if (this.config) return this.config;
+		this.config = this.schema.parse();
+		return this.config;
+	}
 }

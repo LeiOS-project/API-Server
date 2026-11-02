@@ -1,0 +1,12 @@
+# Keep the build context to what docker/Dockerfile copies: the compiled binary and the migrations.
+node_modules
+.git
+.bun
+data
+config
+tmp-*
+testdata
+coverage
+junit.xml
+.env
+.env.*

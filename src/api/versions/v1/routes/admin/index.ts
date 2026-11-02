@@ -1,29 +1,29 @@
 import { Hono } from "hono";
 import { APIResponse } from "../../../../utils/api-res";
 import { AuthHandler } from "../../../../utils/authHandler";
-import { router as usersRouter } from "./users";
-import { router as osReleasesRouter } from "./os-releases";
-import { router as tasksRouter } from "./tasks";
-import { router as stablePromotionRequestsRouter } from "./stable-promotion-requests";
 
-export const router = new Hono().basePath('/admin');
+export const router = new Hono().basePath("/admin");
 
 // Site-admin gate. Everything under /admin/* requires user_role === 'admin'.
-router.use('*', async (c, next) => {
-    // @ts-ignore
-    const authContext = c.get("authContext") as AuthHandler.AuthContext;
+router.use("*", async (c, next) => {
+	const authContext = AuthHandler.AuthContext.get(c);
 
-    if (authContext.type === 'unauthenticated') {
-        return APIResponse.unauthorized(c, "Authentication required");
-    }
-    if (authContext.user_role !== 'admin') {
-        return APIResponse.forbidden(c, "This endpoint is restricted to site administrators");
-    }
+	if (authContext.type === "unauthenticated") {
+		return APIResponse.unauthorized(c, "Authentication required");
+	}
+	if (authContext.user_role !== "admin") {
+		return APIResponse.forbidden(c, "This endpoint is restricted to site administrators");
+	}
 
-    await next();
+	await next();
 });
 
-router.route('/', usersRouter);
-router.route('/', osReleasesRouter);
-router.route('/', tasksRouter);
-router.route('/', stablePromotionRequestsRouter);
+router.route("/", (await import("./users")).router);
+router.route("/", (await import("./os-releases")).router);
+router.route("/", (await import("./tasks")).router);
+router.route("/", (await import("./stable-promotion-requests")).router);
+router.route("/", (await import("./publishers")).router);
+router.route("/", (await import("./packages")).router);
+router.route("/", (await import("./reports")).router);
+router.route("/", (await import("./audit-log")).router);
+router.route("/", (await import("./stats")).router);

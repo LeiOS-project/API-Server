@@ -17,29 +17,37 @@ const PACKAGE_NAME = "leios.system.branding-meta-files";
  *   cleaned up together.
  * @returns The path to use as LRA_BRANDING_META_REPO.
  */
-export async function ensureBrandingFixtureRepo(preferredRepoPath: string, parentDir: string): Promise<string> {
-    const repoExists = await fs.access(preferredRepoPath).then(() => true).catch(() => false);
+export async function ensureBrandingFixtureRepo(
+	preferredRepoPath: string,
+	parentDir: string,
+): Promise<string> {
+	const repoExists = await fs
+		.access(preferredRepoPath)
+		.then(() => true)
+		.catch(() => false);
 
-    const root = path.join(parentDir, "branding-meta-files");
+	const root = path.join(parentDir, "branding-meta-files");
 
-    if (repoExists) {
-        // Copy the real repo into an isolated temp directory to avoid races
-        // when multiple test files build branding packages concurrently.
-        await fs.cp(preferredRepoPath, root, { recursive: true, force: true });
-        return root;
-    }
+	if (repoExists) {
+		// Copy the real repo into an isolated temp directory to avoid races
+		// when multiple test files build branding packages concurrently.
+		await fs.cp(preferredRepoPath, root, { recursive: true, force: true });
+		return root;
+	}
 
-    const scriptsDir = path.join(root, "scripts");
-    const debBuildDir = path.join(root, "deb-build");
+	const scriptsDir = path.join(root, "scripts");
+	const debBuildDir = path.join(root, "deb-build");
 
-    await fs.mkdir(scriptsDir, { recursive: true });
-    await fs.mkdir(debBuildDir, { recursive: true });
+	await fs.mkdir(scriptsDir, { recursive: true });
+	await fs.mkdir(debBuildDir, { recursive: true });
 
-    // Minimal build script that dpkg-deb can use to produce a valid .deb.
-    // Shell variables (${VERSION}, ${DIST}, ${3:-}) are escaped so they are
-    // expanded at shell runtime; the package name is interpolated now since it
-    // is a TS constant.
-    await Bun.write(path.join(scriptsDir, "build.sh"), `#!/bin/bash
+	// Minimal build script that dpkg-deb can use to produce a valid .deb.
+	// Shell variables (${VERSION}, ${DIST}, ${3:-}) are escaped so they are
+	// expanded at shell runtime; the package name is interpolated now since it
+	// is a TS constant.
+	await Bun.write(
+		path.join(scriptsDir, "build.sh"),
+		`#!/bin/bash
 set -e
 
 DIST="$1"
@@ -66,7 +74,8 @@ printf 'leios.system.branding-meta-files (%s) %s; urgency=medium\n\n  * Test fix
 mkdir -p deb-build
 dpkg-deb -Zgzip --build "$BUILD_DIR" "deb-build/${PACKAGE_NAME}_\${VERSION}_all.deb"
 rm -rf "$BUILD_DIR"
-`);
+`,
+	);
 
-    return root;
+	return root;
 }

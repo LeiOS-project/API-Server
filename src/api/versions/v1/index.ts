@@ -1,180 +1,238 @@
 import { Hono } from "hono";
-import { APIVersionRouter } from "../../utils/apiVersionRouter";
 import type { GenerateSpecOptions } from "hono-openapi";
-import { router as authRouter } from "./routes/auth";
-import { router as accountRouter } from "./routes/account";
-import { router as publishersRouter } from "./routes/publishers";
-import { router as packagesRouter } from "./routes/packages";
-import { router as adminRouter } from "./routes/admin";
-import { router as usersRouter } from "./routes/users";
+import { AppConstants } from "../../../utils/constants";
+import { APIVersionRouter } from "../../utils/apiVersionRouter";
+import { DOCS_TAGS } from "./docs";
 import { authMiddlewareV1 } from "./middleware/auth";
+import { router as accountRouter } from "./routes/account";
+import { router as adminRouter } from "./routes/admin";
+import { router as authRouter } from "./routes/auth";
+import { router as metaRouter } from "./routes/meta";
+import { router as osReleasesRouter } from "./routes/os-releases";
+import { router as packagesRouter } from "./routes/packages";
+import { router as publishersRouter } from "./routes/publishers";
+import { router as reportsRouter } from "./routes/reports";
+import { router as usersRouter } from "./routes/users";
 
 const openAPIConfig: Partial<GenerateSpecOptions> = {
+	documentation: {
+		info: {
+			title: `${AppConstants.APP_NAME} API`,
+			version: "1.1.0",
+			description:
+				"Unified LeiOS API. Endpoints are scoped by resource and gated by per-route permission checks.",
+		},
+		components: {
+			securitySchemes: {
+				bearerAuth: {
+					type: "http",
+					scheme: "bearer",
+					description: "Enter your bearer token in the format **Bearer &lt;token&gt;**",
+				},
+			},
+		},
 
-    documentation: {
-        info: {
-            title: "LeiOS API",
-            version: "1.1.0",
-            description: "Unified LeiOS API. Endpoints are scoped by resource and gated by per-route permission checks.",
-        },
-        components: {
-            securitySchemes: {
-                bearerAuth: {
-                    type: "http",
-                    scheme: "bearer",
-                    bearerFormat: "JWT",
-                    description: "Enter your bearer token in the format **Bearer &lt;token&gt;**",
-                }
-            },
-            responses: {
-                undefined: {
-                    description: "Authentication information is missing or invalid",
-                },
-            },
-        },
+		security: [
+			{
+				bearerAuth: [],
+			},
+		],
 
-        security: [{
-            bearerAuth: []
-        }],
+		servers: [
+			{
+				url: `http://localhost:${AppConstants.APP_API_DEFAULT_PORT}/v1`,
+				description: "Local development server",
+			},
+			{
+				url: `${AppConstants.APP_API_DEFAULT_PROD_URL}/v1`,
+				description: "Production server",
+			},
+		],
 
-        servers: [
-            {
-                url: "http://localhost:12151/v1/",
-                description: "Local development server",
-            },
-            {
-                url: "https://api.leios.dev/v1/",
-                description: "Production server",
-            },
-        ],
+		"x-tagGroups": [
+			{
+				name: "Hub",
+				tags: [DOCS_TAGS.META, DOCS_TAGS.OS_RELEASES, DOCS_TAGS.REPORTS],
+			},
+			{
+				name: "Resources",
+				tags: [
+					DOCS_TAGS.PUBLISHERS,
+					DOCS_TAGS.PUBLISHERS_MEMBERS,
+					DOCS_TAGS.PACKAGES,
+					DOCS_TAGS.PACKAGES_RELEASES,
+					DOCS_TAGS.PACKAGES_STABLE_REQUESTS,
+					DOCS_TAGS.PACKAGES_ROLE_ASSIGNMENTS,
+					DOCS_TAGS.USERS,
+				],
+			},
+			{
+				name: "Admin",
+				tags: [
+					DOCS_TAGS.ADMIN_OVERVIEW,
+					DOCS_TAGS.ADMIN_USERS,
+					DOCS_TAGS.ADMIN_PUBLISHERS,
+					DOCS_TAGS.ADMIN_PACKAGES,
+					DOCS_TAGS.ADMIN_REPORTS,
+					DOCS_TAGS.ADMIN_AUDIT_LOG,
+					DOCS_TAGS.ADMIN_OS_RELEASES,
+					DOCS_TAGS.ADMIN_TASKS,
+					DOCS_TAGS.ADMIN_STABLE_PROMOTION_REQUESTS,
+				],
+			},
+			{
+				name: "Account & Authentication",
+				tags: [DOCS_TAGS.ACCOUNT, DOCS_TAGS.ACCOUNT_API_KEYS, DOCS_TAGS.AUTHENTICATION],
+			},
+		],
 
-        "x-tagGroups": [
-            {
-                name: "Resources",
-                tags: [
-                    "Publishers",
-                    "Publishers / Members",
-                    "Packages",
-                    "Packages / Releases",
-                    "Packages / Stable Promotion Requests",
-                    "Packages / Role Assignments",
-                    "Users",
-                ],
-            },
-            {
-                name: "Admin",
-                tags: [
-                    "Admin / Users",
-                    "Admin / OS Releases",
-                    "Admin / Tasks",
-                    "Admin / Stable Promotion Requests",
-                ],
-            },
-            {
-                name: "Account & Authentication",
-                tags: [
-                    "Account",
-                    "Account / API Keys",
-                    "Authentication",
-                ],
-            },
-        ],
-
-        tags: [
-            {
-                name: "Publishers",
-                description: "Manage publishers (organizations) and their members.",
-            },
-            {
-                name: "Publishers / Members",
-                // @ts-ignore
-                "x-displayName": "Members",
-                summary: "Members",
-                parent: "Publishers",
-                description: "Manage members of a publisher.",
-            },
-            {
-                name: "Packages",
-                description: "Manage packages owned by publishers.",
-            },
-            {
-                name: "Packages / Releases",
-                // @ts-ignore
-                "x-displayName": "Releases",
-                summary: "Releases",
-                parent: "Packages",
-                description: "Manage package releases.",
-            },
-            {
-                name: "Packages / Stable Promotion Requests",
-                // @ts-ignore
-                "x-displayName": "Stable Promotion Requests",
-                summary: "Stable Promotion Requests",
-                parent: "Packages",
-                description: "Request promotion of package releases to stable.",
-            },
-            {
-                name: "Packages / Role Assignments",
-                // @ts-ignore
-                "x-displayName": "Role Assignments",
-                summary: "Role Assignments",
-                parent: "Packages",
-                description: "Per-package role overrides that elevate a user above their publisher-level role.",
-            },
-            {
-                name: "Admin / Users",
-                // @ts-ignore
-                "x-displayName": "Users",
-                summary: "Users",
-                parent: "Admin",
-                description: "Site-admin user management.",
-            },
-            {
-                name: "Admin / OS Releases",
-                // @ts-ignore
-                "x-displayName": "OS Releases",
-                summary: "OS Releases",
-                parent: "Admin",
-                description: "Site-admin OS release management.",
-            },
-            {
-                name: "Admin / Tasks",
-                // @ts-ignore
-                "x-displayName": "Tasks",
-                summary: "Tasks",
-                parent: "Admin",
-                description: "Site-admin scheduled task management.",
-            },
-            {
-                name: "Admin / Stable Promotion Requests",
-                // @ts-ignore
-                "x-displayName": "Stable Promotion Requests",
-                summary: "Stable Promotion Requests",
-                parent: "Admin",
-                description: "Site-admin global stable promotion request decisions.",
-            },
-            {
-                name: "Account",
-                description: "Endpoints for user account management",
-            },
-            {
-                name: "Account / API Keys",
-                // @ts-ignore
-                "x-displayName": "API Keys",
-                summary: "API Keys",
-                parent: "Account",
-                description: "Endpoints for managing account API keys",
-            },
-            {
-                name: "Authentication",
-                description: "Endpoints for authentication and authorization",
-            },
-            {
-                name: "Users",
-                description: "Public user search, allowing authenticated users to find other users.",
-            }
-        ]
-    }
+		tags: [
+			{
+				name: DOCS_TAGS.META,
+				description: "Server features and public hub statistics.",
+			},
+			{
+				name: DOCS_TAGS.OS_RELEASES,
+				description: "Published LeiOS releases and their changelogs.",
+			},
+			{
+				name: DOCS_TAGS.REPORTS,
+				description: "Report packages and publishers to the moderators.",
+			},
+			{
+				name: DOCS_TAGS.ADMIN_OVERVIEW,
+				// @ts-expect-error - Scalar's x-displayName is not part of the OpenAPI tag type
+				"x-displayName": "Overview",
+				summary: "Overview",
+				parent: "Admin",
+				description: "Counts and open work queues for the admin dashboard.",
+			},
+			{
+				name: DOCS_TAGS.ADMIN_PUBLISHERS,
+				// @ts-expect-error - Scalar's x-displayName is not part of the OpenAPI tag type
+				"x-displayName": "Publishers",
+				summary: "Publishers",
+				parent: "Admin",
+				description: "Review every publisher and mark official ones as verified.",
+			},
+			{
+				name: DOCS_TAGS.ADMIN_PACKAGES,
+				// @ts-expect-error - Scalar's x-displayName is not part of the OpenAPI tag type
+				"x-displayName": "Packages",
+				summary: "Packages",
+				parent: "Admin",
+				description: "Hide packages or mark them as deprecated.",
+			},
+			{
+				name: DOCS_TAGS.ADMIN_REPORTS,
+				// @ts-expect-error - Scalar's x-displayName is not part of the OpenAPI tag type
+				"x-displayName": "Reports",
+				summary: "Reports",
+				parent: "Admin",
+				description: "Work through user reports about packages and publishers.",
+			},
+			{
+				name: DOCS_TAGS.ADMIN_AUDIT_LOG,
+				// @ts-expect-error - Scalar's x-displayName is not part of the OpenAPI tag type
+				"x-displayName": "Audit Log",
+				summary: "Audit Log",
+				parent: "Admin",
+				description: "Who did what to which resource.",
+			},
+			{
+				name: DOCS_TAGS.PUBLISHERS,
+				description: "Manage publishers (organizations) and their members.",
+			},
+			{
+				name: DOCS_TAGS.PUBLISHERS_MEMBERS,
+				// @ts-expect-error - Scalar's x-displayName is not part of the OpenAPI tag type
+				"x-displayName": "Members",
+				summary: "Members",
+				parent: DOCS_TAGS.PUBLISHERS,
+				description: "Manage members of a publisher.",
+			},
+			{
+				name: DOCS_TAGS.PACKAGES,
+				description: "Manage packages owned by publishers.",
+			},
+			{
+				name: DOCS_TAGS.PACKAGES_RELEASES,
+				// @ts-expect-error - Scalar's x-displayName is not part of the OpenAPI tag type
+				"x-displayName": "Releases",
+				summary: "Releases",
+				parent: DOCS_TAGS.PACKAGES,
+				description: "Manage package releases.",
+			},
+			{
+				name: DOCS_TAGS.PACKAGES_STABLE_REQUESTS,
+				// @ts-expect-error - Scalar's x-displayName is not part of the OpenAPI tag type
+				"x-displayName": "Stable Promotion Requests",
+				summary: "Stable Promotion Requests",
+				parent: DOCS_TAGS.PACKAGES,
+				description: "Request promotion of package releases to stable.",
+			},
+			{
+				name: DOCS_TAGS.PACKAGES_ROLE_ASSIGNMENTS,
+				// @ts-expect-error - Scalar's x-displayName is not part of the OpenAPI tag type
+				"x-displayName": "Role Assignments",
+				summary: "Role Assignments",
+				parent: DOCS_TAGS.PACKAGES,
+				description: "Per-package role overrides that elevate a user above their publisher-level role.",
+			},
+			{
+				name: DOCS_TAGS.ADMIN_USERS,
+				// @ts-expect-error - Scalar's x-displayName is not part of the OpenAPI tag type
+				"x-displayName": DOCS_TAGS.USERS,
+				summary: DOCS_TAGS.USERS,
+				parent: "Admin",
+				description: "Site-admin user management.",
+			},
+			{
+				name: DOCS_TAGS.ADMIN_OS_RELEASES,
+				// @ts-expect-error - Scalar's x-displayName is not part of the OpenAPI tag type
+				"x-displayName": "OS Releases",
+				summary: "OS Releases",
+				parent: "Admin",
+				description: "Site-admin OS release management.",
+			},
+			{
+				name: DOCS_TAGS.ADMIN_TASKS,
+				// @ts-expect-error - Scalar's x-displayName is not part of the OpenAPI tag type
+				"x-displayName": "Tasks",
+				summary: "Tasks",
+				parent: "Admin",
+				description: "Site-admin scheduled task management.",
+			},
+			{
+				name: DOCS_TAGS.ADMIN_STABLE_PROMOTION_REQUESTS,
+				// @ts-expect-error - Scalar's x-displayName is not part of the OpenAPI tag type
+				"x-displayName": "Stable Promotion Requests",
+				summary: "Stable Promotion Requests",
+				parent: "Admin",
+				description: "Site-admin global stable promotion request decisions.",
+			},
+			{
+				name: DOCS_TAGS.ACCOUNT,
+				description: "Endpoints for user account management",
+			},
+			{
+				name: DOCS_TAGS.ACCOUNT_API_KEYS,
+				// @ts-expect-error - Scalar's x-displayName is not part of the OpenAPI tag type
+				"x-displayName": "API Keys",
+				summary: "API Keys",
+				parent: DOCS_TAGS.ACCOUNT,
+				description: "Endpoints for managing account API keys",
+			},
+			{
+				name: DOCS_TAGS.AUTHENTICATION,
+				description: "Endpoints for authentication and authorization",
+			},
+			{
+				name: DOCS_TAGS.USERS,
+				description: "Public user search, allowing authenticated users to find other users.",
+			},
+		],
+	},
 };
 
 const router = new Hono();
@@ -187,13 +245,16 @@ router.route("/", publishersRouter);
 router.route("/", packagesRouter);
 router.route("/", adminRouter);
 router.route("/", usersRouter);
+router.route("/", metaRouter);
+router.route("/", osReleasesRouter);
+router.route("/", reportsRouter);
 
 export class APIv1Router extends APIVersionRouter {
-    constructor() {
-        super({
-            version: 1,
-            openAPIConfig,
-            routes: router
-        });
-    }
+	constructor() {
+		super({
+			version: 1,
+			openAPIConfig,
+			routes: router,
+		});
+	}
 }

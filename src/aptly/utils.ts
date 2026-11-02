@@ -4,350 +4,439 @@ import { Logger } from "../utils/logger";
 import { AptlyAPIServer } from "./server";
 
 export class AptlyUtils {
-    private static async delay(ms: number) {
-        await new Promise(resolve => setTimeout(resolve, ms));
-    }
+	private static async delay(ms: number) {
+		await new Promise((resolve) => setTimeout(resolve, ms));
+	}
 
-    static async ensureDirExists(dirPath: string) {
-        await fs.mkdir(dirPath, { recursive: true });
-    }
+	static async ensureDirExists(dirPath: string) {
+		await fs.mkdir(dirPath, { recursive: true });
+	}
 
-    static async removePathIfExists(targetPath: string) {
-        await fs.rm(targetPath, { recursive: true, force: true });
-    }
+	static async removePathIfExists(targetPath: string) {
+		await fs.rm(targetPath, { recursive: true, force: true });
+	}
 
-    static async downloadAptlyBinaryIfNeeded(aptlyBinaryPath: string) {
-        const fileExists = await fs.access(aptlyBinaryPath).then(() => true).catch(() => false);
-        if (fileExists) return;
+	static async downloadAptlyBinaryIfNeeded(aptlyBinaryPath: string) {
+		const fileExists = await fs
+			.access(aptlyBinaryPath)
+			.then(() => true)
+			.catch(() => false);
+		if (fileExists) return;
 
-        const releaseResponse = await fetch("https://api.github.com/repos/aptly-dev/aptly/releases/latest");
-        if (!releaseResponse.ok) {
-            throw new Error(`GitHub release request failed with status ${releaseResponse.status}`);
-        }
-        const releaseData = await releaseResponse.json() as {
-            tag_name: string;
-            assets: Array<{
-                name: string;
-                browser_download_url: string;
-            }>;
-        };
+		const releaseResponse = await fetch(
+			"https://api.github.com/repos/aptly-dev/aptly/releases/latest",
+		);
+		if (!releaseResponse.ok) {
+			throw new Error(`GitHub release request failed with status ${releaseResponse.status}`);
+		}
+		const releaseData = (await releaseResponse.json()) as {
+			tag_name: string;
+			assets: Array<{
+				name: string;
+				browser_download_url: string;
+			}>;
+		};
 
-        const arch = process.arch === "x64" ? "amd64" : process.arch;
-        const os = process.platform;
-        const asset = releaseData.assets?.find((candidate: any) => candidate.name && candidate.name.includes(`${os}_${arch}.zip`));
-        if (!asset) {
-            throw new Error("No suitable Aptly binary found for this architecture and OS.");
-        }
+		const arch = process.arch === "x64" ? "amd64" : process.arch;
+		const os = process.platform;
+		const asset = releaseData.assets?.find(
+			(candidate: any) => candidate.name && candidate.name.includes(`${os}_${arch}.zip`),
+		);
+		if (!asset) {
+			throw new Error("No suitable Aptly binary found for this architecture and OS.");
+		}
 
-        await this.ensureDirExists(path.dirname(aptlyBinaryPath));
+		await this.ensureDirExists(path.dirname(aptlyBinaryPath));
 
-        const tmpArchiveDir = `/tmp/aptly-archive`;
-        const tmpZipPath = `/tmp/aptly-download.zip`;
-        const binName = asset.name.replace(".zip", "");
+		const tmpArchiveDir = `/tmp/aptly-archive`;
+		const tmpZipPath = `/tmp/aptly-download.zip`;
+		const binName = asset.name.replace(".zip", "");
 
-        try {
-            const downloadResponse = await Bun.fetch(asset.browser_download_url);
-            if (!downloadResponse.ok) {
-                throw new Error(`Failed to download Aptly binary: status ${downloadResponse.status}`);
-            }
+		try {
+			const downloadResponse = await Bun.fetch(asset.browser_download_url);
+			if (!downloadResponse.ok) {
+				throw new Error(`Failed to download Aptly binary: status ${downloadResponse.status}`);
+			}
 
-            const archiveBuffer = await downloadResponse.arrayBuffer();
-            await Bun.write(Bun.file(tmpZipPath), archiveBuffer);
-            await Bun.$`unzip -o ${tmpZipPath} -d ${tmpArchiveDir}`.text();
+			const archiveBuffer = await downloadResponse.arrayBuffer();
+			await Bun.write(Bun.file(tmpZipPath), archiveBuffer);
+			await Bun.$`unzip -o ${tmpZipPath} -d ${tmpArchiveDir}`.text();
 
-            await fs.copyFile(`${tmpArchiveDir}/${binName}/aptly`, aptlyBinaryPath);
-            await fs.chmod(aptlyBinaryPath, 0o755);
+			await fs.copyFile(`${tmpArchiveDir}/${binName}/aptly`, aptlyBinaryPath);
+			await fs.chmod(aptlyBinaryPath, 0o755);
 
-            Logger.info(`Aptly binary downloaded to ${aptlyBinaryPath}`);
-        } catch (error) {
-            await this.removePathIfExists(aptlyBinaryPath);
-            throw new Error(`Failed to fetch latest Aptly release: ${error}`);
-        } finally {
-            await this.removePathIfExists(tmpArchiveDir);
-            await this.removePathIfExists(tmpZipPath);
-        }
-    }
+			Logger.info(`Aptly binary downloaded to ${aptlyBinaryPath}`);
+		} catch (error) {
+			await this.removePathIfExists(aptlyBinaryPath);
+			throw new Error(`Failed to fetch latest Aptly release: ${error}`);
+		} finally {
+			await this.removePathIfExists(tmpArchiveDir);
+			await this.removePathIfExists(tmpZipPath);
+		}
+	}
 
-    static forwardAptlyOutput(stream: ReadableStream<Uint8Array> | null, logFn: (message: string) => void) {
-        if (!stream) return;
+	static forwardAptlyOutput(
+		stream: ReadableStream<Uint8Array> | null,
+		logFn: (message: string) => void,
+	) {
+		if (!stream) return;
 
-        const decoder = new TextDecoder();
-        const reader = stream.getReader();
-        let buffer = "";
+		const decoder = new TextDecoder();
+		const reader = stream.getReader();
+		let buffer = "";
 
-        const emitLine = (rawLine: string) => {
-            const line = rawLine.replace(/\r$/, "");
-            if (line.startsWith("[GIN]")) return; // skip gin logs
-            logFn(line);
-        };
+		const emitLine = (rawLine: string) => {
+			const line = rawLine.replace(/\r$/, "");
+			if (line.startsWith("[GIN]")) return; // skip gin logs
+			logFn(line);
+		};
 
-        const pump = async () => {
-            try {
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    buffer += decoder.decode(value, { stream: true });
+		const pump = async () => {
+			try {
+				while (true) {
+					const { done, value } = await reader.read();
+					if (done) break;
+					buffer += decoder.decode(value, { stream: true });
 
-                    let newlineIndex: number;
-                    while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
-                        const line = buffer.slice(0, newlineIndex);
-                        buffer = buffer.slice(newlineIndex + 1);
-                        emitLine(line);
-                    }
-                }
+					let newlineIndex = buffer.indexOf("\n");
+					while (newlineIndex !== -1) {
+						emitLine(buffer.slice(0, newlineIndex));
+						buffer = buffer.slice(newlineIndex + 1);
+						newlineIndex = buffer.indexOf("\n");
+					}
+				}
 
-                const remainder = buffer + decoder.decode();
-                if (remainder) {
-                    emitLine(remainder);
-                }
-            } catch (error) {
-                Logger.warn("Failed to read Aptly output:", error);
-            }
-        };
+				const remainder = buffer + decoder.decode();
+				if (remainder) {
+					emitLine(remainder);
+				}
+			} catch (error) {
+				Logger.warn("Failed to read Aptly output:", error);
+			}
+		};
 
-        pump();
-    }
+		pump();
+	}
 
-    static async createDefaultRepositoriesIfNeeded() {
-        const existReposResponse = await AptlyAPIServer.getClient().getApiRepos({});
-        if (!existReposResponse.data) {
-            throw new Error("Failed to fetch existing repositories: " + existReposResponse.error);
-        }
-        const existingRepos = existReposResponse.data;
+	static async createDefaultRepositoriesIfNeeded() {
+		const existReposResponse = await AptlyAPIServer.getClient().getApiRepos({});
+		if (!existReposResponse.data) {
+			throw new Error("Failed to fetch existing repositories: " + existReposResponse.error);
+		}
+		const existingRepos = existReposResponse.data;
 
-        if (!existingRepos.some(repo => repo.Name === "leios-stable")) {
-            await AptlyAPIServer.getClient().postApiRepos({
-                body: {
-                    Name: "leios-stable",
-                    DefaultComponent: "main",
-                    DefaultDistribution: "stable"
-                }
-            });
-            Logger.info("Repository 'leios-stable' created.");
-        }
+		if (!existingRepos.some((repo) => repo.Name === "leios-stable")) {
+			await AptlyAPIServer.getClient().postApiRepos({
+				body: {
+					Name: "leios-stable",
+					DefaultComponent: "main",
+					DefaultDistribution: "stable",
+				},
+			});
+			Logger.info("Repository 'leios-stable' created.");
+		}
 
-        if (!existingRepos.some(repo => repo.Name === "leios-testing")) {
-            await AptlyAPIServer.getClient().postApiRepos({
-                body: {
-                    Name: "leios-testing",
-                    DefaultComponent: "main",
-                    DefaultDistribution: "testing"
-                }
-            });
-            Logger.info("Repository 'leios-testing' created.");
-        }
+		if (!existingRepos.some((repo) => repo.Name === "leios-testing")) {
+			await AptlyAPIServer.getClient().postApiRepos({
+				body: {
+					Name: "leios-testing",
+					DefaultComponent: "main",
+					DefaultDistribution: "testing",
+				},
+			});
+			Logger.info("Repository 'leios-testing' created.");
+		}
 
-        // the archive repo is not published by default, its just to hold every package version in history
-        if (!existingRepos.some(repo => repo.Name === "leios-archive")) {
-            await AptlyAPIServer.getClient().postApiRepos({
-                body: {
-                    Name: "leios-archive",
-                    DefaultComponent: "main",
-                    DefaultDistribution: "archive"
-                }
-            });
-            Logger.info("Repository 'leios-archive' created.");
-        }
-    }
+		// the archive repo is not published by default, its just to hold every package version in history
+		if (!existingRepos.some((repo) => repo.Name === "leios-archive")) {
+			await AptlyAPIServer.getClient().postApiRepos({
+				body: {
+					Name: "leios-archive",
+					DefaultComponent: "main",
+					DefaultDistribution: "archive",
+				},
+			});
+			Logger.info("Repository 'leios-archive' created.");
+		}
+	}
 
-    static async initialRepoPublishIfNeeded() {
+	/** The distributions published to the live S3 repository (`dists/<distribution>/`). */
+	static readonly LIVE_DISTRIBUTIONS = ["testing", "stable"] as const;
 
-        const publishPrefix = "s3:leios-live-repo:";
+	/** Bucket key of a file in the live repository, below LRA_S3_PREFIX. */
+	static liveRepoKey(relativePath: string) {
+		const prefix = AptlyAPIServer.settings.s3Settings.prefix ?? "";
+		if (!prefix) return relativePath;
+		return prefix.endsWith("/") ? `${prefix}${relativePath}` : `${prefix}/${relativePath}`;
+	}
 
-        const existingPublishedReposResult = await AptlyAPIServer.getClient().getApiPublish({});
-        if (!existingPublishedReposResult.data) {
-            throw new Error("Failed to fetch existing published repositories: " + existingPublishedReposResult.error.error);
-        }
-        const existingPublishedRepos = existingPublishedReposResult.data;
+	/** Whether the bucket already serves `distribution` (its signed Release index exists). */
+	static async isPublishedInBucket(distribution: string) {
+		const s3 = AptlyAPIServer.settings.s3Settings;
+		const client = new Bun.S3Client({
+			endpoint: s3.endpoint,
+			region: s3.region,
+			bucket: s3.bucket,
+			accessKeyId: s3.accessKeyId,
+			secretAccessKey: s3.secretAccessKey,
+		});
+		return await client.exists(AptlyUtils.liveRepoKey(`dists/${distribution}/Release`));
+	}
 
-        if (!existingPublishedRepos.some(pub => pub.Storage === "s3:leios-live-repo" && pub.Distribution === "testing")) {
-            const testingPublishResult = await AptlyAPIServer.getClient().postApiPublishByPrefix({
-                path: {
-                    prefix: publishPrefix,
-                },
-                body: {
-                    SourceKind: "local",
-                    Sources: [
-                        {
-                            Name: "leios-testing",
-                            Component: "main"
-                        }
-                    ],
-                    Distribution: "testing",
-                    Architectures: [
-                        "amd64",
-                        "arm64"
-                    ],
-                    Signing: AptlyAPIServer.SigningConfig
-                }
-            });
+	/**
+	 * Refuses to start when the bucket serves a distribution that Aptly's local state does not know.
+	 * That happens when LRA_APTLY_ROOT points at a new or empty directory (a moved or missing Docker
+	 * volume, a typo in the path): the initial publish would then replace the live repository with an
+	 * empty one and break apt for every LeiOS installation. Errors from S3 propagate, so an unreachable
+	 * bucket also stops the startup instead of skipping the check.
+	 */
+	static async assertNoUnknownLivePublications(locallyPublished: readonly string[]) {
+		for (const distribution of AptlyUtils.LIVE_DISTRIBUTIONS) {
+			if (locallyPublished.includes(distribution)) continue;
 
-            Logger.info("Published initial state of 'leios-testing' repository.");
-            if (!testingPublishResult.data) {
-                throw new Error("Failed to publish 'leios-testing' repository: " + testingPublishResult.error.error);
-            }
-        }
+			if (await AptlyUtils.isPublishedInBucket(distribution)) {
+				const s3 = AptlyAPIServer.settings.s3Settings;
+				const location = `s3://${s3.bucket}/${AptlyUtils.liveRepoKey(`dists/${distribution}/`)}`;
+				const repository = `s3://${s3.bucket}/${AptlyUtils.liveRepoKey("")}`;
+				throw new Error(
+					`Refusing to publish '${distribution}': ${location} is already published, but the Aptly ` +
+						`state in ${AptlyAPIServer.settings.aptlyRoot} does not know it. Publishing now would ` +
+						"replace the live repository with an empty one. Point LRA_APTLY_ROOT (and the data " +
+						"volume) at the existing Aptly data. To deliberately start an empty repository, delete " +
+						`the published repository (dists/ and pool/ under ${repository}) first.`,
+				);
+			}
+		}
+	}
 
-        if (!existingPublishedRepos.some(pub => pub.Storage === "s3:leios-live-repo" && pub.Distribution === "stable")) {
-            const createSnapshotResult = await AptlyAPIServer.getClient().postApiReposByNameSnapshots({
-                path: {
-                    name: "leios-stable"
-                },
-                body: {
-                    Name: "leios-stable-0000.00.000",
-                    Description: "Initial stable snapshot. This snapshot is empty.",
-                }
-            });
-            if (!createSnapshotResult.data) {
-                const errMsg = createSnapshotResult.error?.error || "";
-                if (errMsg.includes("already exists")) {
-                    Logger.info("Initial 'leios-stable-0000.00.000' snapshot already exists, skipping creation.");
-                } else {
-                    throw new Error("Failed to create initial snapshot for 'leios-stable' repository: " + errMsg);
-                }
-            }
+	static async initialRepoPublishIfNeeded() {
+		const publishPrefix = "s3:leios-live-repo:";
 
-            const stablePublishResult = await AptlyAPIServer.getClient().postApiPublishByPrefix({
-                path: {
-                    prefix: publishPrefix,
-                },
-                body: {
-                    SourceKind: "snapshot",
-                    Sources: [
-                        {
-                            Name: "leios-stable-0000.00.000",
-                            Component: "main"
-                        }
-                    ],
-                    Distribution: "stable",
-                    Architectures: [
-                        "amd64",
-                        "arm64"
-                    ],
-                    Signing: AptlyAPIServer.SigningConfig
-                }
-            });
+		const existingPublishedReposResult = await AptlyAPIServer.getClient().getApiPublish({});
+		if (!existingPublishedReposResult.data) {
+			throw new Error(
+				"Failed to fetch existing published repositories: " + existingPublishedReposResult.error.error,
+			);
+		}
+		const existingPublishedRepos = existingPublishedReposResult.data;
 
-            Logger.info("Published initial state of 'leios-stable' repository.");
+		await AptlyUtils.assertNoUnknownLivePublications(
+			existingPublishedRepos
+				.filter((pub) => pub.Storage === "s3:leios-live-repo")
+				.map((pub) => pub.Distribution ?? ""),
+		);
 
-            if (!stablePublishResult.data) {
-                throw new Error("Failed to publish 'leios-stable' repository: " + stablePublishResult.error.error);
-            }
-        }
-    }
+		if (
+			!existingPublishedRepos.some(
+				(pub) => pub.Storage === "s3:leios-live-repo" && pub.Distribution === "testing",
+			)
+		) {
+			const testingPublishResult = await AptlyAPIServer.getClient().postApiPublishByPrefix({
+				path: {
+					prefix: publishPrefix,
+				},
+				body: {
+					SourceKind: "local",
+					Sources: [
+						{
+							Name: "leios-testing",
+							Component: "main",
+						},
+					],
+					Distribution: "testing",
+					Architectures: ["amd64", "arm64"],
+					Signing: AptlyAPIServer.SigningConfig,
+				},
+			});
 
-    static extractVersionAndPatchSuffix(fullVersion: string) {
-        // Allow up to four numeric segments in the leios suffix (e.g. leios1, leios1.2.3.4)
-        const leiosSuffixMatch = fullVersion.match(/(.*)leios(\d+(?:\.\d+){0,2})$/);
-        if (leiosSuffixMatch) {
-            return {
-                version: leiosSuffixMatch[1],
-                leios_patch: leiosSuffixMatch[2]
-            };
-        }
-        return {
-            version: fullVersion,
-            leios_patch: undefined
-        };
-    }
+			Logger.info("Published initial state of 'leios-testing' repository.");
+			if (!testingPublishResult.data) {
+				throw new Error(
+					"Failed to publish 'leios-testing' repository: " + testingPublishResult.error.error,
+				);
+			}
+		}
 
-    static buildVersionWithLeiOSSuffix(version: string, leios_patch?: string | null) {
-        if (leios_patch) {
-            if (version.endsWith(`leios${leios_patch}`)) {
-                return version;
-            }
-            return version + `leios${leios_patch}`;
-        }
-        return version;
-    }
+		if (
+			!existingPublishedRepos.some(
+				(pub) => pub.Storage === "s3:leios-live-repo" && pub.Distribution === "stable",
+			)
+		) {
+			const createSnapshotResult = await AptlyAPIServer.getClient().postApiReposByNameSnapshots({
+				path: {
+					name: "leios-stable",
+				},
+				body: {
+					Name: "leios-stable-0000.00.000",
+					Description: "Initial stable snapshot. This snapshot is empty.",
+				},
+			});
+			if (!createSnapshotResult.data) {
+				const errMsg = createSnapshotResult.error?.error || "";
+				if (errMsg.includes("already exists")) {
+					Logger.info("Initial 'leios-stable-0000.00.000' snapshot already exists, skipping creation.");
+				} else {
+					throw new Error("Failed to create initial snapshot for 'leios-stable' repository: " + errMsg);
+				}
+			}
 
-    static getPackageIdentifier(packageFullName: string, fullPackageVersion: string, architecture: string): string;
-    static getPackageIdentifier(packageFullName: string, packageVersion: string, leios_patch: string | null | undefined, architecture: string): string;
-    static getPackageIdentifier(packageFullName: string, versionOrFullVersion: string, leios_patchOrArch: string | null | undefined, architectureOpt?: string) {
-        const fullPackageVersion = architectureOpt
-            ? this.buildVersionWithLeiOSSuffix(versionOrFullVersion, leios_patchOrArch)
-            : versionOrFullVersion;
+			const stablePublishResult = await AptlyAPIServer.getClient().postApiPublishByPrefix({
+				path: {
+					prefix: publishPrefix,
+				},
+				body: {
+					SourceKind: "snapshot",
+					Sources: [
+						{
+							Name: "leios-stable-0000.00.000",
+							Component: "main",
+						},
+					],
+					Distribution: "stable",
+					Architectures: ["amd64", "arm64"],
+					Signing: AptlyAPIServer.SigningConfig,
+				},
+			});
 
-        const architecture = architectureOpt ? architectureOpt : leios_patchOrArch!;
-        return `${packageFullName}_${fullPackageVersion}_${architecture}`;
-    }
+			Logger.info("Published initial state of 'leios-stable' repository.");
 
-    static async waitForAptlyReady(baseUrl: string, timeoutMs = 10_000, pollMs = 300) {
-        const deadline = Date.now() + timeoutMs;
-        let lastError = "";
+			if (!stablePublishResult.data) {
+				throw new Error(
+					"Failed to publish 'leios-stable' repository: " + stablePublishResult.error.error,
+				);
+			}
+		}
+	}
 
-        while (Date.now() < deadline) {
-            try {
-                const response = await fetch(`${baseUrl}/api/version`);
-                if (response.ok) return;
-                lastError = `status ${response.status}`;
-            } catch (error: any) {
-                lastError = error?.message || String(error);
-            }
-            await this.delay(pollMs);
-        }
+	static extractVersionAndPatchSuffix(fullVersion: string) {
+		// Allow up to four numeric segments in the leios suffix (e.g. leios1, leios1.2.3.4)
+		const leiosSuffixMatch = fullVersion.match(/(.*)leios(\d+(?:\.\d+){0,2})$/);
+		if (leiosSuffixMatch) {
+			return {
+				version: leiosSuffixMatch[1],
+				leios_patch: leiosSuffixMatch[2],
+			};
+		}
+		return {
+			version: fullVersion,
+			leios_patch: undefined,
+		};
+	}
 
-        throw new Error(`Aptly API not reachable after ${timeoutMs}ms: ${lastError}`);
-    }
+	static buildVersionWithLeiOSSuffix(version: string, leios_patch?: string | null) {
+		if (leios_patch) {
+			if (version.endsWith(`leios${leios_patch}`)) {
+				return version;
+			}
+			return version + `leios${leios_patch}`;
+		}
+		return version;
+	}
 
+	static getPackageIdentifier(
+		packageFullName: string,
+		fullPackageVersion: string,
+		architecture: string,
+	): string;
+	static getPackageIdentifier(
+		packageFullName: string,
+		packageVersion: string,
+		leios_patch: string | null | undefined,
+		architecture: string,
+	): string;
+	static getPackageIdentifier(
+		packageFullName: string,
+		versionOrFullVersion: string,
+		leios_patchOrArch: string | null | undefined,
+		architectureOpt?: string,
+	) {
+		const fullPackageVersion = architectureOpt
+			? this.buildVersionWithLeiOSSuffix(versionOrFullVersion, leios_patchOrArch)
+			: versionOrFullVersion;
+
+		const architecture = architectureOpt ? architectureOpt : leios_patchOrArch!;
+		return `${packageFullName}_${fullPackageVersion}_${architecture}`;
+	}
+
+	static async waitForAptlyReady(baseUrl: string, timeoutMs = 10_000, pollMs = 300) {
+		const deadline = Date.now() + timeoutMs;
+		let lastError = "";
+
+		while (Date.now() < deadline) {
+			try {
+				const response = await fetch(`${baseUrl}/api/version`);
+				if (response.ok) return;
+				lastError = `status ${response.status}`;
+			} catch (error: any) {
+				lastError = error?.message || String(error);
+			}
+			await this.delay(pollMs);
+		}
+
+		throw new Error(`Aptly API not reachable after ${timeoutMs}ms: ${lastError}`);
+	}
 }
 
 export namespace AptlyUtils.Signing {
+	async function ensureBinaryGpgKeyring(sourcePath: string, outputPath: string) {
+		const outputExists = await fs
+			.access(outputPath, FS_ACCESS_STATE.R_OK)
+			.then(() => true)
+			.catch(() => false);
 
-    async function ensureBinaryGpgKeyring(sourcePath: string, outputPath: string) {
+		if (outputExists) {
+			Logger.info(`GPG keyring already exists at ${outputPath}, skipping dearmoring.`);
+			return outputPath;
+		}
 
-        const outputExists = await fs.access(outputPath, FS_ACCESS_STATE.R_OK).then(() => true).catch(() => false)
+		const fileExists = await fs
+			.access(sourcePath)
+			.then(() => true)
+			.catch(() => false);
+		if (!fileExists) {
+			throw new Error(`GPG key file not found at ${sourcePath}`);
+		}
 
-        if (outputExists) {
-            Logger.info(`GPG keyring already exists at ${outputPath}, skipping dearmoring.`);
-            return outputPath;
-        }
+		await AptlyUtils.ensureDirExists(path.dirname(outputPath));
 
-        const fileExists = await fs.access(sourcePath).then(() => true).catch(() => false);
-        if (!fileExists) {
-            throw new Error(`GPG key file not found at ${sourcePath}`);
-        }
+		const buffer = await fs.readFile(sourcePath);
+		const header = buffer.subarray(0, 64).toString("utf8");
+		const isArmored = header.includes("BEGIN PGP");
 
-        await AptlyUtils.ensureDirExists(path.dirname(outputPath));
+		if (!isArmored) {
+			if (sourcePath !== outputPath) {
+				await fs.copyFile(sourcePath, outputPath);
+			}
+			return outputPath;
+		}
 
-        const buffer = await fs.readFile(sourcePath);
-        const header = buffer.subarray(0, 64).toString("utf8");
-        const isArmored = header.includes("BEGIN PGP");
+		const dearmorProcess = Bun.spawn({
+			cmd: ["gpg", "--dearmor", "--yes", "--output", outputPath, sourcePath],
+			stdin: "ignore",
+			stdout: "pipe",
+			stderr: "pipe",
+		});
 
-        if (!isArmored) {
-            if (sourcePath !== outputPath) {
-                await fs.copyFile(sourcePath, outputPath);
-            }
-            return outputPath;
-        }
+		const exitCode = await dearmorProcess.exited;
+		if (exitCode !== 0) {
+			const stderrText = dearmorProcess.stderr ? await new Response(dearmorProcess.stderr).text() : "";
+			throw new Error(`Failed to dearmor GPG key at ${sourcePath}: ${stderrText}`);
+		}
 
-        const dearmorProcess = Bun.spawn({
-            cmd: ["gpg", "--dearmor", "--yes", "--output", outputPath, sourcePath],
-            stdin: "ignore",
-            stdout: "pipe",
-            stderr: "pipe",
-        });
+		Logger.info(`GPG key at ${sourcePath} dearmored to ${outputPath}`);
+		return outputPath;
+	}
 
-        const exitCode = await dearmorProcess.exited;
-        if (exitCode !== 0) {
-            const stderrText = dearmorProcess.stderr ? await new Response(dearmorProcess.stderr).text() : "";
-            throw new Error(`Failed to dearmor GPG key at ${sourcePath}: ${stderrText}`);
-        }
+	export async function ensureSigningConfigExists() {
+		await AptlyUtils.ensureDirExists(AptlyAPIServer.dearmoredKeysDir);
 
-        Logger.info(`GPG key at ${sourcePath} dearmored to ${outputPath}`);
-        return outputPath;
-    }
-
-    export async function ensureSigningConfigExists() {
-        await AptlyUtils.ensureDirExists(AptlyAPIServer.dearmoredKeysDir);
-
-        await ensureBinaryGpgKeyring(
-            AptlyAPIServer.settings.keySettings.publicKeyPath,
-            path.join(AptlyAPIServer.dearmoredKeysDir, "public-key.dearmored.gpg")
-        );
-        await ensureBinaryGpgKeyring(
-            AptlyAPIServer.settings.keySettings.privateKeyPath,
-            path.join(AptlyAPIServer.dearmoredKeysDir, "private-key.dearmored.gpg")
-        );
-    }
+		await ensureBinaryGpgKeyring(
+			AptlyAPIServer.settings.keySettings.publicKeyPath,
+			path.join(AptlyAPIServer.dearmoredKeysDir, "public-key.dearmored.gpg"),
+		);
+		await ensureBinaryGpgKeyring(
+			AptlyAPIServer.settings.keySettings.privateKeyPath,
+			path.join(AptlyAPIServer.dearmoredKeysDir, "private-key.dearmored.gpg"),
+		);
+	}
 }

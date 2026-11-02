@@ -1,222 +1,297 @@
 import { describe, expect, test } from "bun:test";
 import { AptlyAPI } from "../src/aptly/api";
 import { AptlyAPIServer } from "../src/aptly/server";
+import { AptlyUtils } from "../src/aptly/utils";
 
 describe("Aptly Package Tests for fastfetch arch: amd64", () => {
+	test("Upload and Verify Package", async () => {
+		const filePath = "./testdata/fastfetch_2.55.0_amd64.deb";
+		const fileData = new File([await Bun.file(filePath).arrayBuffer()], "package.deb");
 
-    test("Upload and Verify Package", async () => {
+		const packageData = {
+			fullname: "fastfetch.fastfetch",
+			maintainer_name: "Carter Li",
+			maintainer_email: "zhangsongcui@live.cn",
+			versionWithLeiosPatch: "2.55.0",
+			architecture: "amd64",
+		} as const;
 
-        const filePath = "./testdata/fastfetch_2.55.0_amd64.deb";
-        const fileData = new File([await Bun.file(filePath).arrayBuffer()], "package.deb");
+		const uploadResult = await AptlyAPI.Packages.uploadAndVerifyIntoArchiveRepo(
+			packageData,
+			fileData,
+		);
+		expect(uploadResult).toBe(true);
+	});
 
-        const packageData = {
-            fullname: "fastfetch.fastfetch",
-            maintainer_name: "Carter Li",
-            maintainer_email: "zhangsongcui@live.cn",
-            versionWithLeiosPatch: "2.55.0",
-            architecture: "amd64"
-        } as const;
+	test("Copy Package into Testing", async () => {
+		const copyResult = await AptlyAPI.Packages.copyIntoRepo(
+			"leios-testing",
+			"fastfetch.fastfetch",
+			"2.55.0",
+			"amd64",
+		);
+		expect(copyResult).toBe(true);
 
-        const uploadResult = await AptlyAPI.Packages.uploadAndVerifyIntoArchiveRepo(packageData, fileData);
-        expect(uploadResult).toBe(true);
+		const packageRefs = await AptlyAPI.Packages.getRefInRepo("leios-testing", "fastfetch.fastfetch");
+		expect(packageRefs[0]).toInclude("fastfetch.fastfetch");
+	});
 
-    });
+	test("Get Package References", async () => {
+		const packageRefs = await AptlyAPI.Packages.getRefInRepo("leios-archive", "fastfetch.fastfetch");
+		expect(packageRefs[0]).toInclude("fastfetch.fastfetch");
+	});
 
-    test("Copy Package into Testing", async () => {
-        const copyResult = await AptlyAPI.Packages.copyIntoRepo("leios-testing", "fastfetch.fastfetch", "2.55.0", "amd64");
-        expect(copyResult).toBe(true);
+	test("Check Package Existence", async () => {
+		const exists = await AptlyAPI.Packages.existsInRepo(
+			"leios-archive",
+			"fastfetch.fastfetch",
+			"2.55.0",
+			"amd64",
+		);
+		expect(exists).toBe(true);
+	});
 
-        const packageRefs = await AptlyAPI.Packages.getRefInRepo("leios-testing", "fastfetch.fastfetch");
-        expect(packageRefs[0]).toInclude("fastfetch.fastfetch");
-    });
+	test("Get Package Details", async () => {
+		const result = (
+			await AptlyAPI.Packages.getInRepo("leios-archive", "fastfetch.fastfetch", "2.55.0", "amd64")
+		)[0];
 
-    test("Get Package References", async () => {
-        const packageRefs = await AptlyAPI.Packages.getRefInRepo("leios-archive", "fastfetch.fastfetch");
-        expect(packageRefs[0]).toInclude("fastfetch.fastfetch");
-    });
+		expect(result).toBeDefined();
+		if (!result) return;
 
-    test("Check Package Existence", async () => {
-        const exists = await AptlyAPI.Packages.existsInRepo("leios-archive", "fastfetch.fastfetch", "2.55.0", "amd64");
-        expect(exists).toBe(true);
-    });
+		expect(result.name).toBe("fastfetch.fastfetch");
+		expect(result.versionWithLeiosPatch).toBe("2.55.0");
+		expect(result.architecture).toBe("amd64");
+		expect(result.maintainer).toBe("Carter Li <zhangsongcui@live.cn>");
+	});
 
-    test("Get Package Details", async () => {
-        
-        const result = (await AptlyAPI.Packages.getInRepo("leios-archive", "fastfetch.fastfetch", "2.55.0", "amd64"))[0];
+	test("Remove Package from Repo", async () => {
+		const removeResult = await AptlyAPI.Packages.deleteInRepo("leios-archive", "fastfetch.fastfetch");
+		expect(removeResult).toBe(true);
 
-        expect(result).toBeDefined();
-        if (!result) return;
+		const packageRefsAfterRemoval = await AptlyAPI.Packages.getRefInRepo(
+			"leios-archive",
+			"fastfetch.fastfetch",
+		);
+		expect(packageRefsAfterRemoval.length).toBe(0);
+	});
 
-        expect(result.name).toBe("fastfetch.fastfetch");
-        expect(result.versionWithLeiosPatch).toBe("2.55.0");
-        expect(result.architecture).toBe("amd64");
-        expect(result.maintainer).toBe("Carter Li <zhangsongcui@live.cn>");
-    });
+	test("Delete Package from all Repos", async () => {
+		const deleteResult = await AptlyAPI.Packages.deleteAllInAllRepos("fastfetch.fastfetch");
+		expect(deleteResult).toBe(true);
 
-    test("Remove Package from Repo", async () => {
-        const removeResult = await AptlyAPI.Packages.deleteInRepo("leios-archive", "fastfetch.fastfetch");
-        expect(removeResult).toBe(true);
-
-        const packageRefsAfterRemoval = await AptlyAPI.Packages.getRefInRepo("leios-archive", "fastfetch.fastfetch");
-        expect(packageRefsAfterRemoval.length).toBe(0);
-    });
-
-    test("Delete Package from all Repos", async () => {
-        const deleteResult = await AptlyAPI.Packages.deleteAllInAllRepos("fastfetch.fastfetch");
-        expect(deleteResult).toBe(true);
-
-        const packageRefsAfterDeletion = await AptlyAPI.Packages.getRefInRepo("leios-testing", "fastfetch.fastfetch");
-        expect(packageRefsAfterDeletion.length).toBe(0);
-    });
-
+		const packageRefsAfterDeletion = await AptlyAPI.Packages.getRefInRepo(
+			"leios-testing",
+			"fastfetch.fastfetch",
+		);
+		expect(packageRefsAfterDeletion.length).toBe(0);
+	});
 });
 
 describe("Aptly Package Tests for base-files arch: all", () => {
+	test("Upload and Verify Package", async () => {
+		const filePath = "./testdata/base-files.deb";
+		const fileData = new File([await Bun.file(filePath).arrayBuffer()], "package.deb");
 
-    test("Upload and Verify Package", async () => {
+		const packageData = {
+			fullname: "leios.system.base-files",
+			maintainer_name: "LeiOS Project Team",
+			maintainer_email: "support@leios.dev",
+			versionWithLeiosPatch: "100.1",
+			architecture: "all",
+		} as const;
 
-        const filePath = "./testdata/base-files.deb";
-        const fileData = new File([await Bun.file(filePath).arrayBuffer()], "package.deb");
+		const uploadResult = await AptlyAPI.Packages.uploadAndVerifyIntoArchiveRepo(
+			packageData,
+			fileData,
+		);
+		expect(uploadResult).toBe(true);
+	});
 
-        const packageData = {
-            fullname: "leios.system.base-files",
-            maintainer_name: "LeiOS Project Team",
-            maintainer_email: "support@leios.dev",
-            versionWithLeiosPatch: "100.1",
-            architecture: "all"
-        } as const;
+	test("Copy Package into Testing", async () => {
+		const copyResult = await AptlyAPI.Packages.copyIntoRepo(
+			"leios-testing",
+			"leios.system.base-files",
+			"100.1",
+			"all",
+		);
+		expect(copyResult).toBe(true);
 
-        const uploadResult = await AptlyAPI.Packages.uploadAndVerifyIntoArchiveRepo(packageData, fileData);
-        expect(uploadResult).toBe(true);
+		const packageRefs = await AptlyAPI.Packages.getRefInRepo(
+			"leios-testing",
+			"leios.system.base-files",
+		);
+		expect(packageRefs[0]).toInclude("leios.system.base-files");
+	});
 
-    });
+	test("Get Package References", async () => {
+		const packageRefs = await AptlyAPI.Packages.getRefInRepo(
+			"leios-archive",
+			"leios.system.base-files",
+		);
+		expect(packageRefs[0]).toInclude("leios.system.base-files");
+	});
 
-    test("Copy Package into Testing", async () => {
-        const copyResult = await AptlyAPI.Packages.copyIntoRepo("leios-testing", "leios.system.base-files", "100.1", "all");
-        expect(copyResult).toBe(true);
+	test("Check Package Existence", async () => {
+		const exists = await AptlyAPI.Packages.existsInRepo(
+			"leios-archive",
+			"leios.system.base-files",
+			"100.1",
+			"all",
+		);
+		expect(exists).toBe(true);
+	});
 
-        const packageRefs = await AptlyAPI.Packages.getRefInRepo("leios-testing", "leios.system.base-files");
-        expect(packageRefs[0]).toInclude("leios.system.base-files");
-    });
+	test("Get Package Details", async () => {
+		const result = (
+			await AptlyAPI.Packages.getInRepo("leios-archive", "leios.system.base-files", "100.1", "all")
+		)[0];
 
-    test("Get Package References", async () => {
-        const packageRefs = await AptlyAPI.Packages.getRefInRepo("leios-archive", "leios.system.base-files");
-        expect(packageRefs[0]).toInclude("leios.system.base-files");
-    });
+		expect(result).toBeDefined();
+		if (!result) return;
 
-    test("Check Package Existence", async () => {
-        const exists = await AptlyAPI.Packages.existsInRepo("leios-archive", "leios.system.base-files", "100.1", "all");
-        expect(exists).toBe(true);
-    });
+		expect(result.name).toBe("leios.system.base-files");
+		expect(result.versionWithLeiosPatch).toBe("100.1");
+		expect(result.architecture).toBe("all");
+		expect(result.maintainer).toBe("LeiOS Project Team <support@leios.dev>");
+	});
 
-    test("Get Package Details", async () => {
-        
-        const result = (await AptlyAPI.Packages.getInRepo("leios-archive", "leios.system.base-files", "100.1", "all"))[0];
+	test("Remove Package from Repo", async () => {
+		const removeResult = await AptlyAPI.Packages.deleteInRepo(
+			"leios-archive",
+			"leios.system.base-files",
+		);
+		expect(removeResult).toBe(true);
 
-        expect(result).toBeDefined();
-        if (!result) return;
+		const packageRefsAfterRemoval = await AptlyAPI.Packages.getRefInRepo(
+			"leios-archive",
+			"leios.system.base-files",
+		);
+		expect(packageRefsAfterRemoval.length).toBe(0);
+	});
 
-        expect(result.name).toBe("leios.system.base-files");
-        expect(result.versionWithLeiosPatch).toBe("100.1");
-        expect(result.architecture).toBe("all");
-        expect(result.maintainer).toBe("LeiOS Project Team <support@leios.dev>");
-    });
+	test("Delete Package from all Repos", async () => {
+		const deleteResult = await AptlyAPI.Packages.deleteAllInAllRepos("leios.system.base-files");
+		expect(deleteResult).toBe(true);
 
-    test("Remove Package from Repo", async () => {
-        const removeResult = await AptlyAPI.Packages.deleteInRepo("leios-archive", "leios.system.base-files");
-        expect(removeResult).toBe(true);
-
-        const packageRefsAfterRemoval = await AptlyAPI.Packages.getRefInRepo("leios-archive", "leios.system.base-files");
-        expect(packageRefsAfterRemoval.length).toBe(0);
-    });
-
-    test("Delete Package from all Repos", async () => {
-        const deleteResult = await AptlyAPI.Packages.deleteAllInAllRepos("leios.system.base-files");
-        expect(deleteResult).toBe(true);
-
-        const packageRefsAfterDeletion = await AptlyAPI.Packages.getRefInRepo("leios-testing", "leios.system.base-files");
-        expect(packageRefsAfterDeletion.length).toBe(0);
-    });
-
+		const packageRefsAfterDeletion = await AptlyAPI.Packages.getRefInRepo(
+			"leios-testing",
+			"leios.system.base-files",
+		);
+		expect(packageRefsAfterDeletion.length).toBe(0);
+	});
 });
 
 describe("Aptly Package Tests for local .deb upload", () => {
+	test("Upload local .deb into archive repo", async () => {
+		const filePath = "./testdata/base-files.deb";
 
-    test("Upload local .deb into archive repo", async () => {
-        const filePath = "./testdata/base-files.deb";
+		const result = await AptlyAPI.Packages.uploadLocalDebIntoArchiveRepo(filePath);
 
-        const result = await AptlyAPI.Packages.uploadLocalDebIntoArchiveRepo(filePath);
+		expect(result.name).toBe("leios.system.base-files");
+		expect(result.version).toBe("100.1");
+		expect(result.architecture).toBe("all");
 
-        expect(result.name).toBe("leios.system.base-files");
-        expect(result.version).toBe("100.1");
-        expect(result.architecture).toBe("all");
+		const exists = await AptlyAPI.Packages.existsInRepo(
+			"leios-archive",
+			"leios.system.base-files",
+			"100.1",
+			"all",
+		);
+		expect(exists).toBe(true);
+	});
 
-        const exists = await AptlyAPI.Packages.existsInRepo("leios-archive", "leios.system.base-files", "100.1", "all");
-        expect(exists).toBe(true);
-    });
+	test("Upload local .deb is idempotent", async () => {
+		const filePath = "./testdata/base-files.deb";
 
-    test("Upload local .deb is idempotent", async () => {
-        const filePath = "./testdata/base-files.deb";
+		const firstResult = await AptlyAPI.Packages.uploadLocalDebIntoArchiveRepo(filePath);
+		const secondResult = await AptlyAPI.Packages.uploadLocalDebIntoArchiveRepo(filePath);
 
-        const firstResult = await AptlyAPI.Packages.uploadLocalDebIntoArchiveRepo(filePath);
-        const secondResult = await AptlyAPI.Packages.uploadLocalDebIntoArchiveRepo(filePath);
+		expect(secondResult.name).toBe(firstResult.name);
+		expect(secondResult.version).toBe(firstResult.version);
+		expect(secondResult.architecture).toBe(firstResult.architecture);
 
-        expect(secondResult.name).toBe(firstResult.name);
-        expect(secondResult.version).toBe(firstResult.version);
-        expect(secondResult.architecture).toBe(firstResult.architecture);
+		const refs = await AptlyAPI.Packages.getRefInRepo(
+			"leios-archive",
+			"leios.system.base-files",
+			"100.1",
+			"all",
+		);
+		expect(refs.length).toBe(1);
+	});
 
-        const refs = await AptlyAPI.Packages.getRefInRepo("leios-archive", "leios.system.base-files", "100.1", "all");
-        expect(refs.length).toBe(1);
-    });
+	test("Delete locally uploaded package from all repos", async () => {
+		const deleteResult = await AptlyAPI.Packages.deleteAllInAllRepos("leios.system.base-files");
+		expect(deleteResult).toBe(true);
 
-    test("Delete locally uploaded package from all repos", async () => {
-        const deleteResult = await AptlyAPI.Packages.deleteAllInAllRepos("leios.system.base-files");
-        expect(deleteResult).toBe(true);
-
-        const packageRefsAfterDeletion = await AptlyAPI.Packages.getRefInRepo("leios-testing", "leios.system.base-files");
-        expect(packageRefsAfterDeletion.length).toBe(0);
-    });
-
+		const packageRefsAfterDeletion = await AptlyAPI.Packages.getRefInRepo(
+			"leios-testing",
+			"leios.system.base-files",
+		);
+		expect(packageRefsAfterDeletion.length).toBe(0);
+	});
 });
 describe("Aptly task runner", () => {
+	test("Returns the task's value and removes the finished task from aptly", async () => {
+		const result = await AptlyAPI.Tasks.run("clean up db", (query) =>
+			AptlyAPIServer.getClient().postApiDbCleanup({ query }),
+		);
+		expect(result.error).toBeNull();
 
-    test("Returns the task's value and removes the finished task from aptly", async () => {
-        const result = await AptlyAPI.Tasks.run("clean up db", (query) =>
-            AptlyAPIServer.getClient().postApiDbCleanup({ query })
-        );
-        expect(result.error).toBeNull();
+		const tasks = await AptlyAPIServer.getClient().getApiTasks();
+		expect(tasks.data ?? []).toEqual([]);
+	});
 
-        const tasks = await AptlyAPIServer.getClient().getApiTasks();
-        expect(tasks.data ?? []).toEqual([]);
-    });
+	test("Returns the error of a task that fails", async () => {
+		const snapshotName = `task-runner-test-${Date.now()}`;
 
-    test("Returns the error of a task that fails", async () => {
-        const snapshotName = `task-runner-test-${Date.now()}`;
+		expect(await AptlyAPI.Snapshots.createSnapshotOfRepo("leios-stable", snapshotName)).toBe(true);
 
-        expect(await AptlyAPI.Snapshots.createSnapshotOfRepo("leios-stable", snapshotName)).toBe(true);
+		const duplicate = await AptlyAPI.Tasks.run("create duplicate snapshot", (query) =>
+			AptlyAPIServer.getClient().postApiReposByNameSnapshots({
+				path: { name: "leios-stable" },
+				body: { Name: snapshotName },
+				query,
+			}),
+		);
+		expect(duplicate.error).toContain("already exists");
 
-        const duplicate = await AptlyAPI.Tasks.run("create duplicate snapshot", (query) =>
-            AptlyAPIServer.getClient().postApiReposByNameSnapshots({
-                path: { name: "leios-stable" },
-                body: { Name: snapshotName },
-                query
-            })
-        );
-        expect(duplicate.error).toContain("already exists");
+		await AptlyAPIServer.getClient().deleteApiSnapshotsByName({ path: { name: snapshotName } });
+	});
 
-        await AptlyAPIServer.getClient().deleteApiSnapshotsByName({ path: { name: snapshotName } });
-    });
+	test("Runs one aptly task at a time", async () => {
+		const events: string[] = [];
+		const cleanup = (label: string) =>
+			AptlyAPI.Tasks.run(label, (query) => {
+				events.push(`start ${label}`);
+				return AptlyAPIServer.getClient().postApiDbCleanup({ query });
+			}).then(() => events.push(`end ${label}`));
 
-    test("Runs one aptly task at a time", async () => {
-        const events: string[] = [];
-        const cleanup = (label: string) => AptlyAPI.Tasks.run(label, (query) => {
-            events.push(`start ${label}`);
-            return AptlyAPIServer.getClient().postApiDbCleanup({ query });
-        }).then(() => events.push(`end ${label}`));
+		await Promise.all([cleanup("first"), cleanup("second")]);
 
-        await Promise.all([cleanup("first"), cleanup("second")]);
+		expect(events).toEqual(["start first", "end first", "start second", "end second"]);
+	});
+});
 
-        expect(events).toEqual(["start first", "end first", "start second", "end second"]);
-    });
+describe("Live repository guard", () => {
+	// The preload published 'testing' and 'stable' into the local S3 server.
+	test("detects distributions that are published in the bucket", async () => {
+		expect(await AptlyUtils.isPublishedInBucket("testing")).toBe(true);
+		expect(await AptlyUtils.isPublishedInBucket("stable")).toBe(true);
+		expect(await AptlyUtils.isPublishedInBucket("not-a-distribution")).toBe(false);
+	});
 
+	test("allows publishing when Aptly knows every live distribution", async () => {
+		await AptlyUtils.assertNoUnknownLivePublications(["testing", "stable"]);
+	});
+
+	test("refuses to publish over a live repository that Aptly does not know", async () => {
+		// What a fresh LRA_APTLY_ROOT looks like next to an existing bucket.
+		await expect(AptlyUtils.assertNoUnknownLivePublications([])).rejects.toThrow(
+			/Refusing to publish 'testing'.*already published/,
+		);
+		await expect(AptlyUtils.assertNoUnknownLivePublications(["testing"])).rejects.toThrow(
+			/Refusing to publish 'stable'/,
+		);
+	});
 });

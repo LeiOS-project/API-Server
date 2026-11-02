@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { StablePromotionRequestsModel } from "../src/api/utils/shared-models/stableRequests";
 import { AdminStablePromotionRequestModel } from "../src/api/versions/v1/routes/admin/stable-promotion-requests/model";
+import { StablePromotionRequestsModel } from "../src/api/versions/v1/routes/packages/releases/stable-promotion-requests/model";
 
 describe("StableRequestModel schemas", () => {
 	test("accepts empty create payload", () => {
@@ -10,14 +10,17 @@ describe("StableRequestModel schemas", () => {
 	});
 
 	test("rejects extra fields in create payload", () => {
-		expect(() => StablePromotionRequestsModel.Create.Body.parse({ package_release_id: 42 } as any)).toThrow();
+		expect(() =>
+			StablePromotionRequestsModel.Create.Body.parse({ package_release_id: 42 } as any),
+		).toThrow();
 	});
 
 	test("rejects invalid architecture for copy body", () => {
-		expect(() => AdminStablePromotionRequestModel.Decide.Body.parse({
-			version: "1.2.3",
-			arch: "x86" as any
-		})).toThrow();
+		expect(() =>
+			AdminStablePromotionRequestModel.Decide.Body.parse({
+				version: "1.2.3",
+				arch: "x86" as any,
+			}),
+		).toThrow();
 	});
-
 });

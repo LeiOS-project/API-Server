@@ -1,219 +1,230 @@
-import { drizzle } from 'drizzle-orm/bun-sqlite';
-import * as TableSchema from './schema';
-import { randomBytes as crypto_randomBytes, createHash as crypto_createHash } from 'crypto';
-import { type DrizzleDB } from './utils';
-import { Logger } from '../utils/logger';
-import { eq } from 'drizzle-orm';
-import { ConfigHandler } from '../utils/config';
-import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
-import { mkdir as fs_mkdir } from 'fs/promises';
-import { dirname as path_dirname } from 'path';
-import { PermissionHelper } from '../utils/permission-helper';
+import { createHash as crypto_createHash, randomBytes as crypto_randomBytes } from "node:crypto";
+import { mkdir as fs_mkdir } from "node:fs/promises";
+import { dirname as path_dirname, join as path_join } from "node:path";
+import { eq } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/bun-sqlite";
+import { migrate } from "drizzle-orm/bun-sqlite/migrator";
+import { ConfigHandler } from "../utils/config";
+import { Logger } from "../utils/logger";
+import { PermissionHelper } from "../utils/permission-helper";
+import * as TableSchema from "./schema";
+import type { DrizzleDB } from "./utils";
 
 export class DB {
+	protected static db: DrizzleDB.BunSQLite;
 
-    protected static db: DrizzleDB;
+	static async init(
+		path: string,
+		autoMigrate: boolean,
+		configBaseDir: string,
+		migrationsFolder: string,
+	) {
+		await fs_mkdir(path_dirname(path), { recursive: true });
+		await fs_mkdir(configBaseDir, { recursive: true });
 
-    static async init(
-        path: string,
-        autoMigrate: boolean = false,
-        configBaseDir: string
-    ) {
+		this.db = drizzle(path);
+		if (autoMigrate) {
+			Logger.info("Running database migrations...");
 
-        await fs_mkdir(path_dirname(path), { recursive: true });
+			// `bun build --compile --asset ./drizzle/migrations` embeds the files as `migrations/...`
+			// next to the entry (`/$bunfs/root/migrations` on Linux) — without the `drizzle/` segment.
+			if (Bun.isStandaloneExecutable) {
+				migrationsFolder = path_join(import.meta.dir, "migrations");
+			}
 
-        this.db = drizzle(path);
-        if (autoMigrate) {
-            Logger.info("Running database migrations...");
-            await migrate(this.db, { migrationsFolder: "drizzle" });
-            Logger.info("Database migrations completed.");
-        }
+			await migrate(this.db, { migrationsFolder });
 
-        const admin_user_id = await this.createInitialAdminUserIfNeeded(configBaseDir);
-        await this.createInitialLeiOSPublisherIfNeeded(admin_user_id || 1);
-        await this.createInitialOSReleasesMetaIfNeeded();
+			Logger.info("Database migrations completed.");
+		}
 
-        Logger.info(`Database initialized at ${path}`);
-    }
+		const adminUserID = await this.createInitialAdminUserIfNeeded(configBaseDir);
+		await this.createInitialLeiOSPublisherIfNeeded(adminUserID ?? 1);
 
-    static async createInitialAdminUserIfNeeded(configBaseDir: string) {
-        const usersTableEmpty = (await this.db.select().from(DB.Tables.users).limit(1)).length === 0;
-        if (!usersTableEmpty) return;
+		Logger.info(`Database initialized at ${path}`);
+	}
 
-        const username = "admin";
+	private static async createInitialAdminUserIfNeeded(configBaseDir: string) {
+		const usersTableEmpty = (await this.db.select().from(DB.Tables.users).limit(1)).length === 0;
+		if (!usersTableEmpty) return;
 
-        const admin_user_id = await this.db.insert(DB.Tables.users).values({
-            username,
-            email: "admin@leios.local",
-            password_hash: await Bun.password.hash(crypto_randomBytes(32).toString('hex')),
-            display_name: "Default Administrator",
-            role: "admin"
-        }).returning().get().id;
+		const username = "admin";
+		const passwordResetToken = crypto_randomBytes(64).toString("hex");
 
-        const passwordResetToken = crypto_randomBytes(64).toString('hex');
-        await this.db.insert(DB.Tables.passwordResets).values({
-            token: crypto_createHash('sha256').update(passwordResetToken).digest('hex'),
-            user_id: admin_user_id,
-            expires_at: Date.now() + 7 * 24 * 60 * 60 * 1000 // 7 Days
-        });
+		let adminUserID: number;
+		try {
+			adminUserID = await this.db.transaction(async (tx) => {
+				const id = tx
+					.insert(DB.Tables.users)
+					.values({
+						username,
+						email: "admin@leios.local",
+						password_hash: await Bun.password.hash(crypto_randomBytes(32).toString("hex")),
+						display_name: "Default Administrator",
+						role: "admin",
+						// admin@leios.local cannot receive mail; the operator owns this account.
+						email_verified_at: Date.now(),
+					})
+					.returning()
+					.get().id;
 
-        const DASHBOARD_URL = ConfigHandler.getConfig()?.LRA_HUB_URL || "https://{DASHBOARD_URL}";
+				tx
+					.insert(DB.Tables.passwordResets)
+					.values({
+						// Same hash as hashResetToken() in routes/auth/reset-password, which consumes it.
+						token: crypto_createHash("sha256").update(passwordResetToken).digest("hex"),
+						user_id: id,
+						expires_at: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 Days
+					})
+					.run();
 
-        Bun.write(`${configBaseDir}/initial_admin_password_reset_token.txt`, `${DASHBOARD_URL}/auth/reset-password?token=${passwordResetToken}`, {
-            mode: 0o600,
-            createPath: true
-        });
+				return id;
+			});
+		} catch (error) {
+			Logger.critical("Failed to create initial admin user:", error);
+			throw error;
+		}
 
-        Logger.info(
-            `Initial admin user created with username: ${username}.\n` +
-            `You can set the password under ${DASHBOARD_URL}/auth/reset-password?token=${passwordResetToken}\n` +
-            `The url is also safed at ${configBaseDir}/initial_admin_password_reset_token.txt\n`
-        );
+		const HUB_URL = ConfigHandler.getConfig()?.HUB_URL ?? "https://<hub-url>";
+		const resetUrl = `${HUB_URL}/auth/reset-password?token=${passwordResetToken}`;
+		const tokenFile = `${configBaseDir}/initial_admin_password_reset_token.txt`;
 
-        return admin_user_id;
-    }
+		await Bun.write(tokenFile, resetUrl, { mode: 0o600, createPath: true });
 
-    static async createInitialOSReleasesMetaIfNeeded() {
+		Logger.info(
+			`Initial admin user created with username: ${username}.\n` +
+				`You can set the password under ${resetUrl}\n` +
+				`The URL is also saved at ${tokenFile}\n`,
+		);
 
-        // const initalReleaseExists = await this.db.select().from(DB.Tables.os_releases).where(
-        //     eq(DB.Tables.os_releases.version, "0000.00.000")
-        // ).get();
+		return adminUserID;
+	}
 
-        // if (!initalReleaseExists) {
-        //     const taskID = await this.db.insert(DB.Tables.scheduled_tasks).values({
-        //         function: "os-release:create",
-        //         status: "completed",
-        //         created_at: new Date(0).getTime(),
-        //         args: {}
-        //     }).returning().get().id;
+	private static async createInitialLeiOSPublisherIfNeeded(admin_user_id: number) {
+		const publisherExists = await this.db
+			.select()
+			.from(DB.Tables.publishers)
+			.where(eq(DB.Tables.publishers.name, "leios"))
+			.get();
 
-        //     await this.db.insert(DB.Tables.os_releases).values({
-        //         version: "0000.00.000",
-        //         changelog: "Initial placeholder release",
-        //         taskID,
-        //         created_at: new Date(0).getTime(),
-        //     });
-        //     Logger.info("Created initial OS release metadata entry (version 0000.00.000)");
-        // }
+		if (publisherExists) {
+			Logger.info("LeiOS Project publisher already exists. Skipping creation.");
+			return;
+		}
 
-        // no longr used, remove any existing placeholder entries
-        // await this.db.delete(DB.Tables.os_releases).where(
-        //     eq(DB.Tables.os_releases.version, "0000.00.0")
-        // );
-        // await this.db.delete(DB.Tables.os_releases).where(
-        //     eq(DB.Tables.os_releases.version, "0000.00.00")
-        // );
-    }
+		const adminUserExists = await this.db
+			.select()
+			.from(DB.Tables.users)
+			.where(eq(DB.Tables.users.id, admin_user_id))
+			.get();
 
-    static async createInitialLeiOSPublisherIfNeeded(admin_user_id: number) {
+		if (!adminUserExists) {
+			throw new Error(
+				`Admin user with ID ${admin_user_id} does not exist. Cannot create initial LeiOS publisher.`,
+			);
+		}
 
-        const publisherExists = await this.db.select().from(DB.Tables.publishers).where(
-            eq(DB.Tables.publishers.name, "leios")
-        ).get();
+		await this.db.transaction(async (tx) => {
+			const publisherID = await tx
+				.insert(DB.Tables.publishers)
+				.values({
+					name: "leios",
 
-        if (publisherExists) {
-            Logger.info("LeiOS Project publisher already exists. Skipping creation.");
-            return;
-        }
+					display_name: "LeiOS Project",
+					description: "Official LeiOS Project Publisher",
+					homepage_url: "https://www.leios.dev",
 
-        const adminUserExists = await this.db.select().from(DB.Tables.users).where(
-            eq(DB.Tables.users.id, admin_user_id)
-        ).get();
+					owner_user_id: admin_user_id,
 
-        if (!adminUserExists) {
-            throw new Error(`Admin user with ID ${admin_user_id} does not exist. Cannot create initial LeiOS publisher.`);
-        }
+					maintainer_contact_name: "LeiOS Project Team",
+					maintainer_contact_email: "support@leios.dev",
+				})
+				.returning()
+				.get().id;
 
-        await this.db.transaction(async (tx) => {
+			await tx.insert(DB.Tables.publisherMembers).values({
+				publisher_id: publisherID,
+				role: PermissionHelper.OrgRoles.ADMIN,
+				user_id: admin_user_id,
+			});
 
-            const publisherID = await tx.insert(DB.Tables.publishers).values({
-                name: "leios",
+			Logger.info("Created initial LeiOS Project publisher and assigned admin user.");
+		});
+	}
 
-                display_name: "LeiOS Project",
-                description: "Official LeiOS Project Publisher",
-                homepage_url: "https://www.leios.dev",
+	static instance() {
+		if (!this.db) {
+			throw new Error("Database not initialized. Call DB.init() first.");
+		}
+		return DB.db;
+	}
 
-                owner_user_id: admin_user_id,
+	static async close() {
+		if (!this.db) return;
 
-                maintainer_contact_name: "LeiOS Project Team",
-                maintainer_contact_email: "support@leios.dev"
-            }).returning().get().id;
+		Logger.info("Database connection closed.");
+		await this.db.$client.close();
 
-            await tx.insert(DB.Tables.publisherMembers).values({
-                publisher_id: publisherID,
-                role: PermissionHelper.OrgRoles.ADMIN,
-                user_id: admin_user_id
-            });
-
-            Logger.info("Created initial LeiOS Project publisher and assigned admin user.");
-        });
-
-    }
-
-    static instance() {
-        if (!this.db) {
-            throw new Error('Database not initialized. Call DB.init() first.');
-        }
-        return DB.db;
-    }
-
-    static async close() {
-        if (!this.db) return;
-
-        Logger.info("Database connection closed.");
-        this.db.$client.close();
-        await Bun.sleep(100);
-    }
-
+		// Release the OS file handle now (unfinalized statements hold it until GC), e.g. for
+		// tests that delete the DB directory right after closing.
+		Bun.gc(true);
+		await Bun.sleep(500);
+	}
 }
 
-
 export namespace DB.Tables {
-    export const users = TableSchema.users;
-    export const sessions = TableSchema.sessions;
-    export const passwordResets = TableSchema.passwordResets;
-    export const apiKeys = TableSchema.apiKeys;
+	export const users = TableSchema.users;
+	export const sessions = TableSchema.sessions;
+	export const passwordResets = TableSchema.passwordResets;
+	export const emailVerifications = TableSchema.emailVerifications;
+	export const apiKeys = TableSchema.apiKeys;
 
-    export const publishers = TableSchema.publishers;
-    export const publisherMembers = TableSchema.publisherMembers;
+	export const publishers = TableSchema.publishers;
+	export const publisherMembers = TableSchema.publisherMembers;
 
-    export const roleAssignments = TableSchema.roleAssignments;
+	export const roleAssignments = TableSchema.roleAssignments;
 
-    export const packages = TableSchema.packages;
-    export const packageReleases = TableSchema.packageReleases;
-    export const packagesFullView = TableSchema.packagesFullView;
+	export const packages = TableSchema.packages;
+	export const packageReleases = TableSchema.packageReleases;
+	export const packagesFullView = TableSchema.packagesFullView;
 
-    export const stablePromotionRequests = TableSchema.stablePromotionRequests;
+	export const stablePromotionRequests = TableSchema.stablePromotionRequests;
 
-    export const os_releases = TableSchema.os_releases;
+	export const os_releases = TableSchema.os_releases;
 
-    export const scheduled_tasks = TableSchema.scheduled_tasks;
-    export const scheduled_tasks_paused_state = TableSchema.scheduled_tasks_paused_state;
+	export const scheduled_tasks = TableSchema.scheduled_tasks;
+	export const scheduled_tasks_paused_state = TableSchema.scheduled_tasks_paused_state;
 
-    export const metadata = TableSchema.metadata;
+	export const metadata = TableSchema.metadata;
+
+	export const auditLog = TableSchema.auditLog;
+	export const reports = TableSchema.reports;
 }
 
 export namespace DB.Models {
-    export type User = typeof DB.Tables.users.$inferSelect;
-    export type Session = typeof DB.Tables.sessions.$inferSelect;
-    export type PasswordReset = typeof DB.Tables.passwordResets.$inferSelect;
-    export type ApiKey = typeof DB.Tables.apiKeys.$inferSelect;
+	export type User = typeof DB.Tables.users.$inferSelect;
+	export type Session = typeof DB.Tables.sessions.$inferSelect;
+	export type PasswordReset = typeof DB.Tables.passwordResets.$inferSelect;
+	export type EmailVerification = typeof DB.Tables.emailVerifications.$inferSelect;
+	export type ApiKey = typeof DB.Tables.apiKeys.$inferSelect;
 
-    export type Publisher = typeof DB.Tables.publishers.$inferSelect;
-    export type PublisherMember = typeof DB.Tables.publisherMembers.$inferSelect;
+	export type Publisher = typeof DB.Tables.publishers.$inferSelect;
+	export type PublisherMember = typeof DB.Tables.publisherMembers.$inferSelect;
 
-    export type RoleAssignment = typeof DB.Tables.roleAssignments.$inferSelect;
+	export type RoleAssignment = typeof DB.Tables.roleAssignments.$inferSelect;
 
-    export type Package = typeof DB.Tables.packages.$inferSelect;
-    export type PackageRelease = typeof DB.Tables.packageReleases.$inferSelect;
-    export type PackageFullView = typeof DB.Tables.packagesFullView.$inferSelect;
+	export type Package = typeof DB.Tables.packages.$inferSelect;
+	export type PackageRelease = typeof DB.Tables.packageReleases.$inferSelect;
+	export type PackageFullView = typeof DB.Tables.packagesFullView.$inferSelect;
 
-    export type StablePromotionRequest = typeof DB.Tables.stablePromotionRequests.$inferSelect;
+	export type StablePromotionRequest = typeof DB.Tables.stablePromotionRequests.$inferSelect;
 
-    export type OSRelease = typeof DB.Tables.os_releases.$inferSelect;
+	export type OSRelease = typeof DB.Tables.os_releases.$inferSelect;
 
-    export type ScheduledTask = typeof DB.Tables.scheduled_tasks.$inferSelect;
-    export type ScheduledTaskPausedState = typeof DB.Tables.scheduled_tasks_paused_state.$inferSelect;
+	export type ScheduledTask = typeof DB.Tables.scheduled_tasks.$inferSelect;
+	export type ScheduledTaskPausedState = typeof DB.Tables.scheduled_tasks_paused_state.$inferSelect;
 
-    export type Metadata = typeof DB.Tables.metadata.$inferSelect;
+	export type Metadata = typeof DB.Tables.metadata.$inferSelect;
+
+	export type AuditLogEntry = typeof DB.Tables.auditLog.$inferSelect;
+	export type Report = typeof DB.Tables.reports.$inferSelect;
 }
